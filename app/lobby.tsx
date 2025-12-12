@@ -62,12 +62,15 @@ export default function Lobby() {
             });
 
             const host = nextPlayers.find((p) => p.isHost);
+            const hostPresence = presences.find((p) => p?.player?.isHost);
+            const hostSettings = hostPresence?.room?.settings;
 
             setGameState((prev) => {
                 if (!prev) return prev;
                 return {
                     ...prev,
                     hostId: host?.id || prev.hostId,
+                    settings: hostSettings || prev.settings,
                     players: nextPlayers.length ? nextPlayers : prev.players,
                 };
             });

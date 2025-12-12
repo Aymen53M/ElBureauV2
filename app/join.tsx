@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 export default function JoinRoom() {
     const router = useRouter();
@@ -25,27 +26,82 @@ export default function JoinRoom() {
     const handleJoin = async () => {
         if (!canJoin) return;
 
+        if (!supabase || !isSupabaseConfigured) {
+            Alert.alert('Supabase', 'Realtime is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+            return;
+        }
+
+        const supabaseClient = supabase;
+
         setIsJoining(true);
 
-        // Simulate joining (in real app, would connect to server)
-        setTimeout(() => {
-            const joiningPlayer = {
-                id: 'player-' + Date.now(),
-                name: localPlayerName,
-                score: 0,
-                isHost: false,
-                isReady: false,
-                usedBets: [],
-                hasApiKey: !!apiKey,
-            };
+        const normalizedRoomCode = roomCode.toUpperCase();
+        const joiningPlayer = {
+            id: 'player-' + Date.now(),
+            name: localPlayerName,
+            score: 0,
+            isHost: false,
+            isReady: false,
+            usedBets: [],
+            hasApiKey: !!apiKey,
+        };
+
+        const channel = supabaseClient.channel(`room:${normalizedRoomCode}`, {
+            config: {
+                presence: { key: joiningPlayer.id },
+            },
+        });
+
+        const cleanup = () => {
+            try {
+                supabaseClient.removeChannel(channel);
+            } catch {
+                // noop
+            }
+        };
+
+        try {
+            const probe = await new Promise<{ hostId: string; settings?: any }>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('ROOM_NOT_FOUND'));
+                }, 5000);
+
+                const check = () => {
+                    const state = channel.presenceState();
+                    const presences: any[] = Object.values(state).flat();
+                    const hostPresence = presences.find((p) => p?.player?.isHost);
+                    if (hostPresence?.player?.id) {
+                        clearTimeout(timeout);
+                        resolve({ hostId: hostPresence.player.id, settings: hostPresence?.room?.settings });
+                    }
+                };
+
+                channel.on('presence', { event: 'sync' }, check);
+                channel.on('presence', { event: 'join' }, check);
+
+                channel.subscribe(async (status: string) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel.track({ player: joiningPlayer });
+                        check();
+                        return;
+                    }
+
+                    if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                        clearTimeout(timeout);
+                        reject(new Error(status));
+                    }
+                });
+            });
+
+            cleanup();
 
             setGameState({
-                roomCode: roomCode.toUpperCase(),
+                roomCode: normalizedRoomCode,
                 phase: 'lobby',
                 players: [joiningPlayer],
                 currentQuestion: 0,
                 questions: [],
-                settings: {
+                settings: probe.settings || {
                     theme: 'movies',
                     difficulty: 'medium',
                     numberOfQuestions: 10,
@@ -54,17 +110,26 @@ export default function JoinRoom() {
                     language,
                     hintsEnabled: true,
                 },
-                hostId: 'pending',
+                hostId: probe.hostId,
                 hostApiKey: undefined,
                 playerApiKeys: apiKey ? { [joiningPlayer.id]: apiKey } : {},
                 answers: {},
             });
 
             setCurrentPlayer(joiningPlayer);
-
             setIsJoining(false);
             router.push('/lobby');
-        }, 1000);
+        } catch (err) {
+            cleanup();
+            setIsJoining(false);
+            const code = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
+            Alert.alert(
+                t('joinRoom'),
+                code === 'ROOM_NOT_FOUND'
+                    ? t('enterHostCode')
+                    : `Failed to join room (${code}).`
+            );
+        }
     };
 
     return (
