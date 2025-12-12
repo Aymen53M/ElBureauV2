@@ -11,7 +11,7 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 export default function Lobby() {
     const router = useRouter();
@@ -19,18 +19,26 @@ export default function Lobby() {
     const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
 
     const channelRef = React.useRef<any>(null);
+    const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+    const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
 
     // Navigate away if no game state - using useEffect to avoid setState during render
     useEffect(() => {
-        if (!gameState) {
+        if (gameState) return;
+        const timeout = setTimeout(() => {
             router.replace('/');
-        }
+        }, 350);
+        return () => clearTimeout(timeout);
     }, [gameState, router]);
 
     useEffect(() => {
-        if (!gameState?.roomCode || !currentPlayer?.id) return;
+        if (!supabase || !gameState?.roomCode || !currentPlayer?.id) return;
 
-        const channel = supabase.channel(`room:${gameState.roomCode}`, {
+        const supabaseClient = supabase;
+        setRealtimeStatus('connecting');
+        setRealtimeError(null);
+
+        const channel = supabaseClient.channel(`room:${gameState.roomCode}`, {
             config: {
                 presence: { key: currentPlayer.id },
             },
@@ -70,22 +78,40 @@ export default function Lobby() {
         channel.on('presence', { event: 'leave' }, syncPlayers);
 
         channel.subscribe(async (status: string) => {
-            if (status !== 'SUBSCRIBED') return;
-            await channel.track({
-                player: currentPlayer,
-                room: currentPlayer.isHost ? { settings: gameState.settings } : undefined,
-            });
+            if (status === 'SUBSCRIBED') {
+                setRealtimeStatus('connected');
+                await channel.track({
+                    player: currentPlayer,
+                    room: currentPlayer.isHost ? { settings: gameState.settings } : undefined,
+                });
+                syncPlayers();
+                return;
+            }
+
+            if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                setRealtimeStatus('error');
+                setRealtimeError(status);
+            }
         });
 
         return () => {
-            supabase.removeChannel(channel);
+            supabaseClient.removeChannel(channel);
             channelRef.current = null;
+            setRealtimeStatus('idle');
         };
     }, [currentPlayer?.id, gameState?.roomCode]);
 
-    // Show nothing while redirecting
     if (!gameState) {
-        return null;
+        return (
+            <SafeAreaView className="flex-1 bg-background">
+                <ScreenBackground variant="default" />
+                <View className="flex-1 items-center justify-center p-7">
+                    <Text className="text-base font-display font-semibold text-foreground">
+                        {t('loading')}
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
     }
 
     const isHost = !!currentPlayer?.id && currentPlayer.id === gameState.hostId;
@@ -155,6 +181,30 @@ export default function Lobby() {
                 </View>
 
                 <View className="max-w-2xl mx-auto w-full space-y-12">
+                    {!isSupabaseConfigured && (
+                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                            <CardContent className="p-5 space-y-2">
+                                <Text className="font-display font-bold text-foreground">Realtime not configured</Text>
+                                <Text className="text-sm text-muted-foreground">
+                                    This deployment is missing Supabase environment variables. Set EXPO_PUBLIC_SUPABASE_URL and
+                                    EXPO_PUBLIC_SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY) in Vercel,
+                                    then redeploy.
+                                </Text>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {isSupabaseConfigured && realtimeStatus === 'error' && (
+                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                            <CardContent className="p-5 space-y-2">
+                                <Text className="font-display font-bold text-foreground">Realtime connection error</Text>
+                                <Text className="text-sm text-muted-foreground">
+                                    {realtimeError || 'Unknown error'}
+                                </Text>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Room Code */}
                     <Card className="border-primary/30 rounded-3xl" style={{
                         shadowColor: '#C97B4C',
