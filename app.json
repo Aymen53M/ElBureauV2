@@ -5,12 +5,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "scheme": "elbureau",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0D1321"
+      "backgroundColor": "#F7F1E6"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -21,13 +21,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0D1321"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F7F1E6"
       },
       "package": "com.elbureau.quiz"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./public/favicon.ico",
       "bundler": "metro"
     },
     "plugins": [
@@ -38,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d41f9a4-23fe-4d07-8e61-45da74abec3d"
+      }
     }
   }
 }

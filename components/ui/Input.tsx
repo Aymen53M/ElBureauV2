@@ -19,7 +19,7 @@ const Input: React.FC<InputProps> = ({
                     "h-12 w-full rounded-xl border border-border bg-input px-4 text-base text-foreground",
                     className
                 )}
-                placeholderTextColor="#8FA3B8"
+                placeholderTextColor="#7B6657"
                 style={styles.input}
                 {...props}
             />

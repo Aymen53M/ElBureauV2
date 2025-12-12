@@ -7,13 +7,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
 
 export default function Lobby() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const { gameState, setGameState } = useGame();
 
     // Navigate away if no game state - using useEffect to avoid setState during render
@@ -63,20 +64,21 @@ export default function Lobby() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="default" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-7 max-w-4xl w-full self-center pb-16 space-y-12"
             >
                 {/* Header */}
-                <View className="flex-row items-center gap-4 mb-8 pt-8">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
                     <TouchableOpacity onPress={() => router.replace('/')} className="p-2">
-                        <Ionicons name="arrow-back" size={24} color="#F5FFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <View className="flex-1" />
                     {isHost && (
                         <TouchableOpacity onPress={() => router.push('/create')} className="p-2">
-                            <Ionicons name="settings-outline" size={20} color="#F5FFFF" />
+                            <Ionicons name="settings-outline" size={20} color="#2B1F17" />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -84,7 +86,7 @@ export default function Lobby() {
                 <View className="max-w-2xl mx-auto w-full space-y-12">
                     {/* Room Code */}
                     <Card className="border-primary/30 rounded-3xl" style={{
-                        shadowColor: '#00D4AA',
+                        shadowColor: '#C97B4C',
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.5,
                         shadowRadius: 20,
@@ -94,14 +96,14 @@ export default function Lobby() {
                             <Text className="text-sm text-muted-foreground mb-2">{t('roomCode')}</Text>
                             <View className="flex-row items-center gap-4">
                                 <Text className="text-5xl font-display font-bold tracking-widest text-primary" style={{
-                                    textShadowColor: '#00D4AA',
+                                    textShadowColor: '#C97B4C',
                                     textShadowOffset: { width: 0, height: 0 },
                                     textShadowRadius: 15,
                                 }}>
                                     {gameState.roomCode}
                                 </Text>
                                 <TouchableOpacity onPress={copyRoomCode} className="p-2">
-                                    <Ionicons name="copy-outline" size={20} color="#F5FFFF" />
+                                    <Ionicons name="copy-outline" size={20} color="#2B1F17" />
                                 </TouchableOpacity>
                             </View>
                             <Text className="text-sm text-muted-foreground mt-4 text-center">
@@ -194,7 +196,7 @@ export default function Lobby() {
                                 className="w-full"
                             >
                                 <View className="flex-row items-center gap-2">
-                                    <Ionicons name="play" size={24} color="#0D1321" />
+                                    <Ionicons name="play" size={24} color="#FFF8EF" />
                                     <Text className="text-lg font-display font-bold text-primary-foreground">
                                         {t('startGame')}
                                     </Text>

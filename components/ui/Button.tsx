@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { twMerge } from 'tailwind-merge';
 
@@ -60,7 +60,7 @@ const Button: React.FC<ButtonProps> = ({
                 style={[disabled && styles.disabled]}
             >
                 <LinearGradient
-                    colors={['#00D4AA', '#00B894']}
+                    colors={['#6B3F23', '#C97B4C']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     className={twMerge(`h-16 px-10 rounded-2xl items-center justify-center`, className)}
@@ -93,28 +93,28 @@ const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
     heroShadow: {
-        shadowColor: '#00D4AA',
+        shadowColor: '#C97B4C',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 20,
         elevation: 10,
     },
     primaryShadow: {
-        shadowColor: '#00D4AA',
+        shadowColor: '#6B3F23',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 15,
         elevation: 8,
     },
     secondaryShadow: {
-        shadowColor: '#F06543',
+        shadowColor: '#C83A32',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 15,
         elevation: 8,
     },
     accentShadow: {
-        shadowColor: '#FFCC00',
+        shadowColor: '#D4A72C',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 15,

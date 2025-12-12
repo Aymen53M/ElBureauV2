@@ -8,16 +8,29 @@ import QuestionCard from '@/components/QuestionCard';
 import BetSelector from '@/components/BetSelector';
 import Timer from '@/components/Timer';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player } from '@/contexts/GameContext';
 import { generateQuestions } from '@/services/questionService';
 
 type AnswerBoard = Record<string, { answer?: string; isCorrect?: boolean; hasAnswered: boolean }>;
 
+const LOADING_MESSAGES = [
+    { en: 'Brewing questions...', fr: 'Préparation des questions...', ar: 'جاري تحضير الأسئلة...' },
+    { en: 'Consulting the AI oracle...', fr: "Consultation de l'oracle IA...", ar: 'استشارة أوراكل الذكاء الاصطناعي...' },
+    { en: 'Making it fun...', fr: 'On rend ça fun...', ar: 'نجعلها ممتعة...' },
+    { en: 'Almost ready!', fr: 'Presque prêt!', ar: 'تقريباً جاهز!' },
+] as const;
+
 export default function Game() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey } = useGame();
+
+    const gameStateRef = React.useRef(gameState);
+    useEffect(() => {
+        gameStateRef.current = gameState;
+    }, [gameState]);
 
     const [phase, setPhase] = useState<GamePhase>('betting');
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
@@ -36,16 +49,12 @@ export default function Game() {
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
 
-    const loadingMessages = [
-        { en: 'Brewing questions...', fr: 'Préparation des questions...', ar: 'جاري تحضير الأسئلة...' },
-        { en: 'Consulting the AI oracle...', fr: "Consultation de l'oracle IA...", ar: 'استشارة أوراكل الذكاء الاصطناعي...' },
-        { en: 'Making it fun...', fr: 'On rend ça fun...', ar: 'نجعلها ممتعة...' },
-        { en: 'Almost ready!', fr: 'Presque prêt!', ar: 'تقريباً جاهز!' },
-    ];
-
     const activePlayer: Player | undefined = useMemo(() => {
         if (!gameState) return undefined;
-        return currentPlayer || gameState.players.find((p) => p.isHost) || gameState.players[0];
+        if (currentPlayer?.id) {
+            return gameState.players.find((p) => p.id === currentPlayer.id) || currentPlayer;
+        }
+        return gameState.players.find((p) => p.isHost) || gameState.players[0];
     }, [gameState, currentPlayer]);
 
     const activeQuestion = useMemo(() => {
@@ -72,13 +81,14 @@ export default function Game() {
     };
 
     useEffect(() => {
-        if (!gameState) {
+        const snapshot = gameStateRef.current;
+        if (!snapshot) {
             router.replace('/');
             return;
         }
 
         const board: AnswerBoard = {};
-        gameState.players.forEach((p) => {
+        snapshot.players.forEach((p) => {
             board[p.id] = { hasAnswered: false };
         });
         setAnswerBoard(board);
@@ -88,20 +98,20 @@ export default function Game() {
 
             let messageIndex = 0;
             const messageInterval = setInterval(() => {
-                const msg = loadingMessages[messageIndex % loadingMessages.length];
-                setLoadingMessage(msg[gameState.settings.language] || msg.en);
+                const msg = LOADING_MESSAGES[messageIndex % LOADING_MESSAGES.length];
+                setLoadingMessage(msg[snapshot.settings.language] || msg.en);
                 messageIndex++;
             }, 1500);
 
             try {
-                const hostKey = gameState.hostApiKey || apiKey;
+                const hostKey = snapshot.hostApiKey || apiKey;
                 if (!hostKey) {
                     Alert.alert(t('apiKey'), t('missingApiKeyHost'));
                     router.replace('/settings');
                     return;
                 }
 
-                const result = await generateQuestions(gameState.settings, hostKey);
+                const result = await generateQuestions(snapshot.settings, hostKey);
 
                 clearInterval(messageInterval);
 
@@ -126,16 +136,17 @@ export default function Game() {
         };
 
         loadQuestions();
-    }, []);
+    }, [apiKey, router, t]);
 
     if (!gameState || !activePlayer) return null;
 
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background items-center justify-center p-4">
+                <ScreenBackground variant="game" />
                 <Logo size="lg" animated />
                 <View className="mt-8 items-center max-w-2xl">
-                    <ActivityIndicator size="large" color="#00D4AA" />
+                    <ActivityIndicator size="large" color="#C97B4C" />
                     <Text className="text-2xl font-display font-bold text-foreground mt-4 text-center">
                         {loadingMessage || 'Loading...'}
                     </Text>
@@ -149,6 +160,12 @@ export default function Game() {
 
     const handleBetConfirm = () => {
         if (!selectedBet) return;
+
+        if (activePlayer.usedBets?.includes(selectedBet)) {
+            Alert.alert(t('placeBet'), t('betAlreadyUsed'));
+            setSelectedBet(null);
+            return;
+        }
 
         setGameState((prev) => {
             if (!prev) return prev;
@@ -343,12 +360,13 @@ export default function Game() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="game" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-7 max-w-5xl w-full self-center pb-16 space-y-10"
             >
                 {/* Header */}
-                <View className="flex-row items-center justify-between mb-9 pt-12">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between mb-9 pt-12`}>
                     <Logo size="sm" animated={false} />
                     <View className="flex-row items-center gap-4">
                         <Text className="text-sm text-muted-foreground">
@@ -366,7 +384,7 @@ export default function Game() {
                         <View className="space-y-7">
                             {/* Show the Question First */}
                             <Card className="border-primary/30 rounded-3xl" style={{
-                                shadowColor: '#00D4AA',
+                                shadowColor: '#C97B4C',
                                 shadowOffset: { width: 0, height: 0 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 20,
@@ -405,7 +423,7 @@ export default function Game() {
 
                             {/* Bet Selector Below Question */}
                             <Card className="border-accent/30 rounded-3xl" style={{
-                                shadowColor: '#FFCC00',
+                                shadowColor: '#D4A72C',
                                 shadowOffset: { width: 0, height: 0 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 20,

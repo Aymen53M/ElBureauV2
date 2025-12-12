@@ -12,8 +12,8 @@ interface PlayerAvatarProps {
 }
 
 const avatarColors = [
-    '#00D4AA', '#F06543', '#FFCC00', '#FF66AA',
-    '#8B5CF6', '#00FFFF', '#00FF88', '#FF8C42'
+    '#6B3F23', '#C97B4C', '#C83A32', '#2D9C93',
+    '#D4A72C', '#3C8C6E', '#D1497B', '#D9822B'
 ];
 
 const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
@@ -85,7 +85,7 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
 
 const styles = StyleSheet.create({
     readyShadow: {
-        shadowColor: '#00FF88',
+        shadowColor: '#3C8C6E',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 10,

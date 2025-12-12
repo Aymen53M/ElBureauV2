@@ -7,12 +7,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
 
 export default function JoinRoom() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const { playerName, apiKey, setGameState, setCurrentPlayer } = useGame();
 
     const [roomCode, setRoomCode] = useState('');
@@ -79,15 +80,16 @@ export default function JoinRoom() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="default" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-7 flex-1 justify-center max-w-md w-full self-center space-y-8"
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
-                <View className="flex-row items-center gap-4 mb-8 pt-8">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
                     <TouchableOpacity onPress={() => router.back()} className="p-2">
-                        <Ionicons name="arrow-back" size={24} color="#F5FFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <Text className="text-2xl font-display font-bold text-foreground flex-1">
@@ -99,7 +101,7 @@ export default function JoinRoom() {
                     <Card className="rounded-3xl">
                         <CardHeader className="items-center space-y-4 pt-2">
                             <View className="w-20 h-20 rounded-full bg-secondary/20 items-center justify-center mb-4">
-                                <Ionicons name="people" size={40} color="#F06543" />
+                                <Ionicons name="people" size={40} color="#C83A32" />
                             </View>
                             <CardTitle>{t('joinRoom')}</CardTitle>
                             <CardDescription className="text-center">

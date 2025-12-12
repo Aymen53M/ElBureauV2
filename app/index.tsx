@@ -1,33 +1,82 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Logo from '@/components/Logo';
+import { Asset } from 'expo-asset';
 import Button from '@/components/ui/Button';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+const floatingLogo = require('../assets/Flowting Logo.png');
+
 export default function Index() {
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
+    const { width } = useWindowDimensions();
+
+    const [logoError, setLogoError] = useState(false);
+
+    const floatAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        let mounted = true;
+        Asset.fromModule(floatingLogo)
+            .downloadAsync()
+            .then(() => {
+                if (mounted) setLogoError(false);
+            })
+            .catch(() => {
+                if (mounted) setLogoError(true);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const animation = Animated.loop(
+            Animated.sequence([
+                Animated.timing(floatAnim, {
+                    toValue: 1,
+                    duration: 1600,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(floatAnim, {
+                    toValue: 0,
+                    duration: 1600,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        animation.start();
+        return () => animation.stop();
+    }, [floatAnim]);
+
+    const translateY = floatAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -10],
+    });
+
+    const rotate = floatAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', isRTL ? '-1.2deg' : '1.2deg'],
+    });
+
+    const logoWidth = Math.max(260, Math.min(520, Math.round(width * 0.92)));
+    const logoHeight = Math.round(logoWidth * 0.62);
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <View className="absolute inset-0 overflow-hidden">
-                <View className="absolute top-20 left-4 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
-                <View className="absolute bottom-20 right-4 w-80 h-80 rounded-full bg-secondary/10 blur-3xl" />
-                <View className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-accent/5 blur-3xl" />
-                <Text className="absolute top-12 right-8 text-4xl opacity-20">🎯</Text>
-                <Text className="absolute bottom-32 left-8 text-3xl opacity-20">🎲</Text>
-                <Text className="absolute top-32 right-24 text-2xl opacity-20">✨</Text>
-                <Text className="absolute bottom-20 right-24 text-3xl opacity-20">🏆</Text>
-            </View>
+            <ScreenBackground variant="home" />
 
-            <View className="flex-row items-center justify-between px-6 pt-12 pb-8 max-w-5xl w-full self-center">
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 pt-12 pb-8 max-w-5xl w-full self-center`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
                     <TouchableOpacity className="p-2">
-                        <Ionicons name="settings-outline" size={24} color="#F5FFFF" />
+                        <Ionicons name="settings-outline" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                 </Link>
             </View>
@@ -38,7 +87,20 @@ export default function Index() {
             >
                 <View className="items-center space-y-12 w-full">
                     <View className="mb-6">
-                        <Logo size="xl" animated />
+                        <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
+                            {!logoError ? (
+                                <Animated.Image
+                                    source={floatingLogo}
+                                    resizeMode="contain"
+                                    style={{ width: logoWidth, height: logoHeight }}
+                                    onError={() => setLogoError(true)}
+                                />
+                            ) : (
+                                <View style={{ width: logoWidth, height: logoHeight }} className="items-center justify-center">
+                                    <Text className="text-5xl font-display font-bold text-primary">ElBureau</Text>
+                                </View>
+                            )}
+                        </Animated.View>
                     </View>
                     <Text className="text-xl text-muted-foreground font-display text-center">
                         {t('tagline')}
@@ -47,7 +109,7 @@ export default function Index() {
                         <Link href="/create" asChild>
                             <Button variant="hero" className="w-full rounded-full py-5">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="add-circle-outline" size={24} color="#0D1321" />
+                                    <Ionicons name="add-circle-outline" size={24} color="#FFF8EF" />
                                     <Text className="text-lg font-display font-bold text-primary-foreground">
                                         {t('createRoom')}
                                     </Text>
@@ -58,7 +120,7 @@ export default function Index() {
                         <Link href="/join" asChild>
                             <Button variant="secondary" size="lg" className="w-full">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="people-outline" size={20} color="#0D1321" />
+                                    <Ionicons name="people-outline" size={20} color="#FFF8EF" />
                                     <Text className="font-display font-semibold text-secondary-foreground">
                                         {t('joinRoom')}
                                     </Text>
@@ -69,7 +131,7 @@ export default function Index() {
                         <Link href="/how-to-play" asChild>
                             <Button variant="outline" size="lg" className="w-full">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="help-circle-outline" size={20} color="#00D4AA" />
+                                    <Ionicons name="help-circle-outline" size={20} color="#6B3F23" />
                                     <Text className="font-display font-semibold text-primary">
                                         {t('howToPlay')}
                                     </Text>

@@ -49,7 +49,7 @@ const BetSelector: React.FC<BetSelectorProps> = ({
                                     : 'bg-muted border-2 border-border'
                                 }`}
                             style={isSelected ? {
-                                shadowColor: '#FFCC00',
+                                shadowColor: '#D4A72C',
                                 shadowOffset: { width: 0, height: 0 },
                                 shadowOpacity: 0.5,
                                 shadowRadius: 15,

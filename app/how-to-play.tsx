@@ -5,11 +5,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, CardContent } from '@/components/ui/Card';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HowToPlay() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
 
     const steps = [
         { icon: '🎯', titleKey: 'htpStep1Title', descKey: 'htpStep1Desc' },
@@ -21,14 +22,15 @@ export default function HowToPlay() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="default" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-4 max-w-3xl w-full self-center pb-10"
             >
                 {/* Header */}
-                <View className="flex-row items-center gap-4 mb-8 pt-8">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
                     <TouchableOpacity onPress={() => router.back()} className="p-2">
-                        <Ionicons name="arrow-back" size={24} color="#F5FFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <Text className="text-2xl font-display font-bold text-foreground flex-1">

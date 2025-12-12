@@ -74,6 +74,7 @@ export const translations: Translations = {
     question: { en: 'Question', fr: 'Question', ar: 'سؤال' },
     placeBet: { en: 'Place Your Bet', fr: 'Placez Votre Pari', ar: 'ضع رهانك' },
     betDescription: { en: 'Choose wisely! Each number can only be used once.', fr: 'Choisissez bien! Chaque nombre ne peut être utilisé qu\'une fois.', ar: 'اختر بحكمة! كل رقم يمكن استخدامه مرة واحدة فقط.' },
+    betAlreadyUsed: { en: 'That number was already used. Pick a different bet.', fr: 'Ce nombre a déjà été utilisé. Choisissez un autre pari.', ar: 'تم استخدام هذا الرقم مسبقاً. اختر رهاناً آخر.' },
     answer: { en: 'Your Answer', fr: 'Votre Réponse', ar: 'إجابتك' },
     timeLeft: { en: 'Time Left', fr: 'Temps Restant', ar: 'الوقت المتبقي' },
     correctAnswer: { en: 'Correct Answer', fr: 'Bonne Réponse', ar: 'الإجابة الصحيحة' },

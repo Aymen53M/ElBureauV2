@@ -169,7 +169,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                     value={openEndedAnswer}
                                     onChangeText={setOpenEndedAnswer}
                                     placeholder={t('answer') + '...'}
-                                    placeholderTextColor="#8FA3B8"
+                                    placeholderTextColor="#7B6657"
                                     className="flex-1 h-12 px-4 rounded-xl border border-border bg-input text-foreground"
                                 />
                                 <Button
@@ -201,7 +201,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
 const styles = StyleSheet.create({
     cardShadow: {
-        shadowColor: '#00D4AA',
+        shadowColor: '#C97B4C',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.3,
         shadowRadius: 20,

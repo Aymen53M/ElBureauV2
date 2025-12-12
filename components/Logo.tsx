@@ -30,7 +30,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
                 ])
             ).start();
         }
-    }, [animated]);
+    }, [animated, animatedValue]);
 
     const getSizeClasses = () => {
         switch (size) {
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
         opacity: 0.4,
     },
     glowText: {
-        textShadowColor: '#00D4AA',
+        textShadowColor: '#C97B4C',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 20,
     },

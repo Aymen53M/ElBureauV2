@@ -7,13 +7,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
 
 export default function Settings() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const { apiKey, setApiKey, playerName, setPlayerName } = useGame();
 
     const [localApiKey, setLocalApiKey] = useState(apiKey);
@@ -37,15 +38,16 @@ export default function Settings() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="default" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-4 max-w-4xl w-full self-center pb-10"
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
-                <View className="flex-row items-center gap-4 mb-8 pt-8">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
                     <TouchableOpacity onPress={() => router.back()} className="p-2">
-                        <Ionicons name="arrow-back" size={24} color="#F5FFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <Text className="text-2xl font-display font-bold text-foreground flex-1">
@@ -58,7 +60,7 @@ export default function Settings() {
                     <Card>
                         <CardHeader>
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="person-outline" size={20} color="#00D4AA" />
+                                <Ionicons name="person-outline" size={20} color="#6B3F23" />
                                 <CardTitle>{t('playerName')}</CardTitle>
                             </View>
                         </CardHeader>
@@ -76,7 +78,7 @@ export default function Settings() {
                     <Card>
                         <CardHeader>
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="key-outline" size={20} color="#FFCC00" />
+                                <Ionicons name="key-outline" size={20} color="#D4A72C" />
                                 <CardTitle>{t('apiKey')}</CardTitle>
                             </View>
                             <CardDescription>
@@ -98,7 +100,7 @@ export default function Settings() {
                                     <Ionicons
                                         name={showApiKey ? 'eye-off-outline' : 'eye-outline'}
                                         size={20}
-                                        color="#8FA3B8"
+                                        color="#7B6657"
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -109,7 +111,7 @@ export default function Settings() {
                                 <Text className="text-sm text-primary">
                                     {t('apiKeyCta')}
                                 </Text>
-                                <Ionicons name="open-outline" size={12} color="#00D4AA" />
+                                <Ionicons name="open-outline" size={12} color="#6B3F23" />
                             </TouchableOpacity>
                         </CardContent>
                     </Card>
@@ -131,7 +133,7 @@ export default function Settings() {
                     <Card>
                         <CardHeader>
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="globe-outline" size={20} color="#F06543" />
+                                <Ionicons name="globe-outline" size={20} color="#C83A32" />
                                 <CardTitle>{t('language')}</CardTitle>
                             </View>
                         </CardHeader>

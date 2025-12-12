@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
 /* Custom game-show theme colors as CSS variables for reference */
 /* These are used in tailwind.config.js */
 

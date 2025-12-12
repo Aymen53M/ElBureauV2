@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 interface TimerProps {
@@ -49,7 +49,7 @@ const Timer: React.FC<TimerProps> = ({
                 Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
             ]).start();
         }
-    }, [seconds]);
+    }, [seconds, shakeAnim]);
 
     const isWarning = seconds <= 10 && seconds > 5;
     const isCritical = seconds <= 5;
@@ -66,9 +66,9 @@ const Timer: React.FC<TimerProps> = ({
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
     const getColor = () => {
-        if (isCritical) return '#EB3B3B';
-        if (isWarning) return '#FFCC00';
-        return '#00D4AA';
+        if (isCritical) return '#B3261E';
+        if (isWarning) return '#D4A72C';
+        return '#C97B4C';
     };
 
     return (
@@ -89,7 +89,7 @@ const Timer: React.FC<TimerProps> = ({
                     cx={config.container / 2}
                     cy={config.container / 2}
                     r={config.radius}
-                    stroke="#212D3D"
+                    stroke="#E2CFBC"
                     strokeWidth={config.stroke}
                     fill="transparent"
                 />
@@ -123,7 +123,7 @@ const Timer: React.FC<TimerProps> = ({
 
 const styles = StyleSheet.create({
     glowText: {
-        textShadowColor: '#EB3B3B',
+        textShadowColor: '#B3261E',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },

@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
 import PlayerAvatar from '@/components/PlayerAvatar';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
 import { generateGameHighlights } from '@/services/questionService';
@@ -18,7 +19,7 @@ const demoPlayers: Player[] = [
     { id: '4', name: 'Taylor', score: 28, isHost: false, isReady: true, usedBets: [], hasApiKey: false },
 ];
 
-const CONFETTI_COLORS = ['#00D4AA', '#FF66AA', '#FFD93D', '#FF8C42', '#8B5CF6', '#00BFFF', '#FF6B6B'];
+const CONFETTI_COLORS = ['#C97B4C', '#D1497B', '#D4A72C', '#D9822B', '#2D9C93', '#6B3F23', '#C83A32'];
 const CONFETTI_COUNT = 50;
 
 interface ConfettiPiece {
@@ -68,7 +69,7 @@ const ConfettiAnimation: React.FC<{ show: boolean }> = ({ show }) => {
                 animate();
             });
         }
-    }, [show]);
+    }, [show, animations, confettiPieces]);
 
     if (!show) return null;
 
@@ -184,6 +185,7 @@ export default function Results() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="game" />
             {/* Animated Confetti */}
             <ConfettiAnimation show={showConfetti} />
 
@@ -209,13 +211,13 @@ export default function Results() {
                     {revealedRanks.includes(0) && (
                         <Card className="border-accent/50" style={styles.winnerCard}>
                             <CardContent className="p-8 items-center">
-                                <Ionicons name="trophy" size={64} color="#FFCC00" style={{ marginBottom: 16 }} />
+                                <Ionicons name="trophy" size={64} color="#D4A72C" style={{ marginBottom: 16 }} />
                                 <Text className="text-sm text-muted-foreground mb-2">{t('winner')}</Text>
                                 <View className="items-center mb-4">
                                     <PlayerAvatar name={winner.name} size="lg" showName={false} />
                                 </View>
                                 <Text className="text-3xl font-display font-bold text-accent mb-2" style={{
-                                    textShadowColor: '#FFCC00',
+                                    textShadowColor: '#D4A72C',
                                     textShadowOffset: { width: 0, height: 0 },
                                     textShadowRadius: 15,
                                 }}>
@@ -240,7 +242,7 @@ export default function Results() {
                                 </View>
                                 {isLoadingHighlights ? (
                                     <View className="flex-row items-center gap-3 py-2">
-                                        <ActivityIndicator size="small" color="#00D4AA" />
+                                        <ActivityIndicator size="small" color="#C97B4C" />
                                         <Text className="text-muted-foreground text-sm">
                                             {t('generatingHighlights')}
                                         </Text>
@@ -319,7 +321,7 @@ export default function Results() {
                             className="flex-1"
                         >
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="refresh" size={20} color="#0D1321" />
+                                <Ionicons name="refresh" size={20} color="#FFF8EF" />
                                 <Text className="font-display font-bold text-primary-foreground">
                                     {t('playAgain')}
                                 </Text>
@@ -332,7 +334,7 @@ export default function Results() {
                             className="flex-1"
                         >
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="home" size={20} color="#00D4AA" />
+                                <Ionicons name="home" size={20} color="#6B3F23" />
                                 <Text className="font-display font-bold text-primary">
                                     {t('home')}
                                 </Text>
@@ -347,7 +349,7 @@ export default function Results() {
 
 const styles = StyleSheet.create({
     winnerCard: {
-        shadowColor: '#FFCC00',
+        shadowColor: '#D4A72C',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 20,

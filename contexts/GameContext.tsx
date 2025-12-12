@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { Language } from './LanguageContext';
 
 export type GamePhase =
@@ -72,10 +73,13 @@ interface GameContextType {
     currentPlayer: Player | null;
     setCurrentPlayer: React.Dispatch<React.SetStateAction<Player | null>>;
     apiKey: string;
-    setApiKey: (key: string) => void;
+    setApiKey: (key: string) => Promise<void>;
     playerName: string;
-    setPlayerName: (name: string) => void;
+    setPlayerName: (name: string) => Promise<void>;
 }
+
+const API_KEY_STORAGE_KEY = 'elbureau-api-key';
+const PLAYER_NAME_STORAGE_KEY = 'elbureau-player-name';
 
 const defaultSettings: GameSettings = {
     theme: 'movies',
@@ -100,13 +104,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const loadSavedData = async () => {
             try {
                 // Load API key from secure storage
-                const savedApiKey = await SecureStore.getItemAsync('elbureau-api-key');
+                const savedApiKey = Platform.OS === 'web'
+                    ? await AsyncStorage.getItem(API_KEY_STORAGE_KEY)
+                    : await SecureStore.getItemAsync(API_KEY_STORAGE_KEY);
                 if (savedApiKey) {
                     setApiKeyState(savedApiKey);
                 }
 
                 // Load player name from async storage
-                const savedName = await AsyncStorage.getItem('elbureau-player-name');
+                const savedName = await AsyncStorage.getItem(PLAYER_NAME_STORAGE_KEY);
                 if (savedName) {
                     setPlayerNameState(savedName);
                 }
@@ -119,7 +125,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const setApiKey = async (key: string) => {
         try {
-            await SecureStore.setItemAsync('elbureau-api-key', key);
+            if (Platform.OS === 'web') {
+                await AsyncStorage.setItem(API_KEY_STORAGE_KEY, key);
+            } else {
+                await SecureStore.setItemAsync(API_KEY_STORAGE_KEY, key);
+            }
             setApiKeyState(key);
 
             // Keep the game state's player key ledger in sync so hosts/personal rounds
@@ -142,7 +152,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const setPlayerName = async (name: string) => {
         try {
-            await AsyncStorage.setItem('elbureau-player-name', name);
+            await AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, name);
             setPlayerNameState(name);
         } catch (error) {
             console.error('Failed to save player name:', error);

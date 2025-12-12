@@ -61,7 +61,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                     value={customTheme}
                     onChangeText={onCustomThemeChange}
                     placeholder={t('customTheme')}
-                    placeholderTextColor="#8FA3B8"
+                    placeholderTextColor="#7B6657"
                     className="h-12 px-4 rounded-xl border border-primary bg-input text-foreground font-sans"
                 />
             )}

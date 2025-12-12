@@ -7,6 +7,7 @@ import Slider from '@react-native-community/slider';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
+import ScreenBackground from '@/components/ui/ScreenBackground';
 import ThemeSelector from '@/components/ThemeSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Difficulty, QuestionType } from '@/contexts/GameContext';
@@ -20,7 +21,7 @@ const questionTypes: { type: QuestionType; icon: string }[] = [
 
 export default function CreateRoom() {
     const router = useRouter();
-    const { t, language } = useLanguage();
+    const { t, language, isRTL } = useLanguage();
     const { apiKey, playerName, setGameState, setCurrentPlayer } = useGame();
 
     const [theme, setTheme] = useState('movies');
@@ -99,15 +100,16 @@ export default function CreateRoom() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
+            <ScreenBackground variant="default" />
             <ScrollView
                 className="flex-1"
                 contentContainerClassName="p-7 pb-14 max-w-4xl w-full self-center space-y-8"
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
-                <View className="flex-row items-center gap-4 mb-6 pt-8">
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-6 pt-8`}>
                     <TouchableOpacity onPress={() => router.back()} className="p-2">
-                        <Ionicons name="arrow-back" size={24} color="#F5FFFF" />
+                        <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <Text className="text-2xl font-display font-bold text-foreground flex-1">
@@ -150,7 +152,7 @@ export default function CreateRoom() {
                     <Card className="rounded-3xl">
                         <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="flash" size={20} color="#FFCC00" />
+                                <Ionicons name="flash" size={20} color="#D4A72C" />
                                 <CardTitle className="text-lg">{t('difficulty')}</CardTitle>
                             </View>
                         </CardHeader>
@@ -176,7 +178,7 @@ export default function CreateRoom() {
                     <Card className="rounded-3xl">
                         <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="help-circle" size={20} color="#00D4AA" />
+                                <Ionicons name="help-circle" size={20} color="#6B3F23" />
                                 <CardTitle className="text-lg">
                                     {t('numberOfQuestions')}: <Text className="text-primary">{questionCount}</Text>
                                 </CardTitle>
@@ -189,9 +191,9 @@ export default function CreateRoom() {
                                 minimumValue={5}
                                 maximumValue={20}
                                 step={1}
-                                minimumTrackTintColor="#00D4AA"
-                                maximumTrackTintColor="#212D3D"
-                                thumbTintColor="#00D4AA"
+                                minimumTrackTintColor="#C97B4C"
+                                maximumTrackTintColor="#E2CFBC"
+                                thumbTintColor="#C97B4C"
                             />
                             <View className="flex-row justify-between mt-1">
                                 <Text className="text-xs text-muted-foreground">5</Text>
@@ -204,7 +206,7 @@ export default function CreateRoom() {
                     <Card className="rounded-3xl">
                         <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="timer" size={20} color="#F06543" />
+                                <Ionicons name="timer" size={20} color="#C97B4C" />
                                 <CardTitle className="text-lg">
                                     {t('timeLeft')}: <Text className="text-secondary">{timePerQuestion}s</Text>
                                 </CardTitle>
@@ -217,9 +219,9 @@ export default function CreateRoom() {
                                 minimumValue={10}
                                 maximumValue={60}
                                 step={5}
-                                minimumTrackTintColor="#F06543"
-                                maximumTrackTintColor="#212D3D"
-                                thumbTintColor="#F06543"
+                                minimumTrackTintColor="#C97B4C"
+                                maximumTrackTintColor="#E2CFBC"
+                                thumbTintColor="#C97B4C"
                             />
                             <View className="flex-row justify-between mt-1">
                                 <Text className="text-xs text-muted-foreground">10s</Text>

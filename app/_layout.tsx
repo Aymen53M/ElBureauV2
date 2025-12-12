@@ -14,11 +14,11 @@ export default function RootLayout() {
             <QueryClientProvider client={queryClient}>
                 <LanguageProvider>
                     <GameProvider>
-                        <StatusBar style="light" />
+                        <StatusBar style="dark" />
                         <Stack
                             screenOptions={{
                                 headerShown: false,
-                                contentStyle: { backgroundColor: '#0D1321' },
+                                contentStyle: { backgroundColor: '#F7F1E6' },
                                 animation: 'slide_from_right',
                             }}
                         />
