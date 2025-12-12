@@ -121,6 +121,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             await SecureStore.setItemAsync('elbureau-api-key', key);
             setApiKeyState(key);
+
+            // Keep the game state's player key ledger in sync so hosts/personal rounds
+            // always use the correct player's saved key.
+            setGameState((prev) => {
+                if (!prev || !currentPlayer?.id) return prev;
+                return {
+                    ...prev,
+                    hostApiKey: currentPlayer.id === prev.hostId ? key : prev.hostApiKey,
+                    playerApiKeys: {
+                        ...prev.playerApiKeys,
+                        [currentPlayer.id]: key,
+                    },
+                };
+            });
         } catch (error) {
             console.error('Failed to save API key:', error);
         }

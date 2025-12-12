@@ -22,7 +22,6 @@ export default function Game() {
     const [phase, setPhase] = useState<GamePhase>('betting');
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-    const [usedBets, setUsedBets] = useState<number[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
     const [timerKey, setTimerKey] = useState(0);
@@ -31,7 +30,6 @@ export default function Game() {
     const [loadingMessage, setLoadingMessage] = useState('');
     const [score, setScore] = useState(0);
     const [answerBoard, setAnswerBoard] = useState<AnswerBoard>({});
-    const [betLedger, setBetLedger] = useState<Record<string, number>>({});
     const [isFinalRound, setIsFinalRound] = useState(false);
     const [finalChoices, setFinalChoices] = useState<Record<string, { wager: number | null; difficulty: Difficulty }>>({});
     const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('personalized');
@@ -59,7 +57,8 @@ export default function Game() {
     const currentFinalChoice = activePlayer
         ? (finalChoices[activePlayer.id] || { wager: null, difficulty: 'medium' as Difficulty })
         : { wager: null, difficulty: 'medium' as Difficulty };
-    const currentBetDisplay = isFinalRound ? currentFinalChoice.wager : selectedBet ?? betLedger[activePlayer?.id || ''] ?? null;
+    const usedBetsForPlayer = activePlayer?.usedBets ?? [];
+    const currentBetDisplay = isFinalRound ? currentFinalChoice.wager : activePlayer.currentBet ?? selectedBet ?? null;
 
     const resetForNewQuestion = () => {
         setSelectedAnswer(null);
@@ -151,8 +150,22 @@ export default function Game() {
     const handleBetConfirm = () => {
         if (!selectedBet) return;
 
-        setBetLedger((prev) => ({ ...prev, [activePlayer.id]: selectedBet }));
-        setUsedBets((prev) => [...prev, selectedBet]);
+        setGameState((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                players: prev.players.map((p) => {
+                    if (p.id !== activePlayer.id) return p;
+                    const mergedUsed = Array.from(new Set([...(p.usedBets || []), selectedBet]));
+                    return {
+                        ...p,
+                        currentBet: selectedBet,
+                        usedBets: mergedUsed,
+                    };
+                }),
+            };
+        });
+
         setPhase('question');
         setTimerKey((prev) => prev + 1);
     };
@@ -214,7 +227,8 @@ export default function Game() {
     const applyScores = () => {
         const wagerForPlayer = (playerId: string) => {
             if (isFinalRound) return finalChoices[playerId]?.wager || 0;
-            return betLedger[playerId] || 0;
+            const player = gameState?.players.find((p) => p.id === playerId);
+            return player?.currentBet || 0;
         };
 
         setGameState((prev) => {
@@ -224,10 +238,12 @@ export default function Game() {
                 players: prev.players.map((p) => {
                     const entry = answerBoard[p.id];
                     const wager = wagerForPlayer(p.id);
-                    if (!entry?.hasAnswered || entry.isCorrect === undefined || wager === 0) return p;
+                    if (!entry?.hasAnswered || entry.isCorrect === undefined || wager === 0) {
+                        return { ...p, currentBet: undefined };
+                    }
 
                     const delta = entry.isCorrect ? wager : isFinalRound ? -wager : 0;
-                    return { ...p, score: p.score + delta };
+                    return { ...p, score: p.score + delta, currentBet: undefined };
                 }),
             };
         });
@@ -251,7 +267,6 @@ export default function Game() {
         if (currentQuestionIndex < totalQuestions - 1) {
             setCurrentQuestionIndex((prev) => prev + 1);
             setSelectedBet(null);
-            setBetLedger({});
             resetForNewQuestion();
             setPhase('betting');
         } else {
@@ -259,6 +274,15 @@ export default function Game() {
             resetForNewQuestion();
             setPhase('final-wager');
         }
+
+        // Clear transient bets between questions so the next pick is clean.
+        setGameState((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                players: prev.players.map((p) => ({ ...p, currentBet: undefined })),
+            };
+        });
     };
 
     const updateFinalChoice = (updates: Partial<{ wager: number | null; difficulty: Difficulty }>) => {
@@ -276,7 +300,9 @@ export default function Game() {
         const choice = finalChoices[activePlayer.id] || { wager: null, difficulty: 'medium' as Difficulty };
         if (choice.wager === null) return;
 
-        const keyToUse = finalMode === 'personalized' ? apiKey : gameState.hostApiKey || apiKey;
+        const keyToUse = finalMode === 'personalized'
+            ? gameState.playerApiKeys?.[activePlayer.id] || apiKey
+            : gameState.hostApiKey || apiKey;
         if (!keyToUse) {
             Alert.alert(t('apiKey'), t('missingApiKeyPersonal'));
             return;
@@ -348,7 +374,7 @@ export default function Game() {
                                 <CardContent className="p-8">
                                     <BetSelector
                                         totalQuestions={totalQuestions}
-                                        usedBets={usedBets}
+                                        usedBets={usedBetsForPlayer}
                                         selectedBet={selectedBet}
                                         onSelectBet={setSelectedBet}
                                     />

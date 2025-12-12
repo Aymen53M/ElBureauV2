@@ -42,6 +42,11 @@ export default function Lobby() {
     };
 
     const startGame = () => {
+        if (!gameState.hostApiKey) {
+            Alert.alert(t('apiKey'), t('missingApiKeyHost'));
+            router.push('/settings');
+            return;
+        }
         if (!allReady) {
             Alert.alert(t('notReadyTitle'), t('notReadyDesc'));
             return;
