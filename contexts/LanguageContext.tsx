@@ -29,9 +29,7 @@ export const translations: Translations = {
 
     // Home Page
     tagline: { en: 'The Ultimate AI Quiz Party!', fr: 'Le Quiz Party IA Ultime!', ar: 'حفلة الأسئلة الذكية!' },
-    createRoom: { en: 'Create Room', fr: 'Créer une Salle', ar: 'إنشاء غرفة' },
-    joinRoom: { en: 'Join Room', fr: 'Rejoindre une Salle', ar: 'انضم لغرفة' },
-    howToPlay: { en: 'How to Play', fr: 'Comment Jouer', ar: 'كيف تلعب' },
+    poweredBy: { en: 'Powered by AI ✨ Play with friends anywhere!', fr: 'Propulsé par l\'IA ✨ Jouez entre amis partout!', ar: 'مدعوم بالذكاء الاصطناعي ✨ العب مع أصدقائك في أي مكان!' },
 
     // Settings
     apiKey: { en: 'Gemini API Key', fr: 'Clé API Gemini', ar: 'مفتاح API جيميني' },
@@ -125,7 +123,50 @@ export const translations: Translations = {
     notReady: { en: 'Not Ready', fr: 'Pas Prêt', ar: 'غير جاهز' },
     correct: { en: 'Correct!', fr: 'Correct!', ar: 'صحيح!' },
     incorrect: { en: 'Incorrect!', fr: 'Incorrect!', ar: 'خاطئ!' },
+
+    // Lobby & Join
+    shareCodeMessage: { en: 'Share this code with friends to join!', fr: 'Partagez ce code avec vos amis pour rejoindre!', ar: 'شارك هذا الرمز مع أصدقائك للانضمام!' },
+    enterHostCode: { en: 'Enter the room code shared by your host', fr: 'Entrez le code partagé par l\'hôte', ar: 'أدخل رمز الغرفة الذي شاركه المضيف' },
+
+    // How To Play
+    htpStep1Title: { en: 'Choose a Theme', fr: 'Choisissez un Thème', ar: 'اختر موضوعاً' },
+    htpStep1Desc: { en: 'Pick from movies, sports, science, and more - or create your own custom topic!', fr: 'Choisissez parmi films, sports, science et plus - ou créez votre propre thème!', ar: 'اختر من الأفلام، الرياضة، العلوم والمزيد - أو أنشئ موضوعك الخاص!' },
+    htpStep2Title: { en: 'Place Your Bets', fr: 'Placez Vos Paris', ar: 'ضع رهاناتك' },
+    htpStep2Desc: { en: 'Each round, bet 1 to N points based on your confidence. Each number can only be used once!', fr: 'À chaque tour, pariez de 1 à N points selon votre confiance. Chaque nombre ne peut être utilisé qu\'une fois!', ar: 'في كل جولة، راهن من 1 إلى N نقطة بناءً على ثقتك. كل رقم يمكن استخدامه مرة واحدة فقط!' },
+    htpStep3Title: { en: 'Answer Questions', fr: 'Répondez aux Questions', ar: 'أجب على الأسئلة' },
+    htpStep3Desc: { en: 'AI generates unique questions based on your theme. Answer before time runs out!', fr: 'L\'IA génère des questions uniques basées sur votre thème. Répondez avant la fin du temps!', ar: 'الذكاء الاصطناعي يولد أسئلة فريدة حسب موضوعك. أجب قبل انتهاء الوقت!' },
+    htpStep4Title: { en: 'Score Points', fr: 'Marquez des Points', ar: 'احصل على النقاط' },
+    htpStep4Desc: { en: 'Correct answers earn you the points you bet. Wrong answers? You lose nothing!', fr: 'Les bonnes réponses vous font gagner les points pariés. Mauvaises réponses? Vous ne perdez rien!', ar: 'الإجابات الصحيحة تكسبك النقاط التي راهنت عليها. إجابات خاطئة؟ لا تخسر شيئاً!' },
+    htpStep5Title: { en: 'Win the Game', fr: 'Gagnez la Partie', ar: 'اربح اللعبة' },
+    htpStep5Desc: { en: 'After all questions, the player with the most points wins!', fr: 'Après toutes les questions, le joueur avec le plus de points gagne!', ar: 'بعد كل الأسئلة، اللاعب الذي لديه أكثر نقاط يفوز!' },
+    proTips: { en: 'Pro Tips', fr: 'Conseils Pro', ar: 'نصائح احترافية' },
+    proTip1: { en: 'Save high bets for questions you\'re confident about', fr: 'Gardez les gros paris pour les questions dont vous êtes sûr', ar: 'احفظ الرهانات العالية للأسئلة التي أنت واثق منها' },
+    proTip2: { en: 'Pay attention to the difficulty level', fr: 'Faites attention au niveau de difficulté', ar: 'انتبه لمستوى الصعوبة' },
+    proTip3: { en: 'Don\'t rush - use your time wisely', fr: 'Ne vous précipitez pas - utilisez votre temps judicieusement', ar: 'لا تتسرع - استخدم وقتك بحكمة' },
+
+    // Game Generation
+    generatingQuestions: { en: 'AI is generating', fr: 'L\'IA génère', ar: 'الذكاء الاصطناعي يُنشئ' },
+    questionsAbout: { en: 'questions about', fr: 'questions sur', ar: 'أسئلة حول' },
+
+    // Settings Labels (already in Create screen)
+    setupRequiredLabel: { en: 'Setup Required', fr: 'Configuration requise', ar: 'الإعداد مطلوب' },
+    setupRequiredMessage: { en: 'Please set your name and Gemini API key in settings.', fr: 'Veuillez définir votre nom et clé Gemini dans les paramètres.', ar: 'يرجى ضبط اسمك ومفتاح جيميني في الإعدادات.' },
+    settingsButton: { en: 'Settings', fr: 'Paramètres', ar: 'الإعدادات' },
+
+    // Hints
+    showHint: { en: 'Show Hint', fr: 'Voir l\'indice', ar: 'عرض التلميح' },
+    hint: { en: 'Hint', fr: 'Indice', ar: 'تلميح' },
+
+    // Game Highlights
+    gameHighlights: { en: 'Game Highlights', fr: 'Moments Forts', ar: 'أبرز اللحظات' },
+    generatingHighlights: { en: 'Creating your game story...', fr: 'Création de votre histoire de jeu...', ar: 'إنشاء قصة لعبتك...' },
+    highlightsError: { en: 'Could not generate highlights', fr: 'Impossible de générer les moments forts', ar: 'تعذر إنشاء الملخص' },
+
+    // Betting Phase
+    placeBetFirst: { en: 'Choose your bet to reveal answer options', fr: 'Choisissez votre pari pour voir les réponses', ar: 'اختر رهانك للكشف عن خيارات الإجابة' },
+    bet: { en: 'Bet', fr: 'Pari', ar: 'رهان' },
 };
+
 
 interface LanguageContextType {
     language: Language;

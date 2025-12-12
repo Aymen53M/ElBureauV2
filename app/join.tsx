@@ -103,7 +103,7 @@ export default function JoinRoom() {
                             </View>
                             <CardTitle>{t('joinRoom')}</CardTitle>
                             <CardDescription className="text-center">
-                                Enter the room code shared by your host
+                                {t('enterHostCode')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-8">

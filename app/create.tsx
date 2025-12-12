@@ -59,40 +59,40 @@ export default function CreateRoom() {
         const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
         // Initialize game state
-            const hostId = 'host-' + Date.now();
-            const hostPlayer = {
-                id: hostId,
-                name: playerName,
-                score: 0,
-                isHost: true,
-                isReady: true,
-                usedBets: [],
-                hasApiKey: true,
-            };
+        const hostId = 'host-' + Date.now();
+        const hostPlayer = {
+            id: hostId,
+            name: playerName,
+            score: 0,
+            isHost: true,
+            isReady: true,
+            usedBets: [],
+            hasApiKey: true,
+        };
 
-            setGameState({
-                roomCode,
-                phase: 'lobby',
-                players: [hostPlayer],
-                currentQuestion: 0,
-                questions: [],
-                settings: {
-                    theme: theme === 'custom' ? 'custom' : theme,
-                    customTheme: theme === 'custom' ? customTheme : undefined,
-                    difficulty,
-                    numberOfQuestions: questionCount,
-                    timePerQuestion,
-                    questionType,
-                    language,
-                    hintsEnabled: true,
-                },
-                hostId,
-                hostApiKey: apiKey,
-                playerApiKeys: { [hostId]: apiKey },
-                answers: {},
-            });
+        setGameState({
+            roomCode,
+            phase: 'lobby',
+            players: [hostPlayer],
+            currentQuestion: 0,
+            questions: [],
+            settings: {
+                theme: theme === 'custom' ? 'custom' : theme,
+                customTheme: theme === 'custom' ? customTheme : undefined,
+                difficulty,
+                numberOfQuestions: questionCount,
+                timePerQuestion,
+                questionType,
+                language,
+                hintsEnabled: true,
+            },
+            hostId,
+            hostApiKey: apiKey,
+            playerApiKeys: { [hostId]: apiKey },
+            answers: {},
+        });
 
-            setCurrentPlayer(hostPlayer);
+        setCurrentPlayer(hostPlayer);
 
         router.push('/lobby');
     };
@@ -122,13 +122,13 @@ export default function CreateRoom() {
                             <CardContent className="p-5 flex-row items-center gap-3">
                                 <Text className="text-2xl">⚠️</Text>
                                 <View className="flex-1">
-                                    <Text className="font-semibold text-foreground">Setup Required</Text>
+                                    <Text className="font-semibold text-foreground">{t('setupRequiredLabel')}</Text>
                                     <Text className="text-sm text-muted-foreground">
-                                        Please set your name and Gemini API key in settings.
+                                        {t('setupRequiredMessage')}
                                     </Text>
                                 </View>
                                 <Button size="sm" variant="outline" onPress={() => router.push('/settings')}>
-                                    <Text className="text-primary font-display">Settings</Text>
+                                    <Text className="text-primary font-display">{t('settingsButton')}</Text>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -240,8 +240,8 @@ export default function CreateRoom() {
                                         key={type}
                                         onPress={() => setQuestionType(type)}
                                         className={`flex-1 py-4 rounded-xl items-center border-2 ${questionType === type
-                                                ? 'bg-primary/20 border-primary'
-                                                : 'bg-muted border-transparent'
+                                            ? 'bg-primary/20 border-primary'
+                                            : 'bg-muted border-transparent'
                                             }`}
                                     >
                                         <Text className="text-xl mb-1">{icon}</Text>

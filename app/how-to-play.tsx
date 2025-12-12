@@ -12,11 +12,11 @@ export default function HowToPlay() {
     const { t } = useLanguage();
 
     const steps = [
-        { icon: '🎯', title: 'Choose a Theme', description: 'Pick from movies, sports, science, and more - or create your own custom topic!' },
-        { icon: '🎲', title: 'Place Your Bets', description: 'Each round, bet 1 to N points based on your confidence. Each number can only be used once!' },
-        { icon: '🤔', title: 'Answer Questions', description: 'AI generates unique questions based on your theme. Answer before time runs out!' },
-        { icon: '✅', title: 'Score Points', description: 'Correct answers earn you the points you bet. Wrong answers? You lose nothing!' },
-        { icon: '🏆', title: 'Win the Game', description: 'After all questions, the player with the most points wins!' },
+        { icon: '🎯', titleKey: 'htpStep1Title', descKey: 'htpStep1Desc' },
+        { icon: '🎲', titleKey: 'htpStep2Title', descKey: 'htpStep2Desc' },
+        { icon: '🤔', titleKey: 'htpStep3Title', descKey: 'htpStep3Desc' },
+        { icon: '✅', titleKey: 'htpStep4Title', descKey: 'htpStep4Desc' },
+        { icon: '🏆', titleKey: 'htpStep5Title', descKey: 'htpStep5Desc' },
     ];
 
     return (
@@ -45,10 +45,10 @@ export default function HowToPlay() {
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-lg font-display font-bold text-foreground mb-1">
-                                        {index + 1}. {step.title}
+                                        {index + 1}. {t(step.titleKey)}
                                     </Text>
                                     <Text className="text-muted-foreground">
-                                        {step.description}
+                                        {t(step.descKey)}
                                     </Text>
                                 </View>
                             </CardContent>
@@ -59,12 +59,12 @@ export default function HowToPlay() {
                     <Card className="border-accent/30 bg-accent/5 mt-6">
                         <CardContent className="p-4">
                             <Text className="text-lg font-display font-bold text-accent mb-2">
-                                💡 Pro Tips
+                                💡 {t('proTips')}
                             </Text>
                             <View className="space-y-2">
-                                <Text className="text-foreground">• Save high bets for questions you're confident about</Text>
-                                <Text className="text-foreground">• Pay attention to the difficulty level</Text>
-                                <Text className="text-foreground">• Don't rush - use your time wisely</Text>
+                                <Text className="text-foreground">• {t('proTip1')}</Text>
+                                <Text className="text-foreground">• {t('proTip2')}</Text>
+                                <Text className="text-foreground">• {t('proTip3')}</Text>
                             </View>
                         </CardContent>
                     </Card>

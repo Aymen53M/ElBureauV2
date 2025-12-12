@@ -82,7 +82,7 @@ export default function Index() {
 
             <View className="p-4 items-center">
                 <Text className="text-muted-foreground text-sm text-center">
-                    Powered by AI ✨ Play with friends anywhere!
+                    {t('poweredBy')}
                 </Text>
             </View>
         </SafeAreaView>

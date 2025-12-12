@@ -58,7 +58,7 @@ export default function Game() {
         ? (finalChoices[activePlayer.id] || { wager: null, difficulty: 'medium' as Difficulty })
         : { wager: null, difficulty: 'medium' as Difficulty };
     const usedBetsForPlayer = activePlayer?.usedBets ?? [];
-    const currentBetDisplay = isFinalRound ? currentFinalChoice.wager : activePlayer.currentBet ?? selectedBet ?? null;
+    const currentBetDisplay = isFinalRound ? currentFinalChoice.wager : activePlayer?.currentBet ?? selectedBet ?? null;
 
     const resetForNewQuestion = () => {
         setSelectedAnswer(null);
@@ -140,7 +140,7 @@ export default function Game() {
                         {loadingMessage || 'Loading...'}
                     </Text>
                     <Text className="text-muted-foreground mt-2 text-center">
-                        AI is generating {gameState.settings.numberOfQuestions} questions about {gameState.settings.customTheme || t(gameState.settings.theme)}
+                        {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
                     </Text>
                 </View>
             </SafeAreaView>
@@ -361,9 +361,49 @@ export default function Game() {
                 </View>
 
                 <View className="max-w-3xl mx-auto w-full space-y-10">
-                    {/* Betting Phase */}
-                    {phase === 'betting' && !isFinalRound && (
+                    {/* Betting Phase - Now shows question + bet selector together */}
+                    {phase === 'betting' && !isFinalRound && activeQuestion && (
                         <View className="space-y-7">
+                            {/* Show the Question First */}
+                            <Card className="border-primary/30 rounded-3xl" style={{
+                                shadowColor: '#00D4AA',
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 20,
+                                elevation: 10,
+                            }}>
+                                <CardContent className="p-7 space-y-5">
+                                    {/* Question header */}
+                                    <View className="flex-row items-center justify-between">
+                                        <Text className="text-sm font-semibold text-muted-foreground">
+                                            {t('question')} {currentQuestionIndex + 1}/{totalQuestions}
+                                        </Text>
+                                        <View className={`px-3 py-1 rounded-full ${activeQuestion.difficulty === 'easy' ? 'bg-neon-green/20' :
+                                            activeQuestion.difficulty === 'medium' ? 'bg-accent/20' : 'bg-destructive/20'
+                                            }`}>
+                                            <Text className={`text-xs font-semibold ${activeQuestion.difficulty === 'easy' ? 'text-neon-green' :
+                                                activeQuestion.difficulty === 'medium' ? 'text-accent' : 'text-destructive'
+                                                }`}>
+                                                {t(activeQuestion.difficulty)}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Question text */}
+                                    <Text className="text-2xl font-display font-bold text-center text-foreground leading-tight">
+                                        {activeQuestion.text}
+                                    </Text>
+
+                                    {/* Hint that answers are hidden */}
+                                    <View className="items-center py-2">
+                                        <Text className="text-muted-foreground text-sm italic">
+                                            {t('placeBetFirst') || 'Choose your bet to reveal answer options'}
+                                        </Text>
+                                    </View>
+                                </CardContent>
+                            </Card>
+
+                            {/* Bet Selector Below Question */}
                             <Card className="border-accent/30 rounded-3xl" style={{
                                 shadowColor: '#FFCC00',
                                 shadowOffset: { width: 0, height: 0 },
@@ -389,7 +429,7 @@ export default function Game() {
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Text className="text-lg font-display font-bold text-primary-foreground">
-                                        {t('confirm')} Bet
+                                        {t('confirm')} {selectedBet ? `${selectedBet} ${t('points')}` : t('bet')}
                                     </Text>
                                     <Text className="text-lg">🎲</Text>
                                 </View>
@@ -498,6 +538,7 @@ export default function Game() {
                                 onSelectAnswer={handleAnswerSubmit}
                                 isAnswerPhase={phase === 'question'}
                                 showCorrectAnswer={showCorrectAnswer}
+                                hintsEnabled={gameState.settings.hintsEnabled}
                             />
 
                             {/* Answer Preview Phase */}

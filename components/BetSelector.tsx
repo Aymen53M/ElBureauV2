@@ -43,10 +43,10 @@ const BetSelector: React.FC<BetSelectorProps> = ({
                             onPress={() => !isUsed && onSelectBet(bet)}
                             disabled={isUsed}
                             className={`w-14 h-14 rounded-xl items-center justify-center ${isUsed
-                                    ? 'bg-muted/50 border-2 border-border/50'
-                                    : isSelected
-                                        ? 'bg-accent border-2 border-accent'
-                                        : 'bg-muted border-2 border-border'
+                                ? 'bg-muted/50 border-2 border-border/50'
+                                : isSelected
+                                    ? 'bg-accent border-2 border-accent'
+                                    : 'bg-muted border-2 border-border'
                                 }`}
                             style={isSelected ? {
                                 shadowColor: '#FFCC00',
@@ -57,10 +57,10 @@ const BetSelector: React.FC<BetSelectorProps> = ({
                             } : undefined}
                         >
                             <Text className={`text-xl font-display font-bold ${isUsed
-                                    ? 'text-muted-foreground opacity-50'
-                                    : isSelected
-                                        ? 'text-accent-foreground'
-                                        : 'text-foreground'
+                                ? 'text-muted-foreground opacity-50'
+                                : isSelected
+                                    ? 'text-accent-foreground'
+                                    : 'text-foreground'
                                 }`}>
                                 {bet}
                             </Text>

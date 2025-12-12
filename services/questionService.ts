@@ -31,18 +31,46 @@ type GeminiErrorCode =
     | 'PARSING_ERROR'
     | 'MODEL_UNAVAILABLE';
 
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 750;
+const MAX_RETRIES = 5;
+const RETRY_BASE_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 15000;
 
+/**
+ * Retry fetch with exponential backoff and jitter.
+ * Handles network errors and retryable HTTP status codes (429, 503, 5xx).
+ */
 async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<Response> {
     try {
-        return await fetch(url, init);
+        const response = await fetch(url, init);
+
+        // Retry on 429 (rate limit) or 503 (overloaded) or 5xx server errors
+        if ((response.status === 429 || response.status === 503 || response.status >= 500) && attempt < MAX_RETRIES) {
+            const delay = calculateBackoffDelay(attempt);
+            console.log(`Gemini returned ${response.status}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
+            await new Promise((r) => setTimeout(r, delay));
+            return retryFetch(url, init, attempt + 1);
+        }
+
+        return response;
     } catch (err) {
         if (attempt >= MAX_RETRIES) throw err;
-        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        const delay = calculateBackoffDelay(attempt);
+        console.log(`Network error, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
         await new Promise((r) => setTimeout(r, delay));
         return retryFetch(url, init, attempt + 1);
     }
+}
+
+/**
+ * Calculate backoff delay with exponential increase and jitter.
+ */
+function calculateBackoffDelay(attempt: number): number {
+    // Base exponential backoff: 1s, 2s, 4s, 8s, 16s...
+    const exponentialDelay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+    // Add random jitter (0-25% of the delay) to prevent thundering herd
+    const jitter = Math.random() * 0.25 * exponentialDelay;
+    // Cap at max delay
+    return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY_MS);
 }
 
 export async function generateQuestions(
@@ -145,14 +173,14 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
             const notFound = response.status === 404;
             const code: GeminiErrorCode =
                 response.status === 429 ? 'HTTP_429' :
-                response.status >= 500 ? 'HTTP_500' :
-                notFound ? 'MODEL_UNAVAILABLE' : 'HTTP_400';
+                    response.status >= 500 ? 'HTTP_500' :
+                        notFound ? 'MODEL_UNAVAILABLE' : 'HTTP_400';
             const error =
                 response.status === 429
                     ? 'Gemini is busy. Retried multiple times but rate limit persists. Try again soon.'
                     : notFound
-                    ? 'Model not available for this key. Ensure Gemini 1.5/2.0 access.'
-                    : 'Failed to generate questions after retries. Check your Gemini key or try again.';
+                        ? 'Model not available for this key. Ensure Gemini 1.5/2.0 access.'
+                        : 'Failed to generate questions after retries. Check your Gemini key or try again.';
             return { error, code };
         }
 
@@ -195,5 +223,90 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
             error: err instanceof Error ? err.message : 'An unexpected error occurred',
             code: 'UNEXPECTED_ERROR'
         };
+    }
+}
+
+/**
+ * Generates a fun narrative highlight of the game for the results screen.
+ * Uses the host's API key to generate personalized game commentary.
+ */
+export interface GameHighlightsData {
+    winner: { name: string; score: number };
+    players: { name: string; score: number; isHost: boolean }[];
+    theme: string;
+    totalQuestions: number;
+    language: 'en' | 'fr' | 'ar';
+}
+
+interface HighlightsResponse {
+    highlights?: string;
+    error?: string;
+}
+
+export async function generateGameHighlights(
+    data: GameHighlightsData,
+    apiKey?: string
+): Promise<HighlightsResponse> {
+    if (!apiKey) {
+        return { error: 'Missing API key' };
+    }
+
+    const languageLabel = languageNames[data.language] || 'English';
+    const playerList = data.players
+        .map((p, i) => `${i + 1}. ${p.name}: ${p.score} points${p.isHost ? ' (Host)' : ''}`)
+        .join('\n');
+
+    const systemPrompt = `You are a fun, energetic game show host commentator for "ElBureau" party quiz game.
+Write a short, entertaining highlight summary of the game results.
+Be playful, use emojis sparingly, and make it feel like a real game show wrap-up.
+Write in ${languageLabel}. Keep it to 2-3 sentences max.`;
+
+    const userPrompt = `The quiz game just ended! Here are the results:
+
+Theme: ${data.theme}
+Total Questions: ${data.totalQuestions}
+
+Final Standings:
+${playerList}
+
+Winner: ${data.winner.name} with ${data.winner.score} points!
+
+Write a fun, brief highlight commentary (2-3 sentences) celebrating the game. Make it feel exciting and party-like!`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+
+    try {
+        const response = await retryFetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [
+                    { role: 'user', parts: [{ text: userPrompt }] },
+                ],
+                generationConfig: {
+                    temperature: 0.9,
+                    topP: 0.95,
+                    maxOutputTokens: 200,
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            return { error: 'Failed to generate highlights' };
+        }
+
+        const responseData = await response.json();
+        const parts = responseData?.candidates?.[0]?.content?.parts || [];
+        const content: string | undefined = parts.find((p: any) => p.text)?.text;
+
+        if (!content) {
+            return { error: 'No highlights generated' };
+        }
+
+        return { highlights: content.trim() };
+    } catch (err) {
+        console.error('Error generating highlights:', err);
+        return { error: 'Failed to generate highlights' };
     }
 }

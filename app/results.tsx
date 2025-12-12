@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import Logo from '@/components/Logo';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
+import { generateGameHighlights } from '@/services/questionService';
 
 const demoPlayers: Player[] = [
     { id: '1', name: 'Alex', score: 45, isHost: true, isReady: true, usedBets: [], hasApiKey: true },
@@ -17,6 +18,102 @@ const demoPlayers: Player[] = [
     { id: '4', name: 'Taylor', score: 28, isHost: false, isReady: true, usedBets: [], hasApiKey: false },
 ];
 
+const CONFETTI_COLORS = ['#00D4AA', '#FF66AA', '#FFD93D', '#FF8C42', '#8B5CF6', '#00BFFF', '#FF6B6B'];
+const CONFETTI_COUNT = 50;
+
+interface ConfettiPiece {
+    id: number;
+    x: number;
+    delay: number;
+    duration: number;
+    color: string;
+    size: number;
+    rotation: number;
+}
+
+const ConfettiAnimation: React.FC<{ show: boolean }> = ({ show }) => {
+    const { height: screenHeight } = Dimensions.get('window');
+
+    const confettiPieces = useMemo<ConfettiPiece[]>(() =>
+        Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
+            id: i,
+            x: Math.random() * 100,
+            delay: Math.random() * 2000,
+            duration: 3000 + Math.random() * 2000,
+            color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+            size: 8 + Math.random() * 8,
+            rotation: Math.random() * 360,
+        })), []
+    );
+
+    const animations = useRef(
+        confettiPieces.map(() => new Animated.Value(0))
+    ).current;
+
+    useEffect(() => {
+        if (show) {
+            confettiPieces.forEach((piece, index) => {
+                const animate = () => {
+                    animations[index].setValue(0);
+                    Animated.timing(animations[index], {
+                        toValue: 1,
+                        duration: piece.duration,
+                        delay: piece.delay,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        // Reset and repeat
+                        if (show) animate();
+                    });
+                };
+                animate();
+            });
+        }
+    }, [show]);
+
+    if (!show) return null;
+
+    return (
+        <View className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 100 }}>
+            {confettiPieces.map((piece, index) => {
+                const translateY = animations[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-50, screenHeight + 50],
+                });
+                const translateX = animations[index].interpolate({
+                    inputRange: [0, 0.25, 0.5, 0.75, 1],
+                    outputRange: [0, 15, 0, -15, 0],
+                });
+                const rotate = animations[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', `${piece.rotation + 720}deg`],
+                });
+                const opacity = animations[index].interpolate({
+                    inputRange: [0, 0.1, 0.9, 1],
+                    outputRange: [0, 1, 1, 0],
+                });
+
+                return (
+                    <Animated.View
+                        key={piece.id}
+                        style={[
+                            styles.confetti,
+                            {
+                                left: `${piece.x}%`,
+                                width: piece.size,
+                                height: piece.size,
+                                borderRadius: piece.size / 2,
+                                backgroundColor: piece.color,
+                                transform: [{ translateY }, { translateX }, { rotate }],
+                                opacity,
+                            },
+                        ]}
+                    />
+                );
+            })}
+        </View>
+    );
+};
+
 export default function Results() {
     const router = useRouter();
     const { t } = useLanguage();
@@ -24,6 +121,8 @@ export default function Results() {
 
     const [showConfetti, setShowConfetti] = useState(false);
     const [revealedRanks, setRevealedRanks] = useState<number[]>([]);
+    const [highlights, setHighlights] = useState<string | null>(null);
+    const [isLoadingHighlights, setIsLoadingHighlights] = useState(false);
 
     const players = gameState?.players.length
         ? [...gameState.players].sort((a, b) => b.score - a.score)
@@ -47,6 +146,28 @@ export default function Results() {
         };
     }, []);
 
+    // Generate AI highlights when confetti starts
+    useEffect(() => {
+        if (showConfetti && gameState?.hostApiKey && !highlights && !isLoadingHighlights) {
+            setIsLoadingHighlights(true);
+            generateGameHighlights(
+                {
+                    winner: { name: winner.name, score: winner.score },
+                    players: players.map(p => ({ name: p.name, score: p.score, isHost: p.isHost })),
+                    theme: gameState.settings.customTheme || gameState.settings.theme,
+                    totalQuestions: gameState.settings.numberOfQuestions,
+                    language: gameState.settings.language,
+                },
+                gameState.hostApiKey
+            ).then(result => {
+                if (result.highlights) {
+                    setHighlights(result.highlights);
+                }
+                setIsLoadingHighlights(false);
+            });
+        }
+    }, [showConfetti, gameState, winner, players, highlights, isLoadingHighlights]);
+
     const handlePlayAgain = () => {
         setGameState(null);
         router.replace('/');
@@ -63,23 +184,8 @@ export default function Results() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            {/* Confetti placeholders */}
-            {showConfetti && (
-                <View className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {[...Array(30)].map((_, i) => (
-                        <Animated.View
-                            key={i}
-                            style={[
-                                styles.confetti,
-                                {
-                                    left: `${Math.random() * 100}%`,
-                                    backgroundColor: ['#00D4AA', '#FF66AA', '#FFD93D', '#FF8C42', '#8B5CF6'][i % 5],
-                                }
-                            ]}
-                        />
-                    ))}
-                </View>
-            )}
+            {/* Animated Confetti */}
+            <ConfettiAnimation show={showConfetti} />
 
             <ScrollView
                 className="flex-1"
@@ -118,6 +224,36 @@ export default function Results() {
                                 <Text className="text-5xl font-display font-bold text-primary">
                                     {winner.score} <Text className="text-lg">{t('points')}</Text>
                                 </Text>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* AI Game Highlights */}
+                    {revealedRanks.includes(0) && (
+                        <Card className="border-primary/30 bg-primary/5 rounded-3xl">
+                            <CardContent className="p-5">
+                                <View className="flex-row items-center gap-2 mb-3">
+                                    <Text className="text-xl">✨</Text>
+                                    <Text className="font-display font-bold text-foreground">
+                                        {t('gameHighlights')}
+                                    </Text>
+                                </View>
+                                {isLoadingHighlights ? (
+                                    <View className="flex-row items-center gap-3 py-2">
+                                        <ActivityIndicator size="small" color="#00D4AA" />
+                                        <Text className="text-muted-foreground text-sm">
+                                            {t('generatingHighlights')}
+                                        </Text>
+                                    </View>
+                                ) : highlights ? (
+                                    <Text className="text-foreground leading-relaxed">
+                                        {highlights}
+                                    </Text>
+                                ) : (
+                                    <Text className="text-muted-foreground text-sm italic">
+                                        {t('highlightsError')}
+                                    </Text>
+                                )}
                             </CardContent>
                         </Card>
                     )}

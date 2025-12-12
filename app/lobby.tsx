@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,8 +16,15 @@ export default function Lobby() {
     const { t } = useLanguage();
     const { gameState, setGameState } = useGame();
 
+    // Navigate away if no game state - using useEffect to avoid setState during render
+    useEffect(() => {
+        if (!gameState) {
+            router.replace('/');
+        }
+    }, [gameState, router]);
+
+    // Show nothing while redirecting
     if (!gameState) {
-        router.replace('/');
         return null;
     }
 
@@ -98,7 +105,7 @@ export default function Lobby() {
                                 </TouchableOpacity>
                             </View>
                             <Text className="text-sm text-muted-foreground mt-4 text-center">
-                                Share this code with friends to join!
+                                {t('shareCodeMessage')}
                             </Text>
                         </CardContent>
                     </Card>
