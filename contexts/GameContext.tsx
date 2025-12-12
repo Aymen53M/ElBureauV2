@@ -77,6 +77,7 @@ interface GameContextType {
     playerName: string;
     setPlayerName: (name: string) => Promise<void>;
     deviceId: string;
+    playerId: string;
 }
 
 const API_KEY_STORAGE_KEY = 'elbureau-api-key';
@@ -101,6 +102,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [apiKey, setApiKeyState] = useState('');
     const [playerName, setPlayerNameState] = useState('');
     const [deviceId, setDeviceId] = useState('');
+    const [sessionId, setSessionId] = useState('');
 
     // Load saved data on mount
     useEffect(() => {
@@ -128,12 +130,35 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
                     setDeviceId(nextId);
                 }
+
+                if (Platform.OS === 'web') {
+                    try {
+                        const key = 'elbureau-session-id';
+                        const sessionStorageRef = (globalThis as any)?.sessionStorage as
+                            | { getItem?: (k: string) => string | null; setItem?: (k: string, v: string) => void }
+                            | undefined;
+                        const existing = sessionStorageRef?.getItem?.(key);
+                        if (existing) {
+                            setSessionId(existing);
+                        } else {
+                            const next = `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                            sessionStorageRef?.setItem?.(key, next);
+                            setSessionId(next);
+                        }
+                    } catch {
+                        setSessionId(`session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+                    }
+                }
             } catch (error) {
                 console.error('Failed to load saved data:', error);
             }
         };
         loadSavedData();
     }, []);
+
+    const playerId = Platform.OS === 'web'
+        ? (deviceId && sessionId ? `${deviceId}:${sessionId}` : deviceId)
+        : deviceId;
 
     const setApiKey = async (key: string) => {
         try {
@@ -182,6 +207,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             playerName,
             setPlayerName,
             deviceId,
+            playerId,
         }}>
             {children}
         </GameContext.Provider>

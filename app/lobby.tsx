@@ -69,8 +69,13 @@ export default function Lobby() {
             onRoomChange: refresh,
         });
 
+        const poll = setInterval(() => {
+            refresh();
+        }, 3000);
+
         return () => {
             cancelled = true;
+            clearInterval(poll);
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
             setRealtimeStatus('idle');

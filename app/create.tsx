@@ -24,7 +24,7 @@ const questionTypes: { type: QuestionType; icon: string }[] = [
 export default function CreateRoom() {
     const router = useRouter();
     const { t, language, isRTL } = useLanguage();
-    const { apiKey, playerName, deviceId, setGameState, setCurrentPlayer } = useGame();
+    const { apiKey, playerName, playerId, setGameState, setCurrentPlayer } = useGame();
 
     const [theme, setTheme] = useState('movies');
     const [customTheme, setCustomTheme] = useState('');
@@ -63,12 +63,12 @@ export default function CreateRoom() {
             return;
         }
 
-        if (!deviceId) {
+        if (!playerId) {
             Alert.alert(t('loading'), t('loading'));
             return;
         }
 
-        const hostId = deviceId;
+        const hostId = playerId;
         const hostPlayer = {
             id: hostId,
             name: playerName,

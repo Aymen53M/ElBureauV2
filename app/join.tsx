@@ -16,7 +16,7 @@ import { joinRoom } from '@/services/roomService';
 export default function JoinRoom() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { playerName, apiKey, deviceId, setGameState, setCurrentPlayer } = useGame();
+    const { playerName, apiKey, playerId, setGameState, setCurrentPlayer } = useGame();
 
     const [roomCode, setRoomCode] = useState('');
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
@@ -32,7 +32,7 @@ export default function JoinRoom() {
             return;
         }
 
-        if (!deviceId) {
+        if (!playerId) {
             Alert.alert(t('loading'), t('loading'));
             return;
         }
@@ -41,7 +41,7 @@ export default function JoinRoom() {
 
         const normalizedRoomCode = roomCode.toUpperCase();
         const joiningPlayer = {
-            id: deviceId,
+            id: playerId,
             name: localPlayerName,
             score: 0,
             isHost: false,
