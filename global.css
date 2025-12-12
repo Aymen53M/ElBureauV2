@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom game-show theme colors as CSS variables for reference */
+/* These are used in tailwind.config.js */
+
+/*
+Theme Colors (HSL values used in Tailwind config):
+- background: 222 47% 8%     (#0D1321)
+- foreground: 180 100% 97%   (#F5FFFF)
+- card: 222 47% 12%          (#151E2E)
+- primary: 174 84% 50%       (#00D4AA) - Electric Teal
+- secondary: 16 85% 60%      (#F06543) - Coral
+- accent: 45 100% 55%        (#FFCC00) - Sunny Yellow
+- destructive: 0 84% 60%     (#EB3B3B)
+- muted: 222 30% 18%         (#212D3D)
+- neon-cyan: 180 100% 50%
+- neon-pink: 330 100% 65%
+- neon-yellow: 50 100% 60%
+- neon-green: 150 100% 50%
+*/
