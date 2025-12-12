@@ -10,12 +10,13 @@ import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
-import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { joinRoom } from '@/services/roomService';
 
 export default function JoinRoom() {
     const router = useRouter();
-    const { t, isRTL, language } = useLanguage();
-    const { playerName, apiKey, setGameState, setCurrentPlayer } = useGame();
+    const { t, isRTL } = useLanguage();
+    const { playerName, apiKey, deviceId, setGameState, setCurrentPlayer } = useGame();
 
     const [roomCode, setRoomCode] = useState('');
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
@@ -26,18 +27,21 @@ export default function JoinRoom() {
     const handleJoin = async () => {
         if (!canJoin) return;
 
-        if (!supabase || !isSupabaseConfigured) {
+        if (!isSupabaseConfigured) {
             Alert.alert('Supabase', 'Realtime is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
             return;
         }
 
-        const supabaseClient = supabase;
+        if (!deviceId) {
+            Alert.alert(t('loading'), t('loading'));
+            return;
+        }
 
         setIsJoining(true);
 
         const normalizedRoomCode = roomCode.toUpperCase();
         const joiningPlayer = {
-            id: 'player-' + Date.now(),
+            id: deviceId,
             name: localPlayerName,
             score: 0,
             isHost: false,
@@ -46,71 +50,20 @@ export default function JoinRoom() {
             hasApiKey: !!apiKey,
         };
 
-        const channel = supabaseClient.channel(`room:${normalizedRoomCode}`, {
-            config: {
-                presence: { key: joiningPlayer.id },
-            },
-        });
-
-        const cleanup = () => {
-            try {
-                supabaseClient.removeChannel(channel);
-            } catch {
-                // noop
-            }
-        };
-
         try {
-            const probe = await new Promise<{ hostId: string; settings?: any }>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('ROOM_NOT_FOUND'));
-                }, 5000);
-
-                const check = () => {
-                    const state = channel.presenceState();
-                    const presences: any[] = Object.values(state).flat();
-                    const hostPresence = presences.find((p) => p?.player?.isHost);
-                    if (hostPresence?.player?.id) {
-                        clearTimeout(timeout);
-                        resolve({ hostId: hostPresence.player.id, settings: hostPresence?.room?.settings });
-                    }
-                };
-
-                channel.on('presence', { event: 'sync' }, check);
-                channel.on('presence', { event: 'join' }, check);
-
-                channel.subscribe(async (status: string) => {
-                    if (status === 'SUBSCRIBED') {
-                        await channel.track({ player: joiningPlayer });
-                        check();
-                        return;
-                    }
-
-                    if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-                        clearTimeout(timeout);
-                        reject(new Error(status));
-                    }
-                });
+            const { room, players } = await joinRoom({
+                roomCode: normalizedRoomCode,
+                player: joiningPlayer,
             });
-
-            cleanup();
 
             setGameState({
                 roomCode: normalizedRoomCode,
                 phase: 'lobby',
-                players: [joiningPlayer],
+                players,
                 currentQuestion: 0,
                 questions: [],
-                settings: probe.settings || {
-                    theme: 'movies',
-                    difficulty: 'medium',
-                    numberOfQuestions: 10,
-                    timePerQuestion: 30,
-                    questionType: 'multiple-choice',
-                    language,
-                    hintsEnabled: true,
-                },
-                hostId: probe.hostId,
+                settings: room.settings,
+                hostId: room.host_player_id,
                 hostApiKey: undefined,
                 playerApiKeys: apiKey ? { [joiningPlayer.id]: apiKey } : {},
                 answers: {},
@@ -120,7 +73,6 @@ export default function JoinRoom() {
             setIsJoining(false);
             router.push('/lobby');
         } catch (err) {
-            cleanup();
             setIsJoining(false);
             const code = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
             Alert.alert(

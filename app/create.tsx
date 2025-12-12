@@ -11,6 +11,8 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import ThemeSelector from '@/components/ThemeSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Difficulty, QuestionType } from '@/contexts/GameContext';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { createRoom } from '@/services/roomService';
 
 const difficulties: Difficulty[] = ['easy', 'medium', 'hard', 'mixed'];
 const questionTypes: { type: QuestionType; icon: string }[] = [
@@ -22,7 +24,7 @@ const questionTypes: { type: QuestionType; icon: string }[] = [
 export default function CreateRoom() {
     const router = useRouter();
     const { t, language, isRTL } = useLanguage();
-    const { apiKey, playerName, setGameState, setCurrentPlayer } = useGame();
+    const { apiKey, playerName, deviceId, setGameState, setCurrentPlayer } = useGame();
 
     const [theme, setTheme] = useState('movies');
     const [customTheme, setCustomTheme] = useState('');
@@ -43,7 +45,7 @@ export default function CreateRoom() {
         }
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (!canCreate) {
             Alert.alert(
                 t('setupRequired'),
@@ -56,11 +58,17 @@ export default function CreateRoom() {
             return;
         }
 
-        // Generate room code
-        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        if (!isSupabaseConfigured) {
+            Alert.alert('Supabase', 'Realtime is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+            return;
+        }
 
-        // Initialize game state
-        const hostId = 'host-' + Date.now();
+        if (!deviceId) {
+            Alert.alert(t('loading'), t('loading'));
+            return;
+        }
+
+        const hostId = deviceId;
         const hostPlayer = {
             id: hostId,
             name: playerName,
@@ -71,31 +79,54 @@ export default function CreateRoom() {
             hasApiKey: true,
         };
 
-        setGameState({
-            roomCode,
-            phase: 'lobby',
-            players: [hostPlayer],
-            currentQuestion: 0,
-            questions: [],
-            settings: {
-                theme: theme === 'custom' ? 'custom' : theme,
-                customTheme: theme === 'custom' ? customTheme : undefined,
-                difficulty,
-                numberOfQuestions: questionCount,
-                timePerQuestion,
-                questionType,
-                language,
-                hintsEnabled: true,
-            },
-            hostId,
-            hostApiKey: apiKey,
-            playerApiKeys: { [hostId]: apiKey },
-            answers: {},
-        });
+        const settings = {
+            theme: theme === 'custom' ? 'custom' : theme,
+            customTheme: theme === 'custom' ? customTheme : undefined,
+            difficulty,
+            numberOfQuestions: questionCount,
+            timePerQuestion,
+            questionType,
+            language,
+            hintsEnabled: true,
+        };
 
-        setCurrentPlayer(hostPlayer);
+        let roomCode = '';
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                const { room, players } = await createRoom({
+                    roomCode,
+                    hostPlayer,
+                    settings,
+                });
 
-        router.push('/lobby');
+                setGameState({
+                    roomCode: room.room_code,
+                    phase: 'lobby',
+                    players,
+                    currentQuestion: 0,
+                    questions: [],
+                    settings: room.settings,
+                    hostId: room.host_player_id,
+                    hostApiKey: apiKey,
+                    playerApiKeys: { [hostId]: apiKey },
+                    answers: {},
+                });
+
+                setCurrentPlayer(hostPlayer);
+                router.push('/lobby');
+                return;
+            } catch (err) {
+                lastError = err;
+                const msg = err instanceof Error ? err.message.toLowerCase() : '';
+                if (!msg.includes('duplicate') && !msg.includes('unique')) {
+                    break;
+                }
+            }
+        }
+
+        Alert.alert(t('createRoom'), lastError instanceof Error ? lastError.message : 'Failed to create room');
     };
 
     return (

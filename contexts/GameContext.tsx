@@ -76,10 +76,12 @@ interface GameContextType {
     setApiKey: (key: string) => Promise<void>;
     playerName: string;
     setPlayerName: (name: string) => Promise<void>;
+    deviceId: string;
 }
 
 const API_KEY_STORAGE_KEY = 'elbureau-api-key';
 const PLAYER_NAME_STORAGE_KEY = 'elbureau-player-name';
+const DEVICE_ID_STORAGE_KEY = 'elbureau-device-id';
 
 const defaultSettings: GameSettings = {
     theme: 'movies',
@@ -98,6 +100,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
     const [apiKey, setApiKeyState] = useState('');
     const [playerName, setPlayerNameState] = useState('');
+    const [deviceId, setDeviceId] = useState('');
 
     // Load saved data on mount
     useEffect(() => {
@@ -115,6 +118,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const savedName = await AsyncStorage.getItem(PLAYER_NAME_STORAGE_KEY);
                 if (savedName) {
                     setPlayerNameState(savedName);
+                }
+
+                const savedDeviceId = await AsyncStorage.getItem(DEVICE_ID_STORAGE_KEY);
+                if (savedDeviceId) {
+                    setDeviceId(savedDeviceId);
+                } else {
+                    const nextId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                    await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
+                    setDeviceId(nextId);
                 }
             } catch (error) {
                 console.error('Failed to load saved data:', error);
@@ -169,6 +181,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setApiKey,
             playerName,
             setPlayerName,
+            deviceId,
         }}>
             {children}
         </GameContext.Provider>

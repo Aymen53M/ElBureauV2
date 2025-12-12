@@ -11,14 +11,15 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
-import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { fetchRoomState, subscribeToRoom, updatePlayerState, leaveRoom } from '@/services/roomService';
 
 export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
 
-    const channelRef = React.useRef<any>(null);
+    const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
     const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
 
@@ -32,77 +33,49 @@ export default function Lobby() {
     }, [gameState, router]);
 
     useEffect(() => {
-        if (!supabase || !gameState?.roomCode || !currentPlayer?.id) return;
+        if (!isSupabaseConfigured || !gameState?.roomCode) return;
 
-        const supabaseClient = supabase;
         setRealtimeStatus('connecting');
         setRealtimeError(null);
 
-        const channel = supabaseClient.channel(`room:${gameState.roomCode}`, {
-            config: {
-                presence: { key: currentPlayer.id },
-            },
-        });
+        let cancelled = false;
 
-        channelRef.current = channel;
-
-        const syncPlayers = () => {
-            const state = channel.presenceState();
-            const presences: any[] = Object.values(state).flat();
-
-            const players = presences
-                .map((p) => p?.player as Player | undefined)
-                .filter((p): p is Player => !!p && typeof p.id === 'string');
-
-            const byId = new Map<string, Player>();
-            players.forEach((p) => byId.set(p.id, p));
-            const nextPlayers = Array.from(byId.values()).sort((a, b) => {
-                if (a.isHost === b.isHost) return 0;
-                return a.isHost ? -1 : 1;
-            });
-
-            const host = nextPlayers.find((p) => p.isHost);
-            const hostPresence = presences.find((p) => p?.player?.isHost);
-            const hostSettings = hostPresence?.room?.settings;
-
-            setGameState((prev) => {
-                if (!prev) return prev;
-                return {
-                    ...prev,
-                    hostId: host?.id || prev.hostId,
-                    settings: hostSettings || prev.settings,
-                    players: nextPlayers.length ? nextPlayers : prev.players,
-                };
-            });
+        const refresh = async () => {
+            try {
+                const { room, players } = await fetchRoomState(gameState.roomCode);
+                if (cancelled) return;
+                setGameState((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        roomCode: room.room_code,
+                        hostId: room.host_player_id,
+                        settings: room.settings,
+                        players: players.length ? players : prev.players,
+                    };
+                });
+                setRealtimeStatus('connected');
+            } catch (err) {
+                if (cancelled) return;
+                setRealtimeStatus('error');
+                setRealtimeError(err instanceof Error ? err.message : 'Unknown error');
+            }
         };
 
-        channel.on('presence', { event: 'sync' }, syncPlayers);
-        channel.on('presence', { event: 'join' }, syncPlayers);
-        channel.on('presence', { event: 'leave' }, syncPlayers);
-
-        channel.subscribe(async (status: string) => {
-            if (status === 'SUBSCRIBED') {
-                setRealtimeStatus('connected');
-                await channel.track({
-                    player: currentPlayer,
-                    room: currentPlayer.isHost ? { settings: gameState.settings } : undefined,
-                });
-                syncPlayers();
-                return;
-            }
-
-            if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-                setRealtimeStatus('error');
-                setRealtimeError(status);
-            }
+        refresh();
+        subscriptionRef.current?.unsubscribe();
+        subscriptionRef.current = subscribeToRoom({
+            roomCode: gameState.roomCode,
+            onRoomChange: refresh,
         });
 
         return () => {
-            supabaseClient.removeChannel(channel);
-            channelRef.current = null;
+            cancelled = true;
+            subscriptionRef.current?.unsubscribe();
+            subscriptionRef.current = null;
             setRealtimeStatus('idle');
         };
-    }, [currentPlayer?.id, gameState?.roomCode]);
+    }, [gameState?.roomCode]);
 
     if (!gameState) {
         return (
@@ -125,7 +98,20 @@ export default function Lobby() {
         Alert.alert(t('copied'), gameState.roomCode);
     };
 
-    const toggleReady = () => {
+    const exitLobby = async () => {
+        if (isSupabaseConfigured && gameState?.roomCode && currentPlayer?.id) {
+            try {
+                await leaveRoom({ roomCode: gameState.roomCode, playerId: currentPlayer.id });
+            } catch {
+                // noop
+            }
+        }
+        setCurrentPlayer(null);
+        setGameState(null);
+        router.replace('/');
+    };
+
+    const toggleReady = async () => {
         if (!currentPlayer?.id) return;
 
         const nextReady = !gameState.players.find((p) => p.id === currentPlayer.id)?.isReady;
@@ -146,7 +132,16 @@ export default function Lobby() {
         });
 
         setCurrentPlayer(nextPlayer);
-        channelRef.current?.track?.({ player: nextPlayer });
+
+        try {
+            await updatePlayerState({
+                roomCode: gameState.roomCode,
+                playerId: currentPlayer.id,
+                patch: { is_ready: !!nextReady },
+            });
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update player');
+        }
     };
 
     const startGame = () => {
@@ -171,7 +166,7 @@ export default function Lobby() {
             >
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
-                    <TouchableOpacity onPress={() => router.replace('/')} className="p-2">
+                    <TouchableOpacity onPress={exitLobby} className="p-2">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
