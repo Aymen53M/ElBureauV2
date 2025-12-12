@@ -58,7 +58,7 @@ export default function Lobby() {
         <SafeAreaView className="flex-1 bg-background">
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="p-4 max-w-4xl w-full self-center pb-10"
+                contentContainerClassName="p-7 max-w-4xl w-full self-center pb-16 space-y-12"
             >
                 {/* Header */}
                 <View className="flex-row items-center gap-4 mb-8 pt-8">
@@ -74,16 +74,16 @@ export default function Lobby() {
                     )}
                 </View>
 
-                <View className="max-w-2xl mx-auto w-full space-y-8">
+                <View className="max-w-2xl mx-auto w-full space-y-12">
                     {/* Room Code */}
-                    <Card className="border-primary/30" style={{
+                    <Card className="border-primary/30 rounded-3xl" style={{
                         shadowColor: '#00D4AA',
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.5,
                         shadowRadius: 20,
                         elevation: 10,
                     }}>
-                        <CardContent className="p-6 items-center">
+                        <CardContent className="p-7 items-center space-y-2">
                             <Text className="text-sm text-muted-foreground mb-2">{t('roomCode')}</Text>
                             <View className="flex-row items-center gap-4">
                                 <Text className="text-5xl font-display font-bold tracking-widest text-primary" style={{
@@ -104,8 +104,8 @@ export default function Lobby() {
                     </Card>
 
                     {/* Game Settings Preview */}
-                    <Card>
-                        <CardContent className="p-4">
+                    <Card className="rounded-3xl">
+                        <CardContent className="p-6">
                             <View className="flex-row flex-wrap gap-3 justify-center">
                                 <View className="px-3 py-1.5 rounded-full bg-muted">
                                     <Text className="text-sm font-medium text-foreground">
@@ -133,12 +133,12 @@ export default function Lobby() {
                     </Card>
 
                     {/* Players */}
-                    <View>
+                    <View className="space-y-5">
                         <Text className="text-lg font-display font-bold text-center mb-4 text-foreground">
                             {t('players')} ({gameState.players.length})
                         </Text>
 
-                        <View className="flex-row flex-wrap justify-center gap-6">
+                        <View className="flex-row flex-wrap justify-center gap-7 pt-2">
                             {gameState.players.map((player) => (
                                 <PlayerAvatar
                                     key={player.id}

@@ -47,8 +47,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     };
 
     return (
-        <Card className="border-primary/30" style={styles.cardShadow}>
-            <CardContent className="p-6 space-y-6">
+        <Card className="border-primary/30 rounded-3xl" style={styles.cardShadow}>
+            <CardContent className="p-7 space-y-7">
                 {/* Question header */}
                 <View className="flex-row items-center justify-between">
                     <Text className="text-sm font-semibold text-muted-foreground">

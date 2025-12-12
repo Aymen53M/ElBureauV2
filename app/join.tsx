@@ -81,7 +81,7 @@ export default function JoinRoom() {
         <SafeAreaView className="flex-1 bg-background">
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="p-4 flex-1 justify-center max-w-md w-full self-center"
+                contentContainerClassName="p-7 flex-1 justify-center max-w-md w-full self-center space-y-8"
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
@@ -96,8 +96,8 @@ export default function JoinRoom() {
                 </View>
 
                 <View className="max-w-md mx-auto w-full">
-                    <Card>
-                        <CardHeader className="items-center">
+                    <Card className="rounded-3xl">
+                        <CardHeader className="items-center space-y-4 pt-2">
                             <View className="w-20 h-20 rounded-full bg-secondary/20 items-center justify-center mb-4">
                                 <Ionicons name="people" size={40} color="#F06543" />
                             </View>
@@ -106,9 +106,9 @@ export default function JoinRoom() {
                                 Enter the room code shared by your host
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="space-y-8">
                             {/* Player Name */}
-                            <View className="space-y-2">
+                            <View className="space-y-4">
                                 <Text className="text-sm font-medium text-foreground">{t('playerName')}</Text>
                                 <Input
                                     value={localPlayerName}
@@ -119,7 +119,7 @@ export default function JoinRoom() {
                             </View>
 
                             {/* Room Code */}
-                            <View className="space-y-2">
+                            <View className="space-y-3">
                                 <Text className="text-sm font-medium text-foreground">{t('roomCode')}</Text>
                                 <Input
                                     value={roomCode}

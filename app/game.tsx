@@ -345,10 +345,10 @@ export default function Game() {
         <SafeAreaView className="flex-1 bg-background">
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="p-4 max-w-5xl w-full self-center pb-12"
+                contentContainerClassName="p-7 max-w-5xl w-full self-center pb-16 space-y-10"
             >
                 {/* Header */}
-                <View className="flex-row items-center justify-between mb-6 pt-8">
+                <View className="flex-row items-center justify-between mb-9 pt-12">
                     <Logo size="sm" animated={false} />
                     <View className="flex-row items-center gap-4">
                         <Text className="text-sm text-muted-foreground">
@@ -360,18 +360,18 @@ export default function Game() {
                     </View>
                 </View>
 
-                <View className="max-w-3xl mx-auto w-full space-y-6">
+                <View className="max-w-3xl mx-auto w-full space-y-10">
                     {/* Betting Phase */}
                     {phase === 'betting' && !isFinalRound && (
-                        <View className="space-y-6">
-                            <Card className="border-accent/30" style={{
+                        <View className="space-y-7">
+                            <Card className="border-accent/30 rounded-3xl" style={{
                                 shadowColor: '#FFCC00',
                                 shadowOffset: { width: 0, height: 0 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 20,
                                 elevation: 10,
                             }}>
-                                <CardContent className="p-8">
+                                <CardContent className="p-9">
                                     <BetSelector
                                         totalQuestions={totalQuestions}
                                         usedBets={usedBetsForPlayer}
@@ -399,9 +399,9 @@ export default function Game() {
 
                     {/* Final wager setup */}
                     {phase === 'final-wager' && (
-                        <View className="space-y-4">
-                            <Card>
-                                <CardContent className="p-6 space-y-4">
+                        <View className="space-y-6">
+                            <Card className="rounded-3xl">
+                                <CardContent className="p-7 space-y-5">
                                     <Text className="text-2xl font-display font-bold text-center text-foreground">
                                         {t('finalWager')}
                                     </Text>
@@ -435,7 +435,7 @@ export default function Game() {
                                         ))}
                                     </View>
 
-                                    <View className="space-y-2">
+                                    <View className="space-y-3">
                                         <Text className="text-center font-semibold text-foreground">{t('chooseDifficulty')}</Text>
                                         <View className="flex-row justify-center gap-2">
                                             {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
@@ -467,7 +467,7 @@ export default function Game() {
 
                     {/* Question Phase */}
                     {(phase === 'question' || phase === 'preview' || phase === 'validation' || phase === 'scoring') && activeQuestion && (
-                        <View className="space-y-6">
+                        <View className="space-y-8">
                             {/* Timer */}
                             {phase === 'question' && (
                                 <View className="items-center">
@@ -502,9 +502,9 @@ export default function Game() {
 
                             {/* Answer Preview Phase */}
                             {phase === 'preview' && !showCorrectAnswer && (
-                                <View className="space-y-3">
-                                    <Card>
-                                        <CardContent className="p-4 space-y-2">
+                                <View className="space-y-5">
+                                    <Card className="rounded-3xl">
+                                        <CardContent className="p-5 space-y-3">
                                             <Text className="text-lg font-display font-semibold text-foreground">
                                                 {t('answerPreview')}
                                             </Text>
@@ -546,8 +546,8 @@ export default function Game() {
 
                             {/* Validation Phase */}
                             {phase === 'validation' && (
-                                <Card>
-                                    <CardContent className="p-4 space-y-3">
+                                <Card className="rounded-3xl">
+                                    <CardContent className="p-5 space-y-4">
                                         <Text className="text-lg font-display font-semibold text-foreground">
                                             {t('hostValidation')}
                                         </Text>

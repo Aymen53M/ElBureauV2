@@ -101,7 +101,7 @@ export default function CreateRoom() {
         <SafeAreaView className="flex-1 bg-background">
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="p-4 pb-10 max-w-4xl w-full self-center"
+                contentContainerClassName="p-7 pb-14 max-w-4xl w-full self-center space-y-8"
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Header */}
@@ -115,11 +115,11 @@ export default function CreateRoom() {
                     </Text>
                 </View>
 
-                <View className="max-w-lg mx-auto w-full space-y-4">
+                <View className="max-w-lg mx-auto w-full space-y-8">
                     {/* API Key Warning */}
                     {!canCreate && (
-                        <Card className="border-destructive/50 bg-destructive/10">
-                            <CardContent className="p-4 flex-row items-center gap-3">
+                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                            <CardContent className="p-5 flex-row items-center gap-3">
                                 <Text className="text-2xl">⚠️</Text>
                                 <View className="flex-1">
                                     <Text className="font-semibold text-foreground">Setup Required</Text>
@@ -135,8 +135,8 @@ export default function CreateRoom() {
                     )}
 
                     {/* Theme Selection */}
-                    <Card>
-                        <CardContent className="p-6">
+                    <Card className="rounded-3xl">
+                        <CardContent className="p-7 space-y-4">
                             <ThemeSelector
                                 selectedTheme={theme}
                                 customTheme={customTheme}
@@ -147,14 +147,14 @@ export default function CreateRoom() {
                     </Card>
 
                     {/* Difficulty */}
-                    <Card>
-                        <CardHeader className="pb-3">
+                    <Card className="rounded-3xl">
+                        <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
                                 <Ionicons name="flash" size={20} color="#FFCC00" />
                                 <CardTitle className="text-lg">{t('difficulty')}</CardTitle>
                             </View>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-3">
                             <View className="flex-row gap-2">
                                 {difficulties.map((d) => (
                                     <TouchableOpacity
@@ -173,8 +173,8 @@ export default function CreateRoom() {
                     </Card>
 
                     {/* Question Count */}
-                    <Card>
-                        <CardHeader className="pb-3">
+                    <Card className="rounded-3xl">
+                        <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
                                 <Ionicons name="help-circle" size={20} color="#00D4AA" />
                                 <CardTitle className="text-lg">
@@ -182,7 +182,7 @@ export default function CreateRoom() {
                                 </CardTitle>
                             </View>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-4">
                             <Slider
                                 value={questionCount}
                                 onValueChange={(val) => setQuestionCount(Math.round(val))}
@@ -201,8 +201,8 @@ export default function CreateRoom() {
                     </Card>
 
                     {/* Time per Question */}
-                    <Card>
-                        <CardHeader className="pb-3">
+                    <Card className="rounded-3xl">
+                        <CardHeader className="pb-4">
                             <View className="flex-row items-center gap-2">
                                 <Ionicons name="timer" size={20} color="#F06543" />
                                 <CardTitle className="text-lg">
@@ -256,19 +256,21 @@ export default function CreateRoom() {
                     </Card>
 
                     {/* Create Button */}
-                    <Button
-                        variant="hero"
-                        onPress={handleCreate}
-                        disabled={!canCreate || (theme === 'custom' && !customTheme)}
-                        className="w-full"
-                    >
-                        <View className="flex-row items-center gap-2">
-                            <Text className="text-lg font-display font-bold text-primary-foreground">
-                                {t('createRoom')}
-                            </Text>
-                            <Text className="text-lg">🎉</Text>
-                        </View>
-                    </Button>
+                    <View className="pt-2">
+                        <Button
+                            variant="hero"
+                            onPress={handleCreate}
+                            disabled={!canCreate || (theme === 'custom' && !customTheme)}
+                            className="w-full py-4 shadow-lg shadow-primary/30"
+                        >
+                            <View className="flex-row items-center gap-3 justify-center">
+                                <Text className="text-lg font-display font-bold text-primary-foreground">
+                                    {t('createRoom')}
+                                </Text>
+                                <Text className="text-xl">🎉</Text>
+                            </View>
+                        </Button>
+                    </View>
                 </View>
             </ScrollView>
         </SafeAreaView>

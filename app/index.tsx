@@ -23,7 +23,7 @@ export default function Index() {
                 <Text className="absolute bottom-20 right-24 text-3xl opacity-20">🏆</Text>
             </View>
 
-            <View className="flex-row items-center justify-between px-4 pt-8 pb-4 max-w-5xl w-full self-center">
+            <View className="flex-row items-center justify-between px-6 pt-12 pb-8 max-w-5xl w-full self-center">
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
                     <TouchableOpacity className="p-2">
@@ -33,19 +33,19 @@ export default function Index() {
             </View>
 
             <ScrollView
-                contentContainerClassName="flex-1 items-center justify-center px-4 max-w-5xl w-full self-center"
+                contentContainerClassName="flex-1 items-center justify-center px-6 max-w-5xl w-full self-center space-y-14"
                 showsVerticalScrollIndicator={false}
             >
-                <View className="items-center space-y-8 w-full">
-                    <View className="mb-8">
+                <View className="items-center space-y-12 w-full">
+                    <View className="mb-6">
                         <Logo size="xl" animated />
                     </View>
                     <Text className="text-xl text-muted-foreground font-display text-center">
                         {t('tagline')}
                     </Text>
-                    <View className="w-full space-y-4 pt-8">
+                    <View className="w-full space-y-6 pt-8">
                         <Link href="/create" asChild>
-                            <Button variant="hero" className="w-full">
+                            <Button variant="hero" className="w-full rounded-full py-5">
                                 <View className="flex-row items-center justify-center gap-2">
                                     <Ionicons name="add-circle-outline" size={24} color="#0D1321" />
                                     <Text className="text-lg font-display font-bold text-primary-foreground">
