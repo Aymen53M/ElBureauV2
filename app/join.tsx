@@ -13,7 +13,7 @@ import { useGame } from '@/contexts/GameContext';
 
 export default function JoinRoom() {
     const router = useRouter();
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, language } = useLanguage();
     const { playerName, apiKey, setGameState, setCurrentPlayer } = useGame();
 
     const [roomCode, setRoomCode] = useState('');
@@ -42,18 +42,7 @@ export default function JoinRoom() {
             setGameState({
                 roomCode: roomCode.toUpperCase(),
                 phase: 'lobby',
-                players: [
-                    {
-                        id: 'host-mock',
-                        name: 'Host Player',
-                        score: 0,
-                        isHost: true,
-                        isReady: true,
-                        usedBets: [],
-                        hasApiKey: true,
-                    },
-                    joiningPlayer,
-                ],
+                players: [joiningPlayer],
                 currentQuestion: 0,
                 questions: [],
                 settings: {
@@ -62,12 +51,12 @@ export default function JoinRoom() {
                     numberOfQuestions: 10,
                     timePerQuestion: 30,
                     questionType: 'multiple-choice',
-                    language: 'en',
+                    language,
                     hintsEnabled: true,
                 },
-                hostId: 'host-mock',
+                hostId: 'pending',
                 hostApiKey: undefined,
-                playerApiKeys: { [joiningPlayer.id]: apiKey || '' },
+                playerApiKeys: apiKey ? { [joiningPlayer.id]: apiKey } : {},
                 answers: {},
             });
 

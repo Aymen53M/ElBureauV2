@@ -10,12 +10,15 @@ import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useGame } from '@/contexts/GameContext';
+import { useGame, Player } from '@/contexts/GameContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { gameState, setGameState } = useGame();
+    const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
+
+    const channelRef = React.useRef<any>(null);
 
     // Navigate away if no game state - using useEffect to avoid setState during render
     useEffect(() => {
@@ -24,12 +27,68 @@ export default function Lobby() {
         }
     }, [gameState, router]);
 
+    useEffect(() => {
+        if (!gameState?.roomCode || !currentPlayer?.id) return;
+
+        const channel = supabase.channel(`room:${gameState.roomCode}`, {
+            config: {
+                presence: { key: currentPlayer.id },
+            },
+        });
+
+        channelRef.current = channel;
+
+        const syncPlayers = () => {
+            const state = channel.presenceState();
+            const presences: any[] = Object.values(state).flat();
+
+            const players = presences
+                .map((p) => p?.player as Player | undefined)
+                .filter((p): p is Player => !!p && typeof p.id === 'string');
+
+            const byId = new Map<string, Player>();
+            players.forEach((p) => byId.set(p.id, p));
+            const nextPlayers = Array.from(byId.values()).sort((a, b) => {
+                if (a.isHost === b.isHost) return 0;
+                return a.isHost ? -1 : 1;
+            });
+
+            const host = nextPlayers.find((p) => p.isHost);
+
+            setGameState((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    hostId: host?.id || prev.hostId,
+                    players: nextPlayers.length ? nextPlayers : prev.players,
+                };
+            });
+        };
+
+        channel.on('presence', { event: 'sync' }, syncPlayers);
+        channel.on('presence', { event: 'join' }, syncPlayers);
+        channel.on('presence', { event: 'leave' }, syncPlayers);
+
+        channel.subscribe(async (status: string) => {
+            if (status !== 'SUBSCRIBED') return;
+            await channel.track({
+                player: currentPlayer,
+                room: currentPlayer.isHost ? { settings: gameState.settings } : undefined,
+            });
+        });
+
+        return () => {
+            supabase.removeChannel(channel);
+            channelRef.current = null;
+        };
+    }, [currentPlayer?.id, gameState?.roomCode]);
+
     // Show nothing while redirecting
     if (!gameState) {
         return null;
     }
 
-    const isHost = gameState.players[0]?.isHost;
+    const isHost = !!currentPlayer?.id && currentPlayer.id === gameState.hostId;
     const allReady = gameState.players.every(p => p.isReady);
 
     const copyRoomCode = async () => {
@@ -38,15 +97,27 @@ export default function Lobby() {
     };
 
     const toggleReady = () => {
+        if (!currentPlayer?.id) return;
+
+        const nextReady = !gameState.players.find((p) => p.id === currentPlayer.id)?.isReady;
+
+        const nextPlayer: Player = {
+            ...(gameState.players.find((p) => p.id === currentPlayer.id) || currentPlayer),
+            isReady: !!nextReady,
+        };
+
         setGameState(prev => {
             if (!prev) return prev;
             return {
                 ...prev,
-                players: prev.players.map((p, i) =>
-                    i === (isHost ? 0 : 1) ? { ...p, isReady: !p.isReady } : p
+                players: prev.players.map((p) =>
+                    p.id === currentPlayer.id ? { ...p, isReady: !!nextReady } : p
                 ),
             };
         });
+
+        setCurrentPlayer(nextPlayer);
+        channelRef.current?.track?.({ player: nextPlayer });
     };
 
     const startGame = () => {
@@ -174,16 +245,16 @@ export default function Lobby() {
 
                     {/* Actions */}
                     <View className="space-y-3">
-                        {!isHost && (
+                        {!isHost && currentPlayer?.id && (
                             <Button
-                                variant={gameState.players[1]?.isReady ? 'default' : 'outline'}
+                                variant={gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'default' : 'outline'}
                                 size="lg"
                                 onPress={toggleReady}
                                 className="w-full"
                             >
-                                <Text className={`font-display font-bold ${gameState.players[1]?.isReady ? 'text-primary-foreground' : 'text-primary'
+                                <Text className={`font-display font-bold ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'text-primary-foreground' : 'text-primary'
                                     }`}>
-                                    {gameState.players[1]?.isReady ? t('ready') + ' ✅' : t('notReady')}
+                                    {gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? t('ready') + ' ✅' : t('notReady')}
                                 </Text>
                             </Button>
                         )}
