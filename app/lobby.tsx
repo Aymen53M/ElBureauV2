@@ -11,7 +11,7 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
-import { supabase, isSupabaseConfigured, resolvedSupabaseUrl } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 export default function Lobby() {
     const router = useRouter();
@@ -21,7 +21,6 @@ export default function Lobby() {
     const channelRef = React.useRef<any>(null);
     const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
-    const [realtimeRetryToken, setRealtimeRetryToken] = React.useState(0);
 
     // Navigate away if no game state - using useEffect to avoid setState during render
     useEffect(() => {
@@ -100,13 +99,7 @@ export default function Lobby() {
             channelRef.current = null;
             setRealtimeStatus('idle');
         };
-    }, [currentPlayer?.id, gameState?.roomCode, realtimeRetryToken]);
-
-    const retryRealtime = () => {
-        setRealtimeStatus('connecting');
-        setRealtimeError(null);
-        setRealtimeRetryToken((v) => v + 1);
-    };
+    }, [currentPlayer?.id, gameState?.roomCode]);
 
     if (!gameState) {
         return (
@@ -197,9 +190,6 @@ export default function Lobby() {
                                     EXPO_PUBLIC_SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY) in Vercel,
                                     then redeploy.
                                 </Text>
-                                {!!resolvedSupabaseUrl && (
-                                    <Text className="text-xs text-muted-foreground">URL: {resolvedSupabaseUrl}</Text>
-                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -211,12 +201,6 @@ export default function Lobby() {
                                 <Text className="text-sm text-muted-foreground">
                                     {realtimeError || 'Unknown error'}
                                 </Text>
-                                {!!resolvedSupabaseUrl && (
-                                    <Text className="text-xs text-muted-foreground">URL: {resolvedSupabaseUrl}</Text>
-                                )}
-                                <Button size="sm" variant="outline" onPress={retryRealtime}>
-                                    <Text className="text-primary font-display">Retry</Text>
-                                </Button>
                             </CardContent>
                         </Card>
                     )}
