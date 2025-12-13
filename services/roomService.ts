@@ -7,6 +7,9 @@ type RoomRow = {
     settings: GameSettings;
     phase: string;
     questions?: unknown;
+    current_question_index?: number;
+    phase_started_at?: string;
+    final_mode?: string;
 };
 
 type RoomPlayerRow = {
@@ -52,11 +55,17 @@ export async function fetchRoomState(roomCode: string): Promise<RoomState> {
 
     const { data: room, error: roomError } = await client
         .from('elbureau_rooms')
-        .select('room_code, host_player_id, settings, phase, questions')
+        .select('room_code, host_player_id, settings, phase, questions, current_question_index, phase_started_at, final_mode')
         .eq('room_code', normalized)
         .single();
 
-    if (roomError && roomError.message?.toLowerCase?.().includes('questions')) {
+    const missingColumn = (msg?: string) =>
+        (msg || '').toLowerCase().includes('questions') ||
+        (msg || '').toLowerCase().includes('current_question_index') ||
+        (msg || '').toLowerCase().includes('phase_started_at') ||
+        (msg || '').toLowerCase().includes('final_mode');
+
+    if (roomError && missingColumn(roomError.message)) {
         const { data: fallbackRoom, error: fallbackError } = await client
             .from('elbureau_rooms')
             .select('room_code, host_player_id, settings, phase')

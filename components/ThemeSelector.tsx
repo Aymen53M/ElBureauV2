@@ -7,6 +7,7 @@ interface ThemeSelectorProps {
     customTheme: string;
     onSelectTheme: (theme: string) => void;
     onCustomThemeChange: (text: string) => void;
+    density?: 'default' | 'compact';
 }
 
 const themes = [
@@ -26,8 +27,14 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
     customTheme,
     onSelectTheme,
     onCustomThemeChange,
+    density = 'default',
 }) => {
     const { t } = useLanguage();
+
+    const isCompact = density === 'compact';
+    const tileClass = isCompact ? 'w-16 h-16 rounded-2xl' : 'w-20 h-20 rounded-2xl';
+    const iconClass = isCompact ? 'text-2xl mb-0.5' : 'text-3xl mb-1';
+    const gridClass = isCompact ? 'gap-2' : 'gap-3';
 
     return (
         <View className="space-y-4">
@@ -36,17 +43,17 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
             </Text>
 
             {/* Theme grid */}
-            <View className="flex-row flex-wrap gap-3 justify-center">
+            <View className={`flex-row flex-wrap justify-center ${gridClass}`}>
                 {themes.map((theme) => (
                     <TouchableOpacity
                         key={theme.id}
                         onPress={() => onSelectTheme(theme.id)}
-                        className={`w-20 h-20 rounded-2xl items-center justify-center ${selectedTheme === theme.id
+                        className={`${tileClass} items-center justify-center ${selectedTheme === theme.id
                                 ? 'bg-primary/20 border-2 border-primary'
                                 : 'bg-muted border-2 border-transparent'
                             }`}
                     >
-                        <Text className="text-3xl mb-1">{theme.icon}</Text>
+                        <Text className={iconClass}>{theme.icon}</Text>
                         <Text className={`text-xs font-display ${selectedTheme === theme.id ? 'text-primary' : 'text-muted-foreground'
                             }`}>
                             {t(theme.id)}

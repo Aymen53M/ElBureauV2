@@ -206,15 +206,47 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
             return { error: 'Received unparseable response from Gemini.', code: 'PARSING_ERROR' };
         }
 
-        const questions: Question[] = parsed.map((q: any, index: number) => ({
-            id: `q-${Date.now()}-${index}`,
-            text: q.text,
-            type: q.type || settings.questionType,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            hint: q.hint,
-            difficulty: q.difficulty || settings.difficulty || 'medium',
-        }));
+        const questions: Question[] = parsed.map((q: any, index: number) => {
+            const desiredType = settings.questionType;
+            const correctAnswer = typeof q.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+            const text = typeof q.text === 'string' ? q.text.trim() : '';
+            const hint = typeof q.hint === 'string' ? q.hint.trim() : undefined;
+
+            let options: string[] | undefined = Array.isArray(q.options)
+                ? (q.options as unknown[])
+                    .map((o) => (typeof o === 'string' ? o.trim() : ''))
+                    .filter((o) => o.length > 0)
+                : undefined;
+
+            let finalType = desiredType;
+
+            if (desiredType === 'multiple-choice') {
+                if (options && correctAnswer) {
+                    if (!options.includes(correctAnswer)) {
+                        options = [correctAnswer, ...options];
+                    }
+                    options = Array.from(new Set(options)).slice(0, 4);
+                }
+
+                // If Gemini didn't provide valid options, fallback to open-ended so the UI still works.
+                if (!options || options.length < 2) {
+                    finalType = 'open-ended';
+                    options = undefined;
+                }
+            } else {
+                options = undefined;
+            }
+
+            return {
+                id: `q-${Date.now()}-${index}`,
+                text,
+                type: finalType,
+                options,
+                correctAnswer,
+                hint,
+                difficulty: (q.difficulty || settings.difficulty || 'medium') as any,
+            };
+        });
 
         return { questions };
     } catch (err) {

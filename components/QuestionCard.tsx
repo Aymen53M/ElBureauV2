@@ -11,6 +11,8 @@ interface QuestionCardProps {
     selectedAnswer: string | null;
     onSelectAnswer: (answer: string) => void;
     isAnswerPhase: boolean;
+    headerAccessory?: React.ReactNode;
+    density?: 'default' | 'compact';
     showCorrectAnswer?: boolean;
     hintsEnabled?: boolean;
     disabled?: boolean;
@@ -24,6 +26,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     selectedAnswer,
     onSelectAnswer,
     isAnswerPhase,
+    headerAccessory,
+    density = 'default',
     showCorrectAnswer = false,
     hintsEnabled = false,
     disabled = false,
@@ -31,6 +35,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 }) => {
     const { t } = useLanguage();
     const [showHint, setShowHint] = React.useState(false);
+
+    const isCompact = density === 'compact';
 
     React.useEffect(() => {
         setShowHint(false);
@@ -49,12 +55,15 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
     return (
         <Card className="border-primary/30 rounded-3xl" style={styles.cardShadow}>
-            <CardContent className="p-7 space-y-7">
+            <CardContent className={`${isCompact ? 'p-5 space-y-5' : 'p-7 space-y-7'}`}>
                 {/* Question header */}
                 <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-semibold text-muted-foreground">
-                        {t('question')} {questionNumber}/{totalQuestions}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Text className="text-sm font-semibold text-muted-foreground">
+                            {t('question')} {questionNumber}/{totalQuestions}
+                        </Text>
+                        {headerAccessory}
+                    </View>
                     <View className={`px-3 py-1 rounded-full ${getDifficultyColor()}`}>
                         <Text className="text-xs font-semibold">
                             {t(question.difficulty)}
@@ -63,7 +72,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 </View>
 
                 {/* Question text */}
-                <Text className="text-2xl font-display font-bold text-center text-foreground leading-tight">
+                <Text className={`${isCompact ? 'text-xl' : 'text-2xl'} font-display font-bold text-center text-foreground leading-tight`}>
                     {question.text}
                 </Text>
 
@@ -90,7 +99,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
                 {/* Answer options */}
                 {isAnswerPhase && (
-                    <View className="space-y-3">
+                    <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
                         {disabled && !!disabledMessage && (
                             <View className="items-center">
                                 <Text className="text-muted-foreground text-sm italic text-center">
@@ -99,7 +108,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                             </View>
                         )}
                         {question.type === 'multiple-choice' && question.options && (
-                            <View className="space-y-3">
+                            <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
                                 {question.options.map((option, index) => {
                                     const isSelected = selectedAnswer === option;
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
@@ -112,7 +121,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                             key={index}
                                             onPress={() => !isDisabled && onSelectAnswer(option)}
                                             disabled={isDisabled}
-                                            className={`flex-row items-center p-4 rounded-xl border-2 ${isCorrect
+                                            className={`flex-row items-center ${isCompact ? 'p-3 rounded-lg' : 'p-4 rounded-xl'} border-2 ${isCorrect
                                                 ? 'border-neon-green bg-neon-green/20'
                                                 : isWrong
                                                     ? 'border-destructive bg-destructive/20'
@@ -121,12 +130,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                                         : 'border-primary/30 bg-card'
                                                 }`}
                                         >
-                                            <View className="w-8 h-8 rounded-lg bg-muted items-center justify-center mr-3">
+                                            <View className={`${isCompact ? 'w-7 h-7 rounded-md' : 'w-8 h-8 rounded-lg'} bg-muted items-center justify-center mr-3`}>
                                                 <Text className="font-bold text-foreground">
                                                     {String.fromCharCode(65 + index)}
                                                 </Text>
                                             </View>
-                                            <Text className={`flex-1 text-base ${isCorrect ? 'text-neon-green' : isWrong ? 'text-destructive' : 'text-foreground'
+                                            <Text className={`flex-1 ${isCompact ? 'text-sm' : 'text-base'} ${isCorrect ? 'text-neon-green' : isWrong ? 'text-destructive' : 'text-foreground'
                                                 }`}>
                                                 {option}
                                             </Text>
@@ -150,7 +159,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                             key={option}
                                             onPress={() => !isDisabled && onSelectAnswer(option)}
                                             disabled={isDisabled}
-                                            className={`w-32 py-4 rounded-xl items-center border-2 ${isCorrect
+                                            className={`${isCompact ? 'w-28 py-3 rounded-lg' : 'w-32 py-4 rounded-xl'} items-center border-2 ${isCorrect
                                                 ? 'border-neon-green bg-neon-green/20'
                                                 : isWrong
                                                     ? 'border-destructive bg-destructive/20'
@@ -159,7 +168,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                                         : 'border-primary/30 bg-card'
                                                 }`}
                                         >
-                                            <Text className={`font-display font-bold text-lg ${isCorrect ? 'text-neon-green' : isWrong ? 'text-destructive' : 'text-foreground'
+                                            <Text className={`font-display font-bold ${isCompact ? 'text-base' : 'text-lg'} ${isCorrect ? 'text-neon-green' : isWrong ? 'text-destructive' : 'text-foreground'
                                                 }`}>
                                                 {option}
                                             </Text>
@@ -180,7 +189,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                     editable={!disabled}
                                     placeholder={t('answer') + '...'}
                                     placeholderTextColor="#7B6657"
-                                    className="flex-1 h-12 px-4 rounded-xl border border-border bg-input text-foreground"
+                                    className={`flex-1 ${isCompact ? 'h-11 text-sm' : 'h-12'} px-4 rounded-xl border border-border bg-input text-foreground`}
                                 />
                             </View>
                         )}

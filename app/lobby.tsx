@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -19,9 +19,12 @@ export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
+    const { height: windowHeight } = useWindowDimensions();
+    const isCompact = windowHeight < 760;
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
     const hasNavigatedRef = React.useRef(false);
+    const refreshInFlightRef = React.useRef(false);
     const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
 
@@ -41,8 +44,24 @@ export default function Lobby() {
         setRealtimeError(null);
 
         let cancelled = false;
+        let refreshQueued = false;
+        let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+        const debounceMs = Platform.OS === 'web' ? 180 : 60;
+
+        const scheduleRefresh = () => {
+            refreshQueued = true;
+            if (refreshTimer) return;
+            refreshTimer = setTimeout(() => {
+                refreshTimer = null;
+                if (!refreshQueued) return;
+                refreshQueued = false;
+                refresh().catch(() => undefined);
+            }, debounceMs);
+        };
 
         const refresh = async () => {
+            if (refreshInFlightRef.current) return;
+            refreshInFlightRef.current = true;
             try {
                 const { room, players } = await fetchRoomState(gameState.roomCode);
                 if (cancelled) return;
@@ -67,6 +86,11 @@ export default function Lobby() {
                 if (cancelled) return;
                 setRealtimeStatus('error');
                 setRealtimeError(err instanceof Error ? err.message : 'Unknown error');
+            } finally {
+                refreshInFlightRef.current = false;
+                if (refreshQueued) {
+                    scheduleRefresh();
+                }
             }
         };
 
@@ -74,16 +98,21 @@ export default function Lobby() {
         subscriptionRef.current?.unsubscribe();
         subscriptionRef.current = subscribeToRoom({
             roomCode: gameState.roomCode,
-            onRoomChange: refresh,
+            onRoomChange: scheduleRefresh,
         });
 
+        const pollMs = Platform.OS === 'web' ? 10000 : 3000;
         const poll = setInterval(() => {
-            refresh();
-        }, 3000);
+            scheduleRefresh();
+        }, pollMs);
 
         return () => {
             cancelled = true;
             clearInterval(poll);
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+                refreshTimer = null;
+            }
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
             setRealtimeStatus('idle');
@@ -186,12 +215,9 @@ export default function Lobby() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="default" />
-            <ScrollView
-                className="flex-1"
-                contentContainerClassName="p-7 max-w-4xl w-full self-center pb-16 space-y-12"
-            >
+            <View className={`${isCompact ? 'p-4' : 'p-7'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}>
                 {/* Header */}
-                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'mb-4 pt-2' : 'mb-8 pt-8'}`}>
                     <TouchableOpacity onPress={exitLobby} className="p-2">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
@@ -204,7 +230,7 @@ export default function Lobby() {
                     )}
                 </View>
 
-                <View className="max-w-2xl mx-auto w-full space-y-12">
+                <View className={`max-w-2xl mx-auto w-full flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}>
                     {!isSupabaseConfigured && (
                         <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
                             <CardContent className="p-5 space-y-2">
@@ -237,10 +263,10 @@ export default function Lobby() {
                         shadowRadius: 20,
                         elevation: 10,
                     }}>
-                        <CardContent className="p-7 items-center space-y-2">
+                        <CardContent className={`${isCompact ? 'p-5' : 'p-7'} items-center space-y-2`}>
                             <Text className="text-sm text-muted-foreground mb-2">{t('roomCode')}</Text>
                             <View className="flex-row items-center gap-4">
-                                <Text className="text-5xl font-display font-bold tracking-widest text-primary" style={{
+                                <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold tracking-widest text-primary`} style={{
                                     textShadowColor: '#C97B4C',
                                     textShadowOffset: { width: 0, height: 0 },
                                     textShadowRadius: 15,
@@ -251,7 +277,7 @@ export default function Lobby() {
                                     <Ionicons name="copy-outline" size={20} color="#2B1F17" />
                                 </TouchableOpacity>
                             </View>
-                            <Text className="text-sm text-muted-foreground mt-4 text-center">
+                            <Text className={`${isCompact ? 'text-xs mt-2' : 'text-sm mt-4'} text-muted-foreground text-center`}>
                                 {t('shareCodeMessage')}
                             </Text>
                         </CardContent>
@@ -287,17 +313,17 @@ export default function Lobby() {
                     </Card>
 
                     {/* Players */}
-                    <View className="space-y-5">
-                        <Text className="text-lg font-display font-bold text-center mb-4 text-foreground">
+                    <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
+                        <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-center mb-4 text-foreground`}>
                             {t('players')} ({gameState.players.length})
                         </Text>
 
-                        <View className="flex-row flex-wrap justify-center gap-7 pt-2">
+                        <View className={`flex-row flex-wrap justify-center ${isCompact ? 'gap-4 pt-1' : 'gap-7 pt-2'}`}>
                             {gameState.players.map((player) => (
                                 <PlayerAvatar
                                     key={player.id}
                                     name={player.name}
-                                    size="lg"
+                                    size={isCompact ? 'md' : 'lg'}
                                     isHost={player.isHost}
                                     isReady={player.isReady}
                                 />
@@ -305,8 +331,8 @@ export default function Lobby() {
 
                             {/* Waiting for more players */}
                             {gameState.players.length < 8 && (
-                                <View className="w-20 h-20 rounded-full border-2 border-dashed border-border items-center justify-center opacity-50">
-                                    <Text className="text-3xl text-muted-foreground">+</Text>
+                                <View className={`${isCompact ? 'w-14 h-14' : 'w-20 h-20'} rounded-full border-2 border-dashed border-border items-center justify-center opacity-50`}>
+                                    <Text className={`${isCompact ? 'text-2xl' : 'text-3xl'} text-muted-foreground`}>+</Text>
                                 </View>
                             )}
                         </View>
@@ -342,7 +368,7 @@ export default function Lobby() {
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="play" size={24} color="#FFF8EF" />
-                                    <Text className="text-lg font-display font-bold text-primary-foreground">
+                                    <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
                                         {t('startGame')}
                                     </Text>
                                 </View>
@@ -350,7 +376,7 @@ export default function Lobby() {
                         )}
                     </View>
                 </View>
-            </ScrollView>
+            </View>
         </SafeAreaView>
     );
 }

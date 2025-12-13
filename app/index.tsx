@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,8 @@ const floatingLogo = require('../assets/Flowting Logo.png');
 
 export default function Index() {
     const { t, isRTL } = useLanguage();
-    const { width } = useWindowDimensions();
+    const { width, height } = useWindowDimensions();
+    const isCompact = height < 760;
 
     const [logoError, setLogoError] = useState(false);
 
@@ -72,7 +73,7 @@ export default function Index() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="home" />
 
-            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 pt-12 pb-8 max-w-5xl w-full self-center`}>
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} max-w-5xl w-full self-center`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
                     <TouchableOpacity className="p-2">
@@ -81,12 +82,9 @@ export default function Index() {
                 </Link>
             </View>
 
-            <ScrollView
-                contentContainerClassName="flex-1 items-center justify-center px-6 max-w-5xl w-full self-center space-y-14"
-                showsVerticalScrollIndicator={false}
-            >
-                <View className="items-center space-y-12 w-full">
-                    <View className="mb-6">
+            <View className={`flex-1 items-center justify-center px-6 max-w-5xl w-full self-center ${isCompact ? 'space-y-8' : 'space-y-14'}`}>
+                <View className={`items-center w-full ${isCompact ? 'space-y-8' : 'space-y-12'}`}>
+                    <View className={isCompact ? 'mb-2' : 'mb-6'}>
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
                             {!logoError ? (
                                 <Animated.Image
@@ -102,15 +100,15 @@ export default function Index() {
                             )}
                         </Animated.View>
                     </View>
-                    <Text className="text-xl text-muted-foreground font-display text-center">
+                    <Text className={`${isCompact ? 'text-base' : 'text-xl'} text-muted-foreground font-display text-center`}>
                         {t('tagline')}
                     </Text>
-                    <View className="w-full space-y-6 pt-8">
+                    <View className={`w-full ${isCompact ? 'space-y-3 pt-2' : 'space-y-6 pt-8'}`}>
                         <Link href="/create" asChild>
-                            <Button variant="hero" className="w-full rounded-full py-5">
+                            <Button variant="hero" className={`w-full rounded-full ${isCompact ? 'py-4' : 'py-5'}`}>
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="add-circle-outline" size={24} color="#FFF8EF" />
-                                    <Text className="text-lg font-display font-bold text-primary-foreground">
+                                    <Ionicons name="add-circle-outline" size={isCompact ? 20 : 24} color="#FFF8EF" />
+                                    <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
                                         {t('createRoom')}
                                     </Text>
                                 </View>
@@ -120,7 +118,7 @@ export default function Index() {
                         <Link href="/join" asChild>
                             <Button variant="secondary" size="lg" className="w-full">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="people-outline" size={20} color="#FFF8EF" />
+                                    <Ionicons name="people-outline" size={isCompact ? 18 : 20} color="#FFF8EF" />
                                     <Text className="font-display font-semibold text-secondary-foreground">
                                         {t('joinRoom')}
                                     </Text>
@@ -131,7 +129,7 @@ export default function Index() {
                         <Link href="/how-to-play" asChild>
                             <Button variant="outline" size="lg" className="w-full">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="help-circle-outline" size={20} color="#6B3F23" />
+                                    <Ionicons name="help-circle-outline" size={isCompact ? 18 : 20} color="#6B3F23" />
                                     <Text className="font-display font-semibold text-primary">
                                         {t('howToPlay')}
                                     </Text>
@@ -140,9 +138,9 @@ export default function Index() {
                         </Link>
                     </View>
                 </View>
-            </ScrollView>
+            </View>
 
-            <View className="p-4 items-center">
+            <View className={isCompact ? 'p-3 items-center' : 'p-4 items-center'}>
                 <Text className="text-muted-foreground text-sm text-center">
                     {t('poweredBy')}
                 </Text>

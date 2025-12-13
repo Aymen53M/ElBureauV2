@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -10,12 +10,11 @@ import Timer from '@/components/Timer';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useGame, GamePhase, Question, Difficulty, Player } from '@/contexts/GameContext';
+import { useGame, GamePhase, Question, Difficulty, Player, GameSettings } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { generateQuestions } from '@/services/questionService';
 import { fetchRoomState, updateRoomQuestions, updatePlayerState } from '@/services/roomService';
 import {
-    fetchGameMeta,
     subscribeToGame,
     fetchBets,
     fetchPlayerBets,
@@ -42,6 +41,8 @@ export default function Game() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey } = useGame();
+    const { height: windowHeight } = useWindowDimensions();
+    const isCompact = windowHeight < 760;
 
     const gameStateRef = React.useRef(gameState);
     useEffect(() => {
@@ -75,6 +76,11 @@ export default function Game() {
 
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
     const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
+
+    const selectedAnswerRef = React.useRef<string | null>(null);
+    useEffect(() => {
+        selectedAnswerRef.current = selectedAnswer;
+    }, [selectedAnswer]);
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
 
@@ -162,6 +168,20 @@ export default function Game() {
         if (!isSupabaseConfigured || !gameState?.roomCode) return;
 
         let cancelled = false;
+        let refreshQueued = false;
+        let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+        const debounceMs = Platform.OS === 'web' ? 180 : 60;
+
+        const scheduleRefresh = () => {
+            refreshQueued = true;
+            if (refreshTimer) return;
+            refreshTimer = setTimeout(() => {
+                refreshTimer = null;
+                if (!refreshQueued) return;
+                refreshQueued = false;
+                refresh().catch(() => undefined);
+            }, debounceMs);
+        };
 
         const refresh = async () => {
             if (refreshInFlightRef.current) return;
@@ -169,10 +189,57 @@ export default function Game() {
             try {
                 const roomCode = gameState.roomCode;
 
-                const [roomState, meta] = await Promise.all([
-                    fetchRoomState(roomCode),
-                    fetchGameMeta(roomCode),
-                ]);
+                const roomState = await fetchRoomState(roomCode);
+                const meta: any = {
+                    phase: roomState.room.phase,
+                    currentQuestionIndex: roomState.room.current_question_index ?? 0,
+                    finalMode: (roomState.room.final_mode === 'personalized' ? 'personalized' : 'shared') as 'shared' | 'personalized',
+                    questions: Array.isArray(roomState.room.questions) ? roomState.room.questions : [],
+                };
+
+                const normalizeQuestions = (raw: any[], settings: GameSettings): Question[] => {
+                    const desiredType = settings.questionType;
+                    return (Array.isArray(raw) ? raw : []).map((q: any, index: number) => {
+                        const correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+                        const text = typeof q?.text === 'string' ? q.text.trim() : '';
+                        const hint = typeof q?.hint === 'string' ? q.hint.trim() : undefined;
+                        const difficulty = (q?.difficulty || settings.difficulty || 'medium') as Difficulty;
+                        const id = typeof q?.id === 'string' ? q.id : `q-${index}`;
+
+                        let options: string[] | undefined = Array.isArray(q?.options)
+                            ? (q.options as unknown[])
+                                .map((o) => (typeof o === 'string' ? o.trim() : ''))
+                                .filter((o) => o.length > 0)
+                            : undefined;
+
+                        let type = desiredType;
+
+                        if (desiredType === 'multiple-choice') {
+                            if (options && correctAnswer) {
+                                if (!options.includes(correctAnswer)) {
+                                    options = [correctAnswer, ...options];
+                                }
+                                options = Array.from(new Set(options)).slice(0, 4);
+                            }
+                            if (!options || options.length < 2) {
+                                type = 'open-ended';
+                                options = undefined;
+                            }
+                        } else {
+                            options = undefined;
+                        }
+
+                        return {
+                            id,
+                            text,
+                            type,
+                            options,
+                            correctAnswer,
+                            hint,
+                            difficulty,
+                        };
+                    });
+                };
 
                 if (cancelled) return;
 
@@ -181,10 +248,12 @@ export default function Game() {
                 setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
                 if (Array.isArray(meta.questions) && meta.questions.length > 0) {
-                    const signature = `${meta.questions.length}:${(meta.questions as any)?.[0]?.id || ''}:${(meta.questions as any)?.[meta.questions.length - 1]?.id || ''}`;
+                    const normalized = normalizeQuestions(meta.questions, roomState.room.settings);
+                    const typeSig = normalized.map((q) => `${q.type}:${q.options?.length || 0}`).join('|');
+                    const signature = `${roomState.room.settings.questionType}:${normalized.length}:${typeSig}`;
                     if (signature !== lastQuestionsSignatureRef.current) {
                         lastQuestionsSignatureRef.current = signature;
-                        setQuestions(meta.questions as Question[]);
+                        setQuestions(normalized);
                     }
                     setIsLoading(false);
                 } else {
@@ -238,12 +307,18 @@ export default function Game() {
                 if (!currentPlayer?.id) return;
 
                 if (!meta.phase.startsWith('final')) {
+                    const shouldFetchValidations =
+                        meta.phase === 'validation' ||
+                        meta.phase === 'scoring';
+
                     const [bets, myBets, answers, validations] = await Promise.all([
                         fetchBets({ roomCode, questionIndex: meta.currentQuestionIndex }),
                         fetchPlayerBets({ roomCode, playerId: currentPlayer.id }),
                         fetchAnswers({ roomCode, questionIndex: meta.currentQuestionIndex }),
-                        fetchValidations({ roomCode, questionIndex: meta.currentQuestionIndex }),
-                    ]);
+                        shouldFetchValidations
+                            ? fetchValidations({ roomCode, questionIndex: meta.currentQuestionIndex })
+                            : Promise.resolve([] as { player_id: string; is_correct: boolean }[]),
+                    ] as const);
 
                     const betMap: Record<string, number> = {};
                     bets.forEach((b) => {
@@ -275,7 +350,13 @@ export default function Game() {
                     answerBoardScopeRef.current = { kind: 'normal', questionIndex: meta.currentQuestionIndex };
                     const serverAnswer = answerMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
-                        setSelectedAnswer(serverAnswer);
+                        const serverTrimmed = serverAnswer.trim();
+                        const local = selectedAnswerRef.current;
+                        const localTrimmed = (local || '').trim();
+                        const shouldSync = serverTrimmed.length > 0 || localTrimmed.length === 0;
+                        if (shouldSync) {
+                            setSelectedAnswer(serverAnswer);
+                        }
                     }
 
                     const serverBet = betMap[currentPlayer.id];
@@ -283,12 +364,18 @@ export default function Game() {
                         setSelectedBet(serverBet);
                     }
                 } else {
+                    const shouldFetchFinalValidations =
+                        meta.phase === 'final-validation' ||
+                        meta.phase === 'final-scoring';
+
                     const [choices, myQuestion, finalAnswers, finalValidations] = await Promise.all([
                         fetchFinalChoices(roomCode),
                         fetchFinalQuestion({ roomCode, playerId: currentPlayer.id }),
                         fetchFinalAnswers(roomCode),
-                        fetchFinalValidations(roomCode),
-                    ]);
+                        shouldFetchFinalValidations
+                            ? fetchFinalValidations(roomCode)
+                            : Promise.resolve([] as { player_id: string; is_correct: boolean }[]),
+                    ] as const);
 
                     const nextChoices: Record<string, { wager: number | null; difficulty: Difficulty }> = {};
                     choices.forEach((c) => {
@@ -349,7 +436,13 @@ export default function Game() {
                     answerBoardScopeRef.current = { kind: 'final' };
                     const serverAnswer = ansMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
-                        setSelectedAnswer(serverAnswer);
+                        const serverTrimmed = serverAnswer.trim();
+                        const local = selectedAnswerRef.current;
+                        const localTrimmed = (local || '').trim();
+                        const shouldSync = serverTrimmed.length > 0 || localTrimmed.length === 0;
+                        if (shouldSync) {
+                            setSelectedAnswer(serverAnswer);
+                        }
                     }
                 }
             } catch (err) {
@@ -358,17 +451,25 @@ export default function Game() {
                 setIsLoading(false);
             } finally {
                 refreshInFlightRef.current = false;
+                if (refreshQueued) {
+                    scheduleRefresh();
+                }
             }
         };
 
         refresh();
         subscriptionRef.current?.unsubscribe();
-        subscriptionRef.current = subscribeToGame({ roomCode: gameState.roomCode, onChange: refresh });
+        subscriptionRef.current = subscribeToGame({ roomCode: gameState.roomCode, onChange: scheduleRefresh });
 
-        const poll = setInterval(refresh, 2000);
+        const pollMs = Platform.OS === 'web' ? 10000 : 2500;
+        const poll = setInterval(() => scheduleRefresh(), pollMs);
         return () => {
             cancelled = true;
             clearInterval(poll);
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+                refreshTimer = null;
+            }
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
         };
@@ -690,37 +791,25 @@ export default function Game() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="game" />
-            <ScrollView
+            <KeyboardAvoidingView
                 className="flex-1"
-                contentContainerClassName="p-7 max-w-5xl w-full self-center pb-16 space-y-10"
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
+                <View
+                    className={`${isCompact ? 'p-4' : 'p-7'} max-w-5xl w-full self-center flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}
+                >
                 {/* Header */}
-                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between mb-9 pt-12`}>
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-4 pt-4' : 'mb-9 pt-12'}`}>
                     <Logo size="sm" animated={false} />
-                    <View className="flex-row items-center gap-4">
-                        <View className="flex-row items-center gap-2">
-                            <Text className="text-sm text-muted-foreground">
-                                {isFinalRound ? t('finalQuestion') : t('question')} {isFinalRound ? 1 : currentQuestionIndex + 1}/{totalQuestions}
-                            </Text>
-                            {(phase === 'question' || phase === 'final-question') && (
-                                <Timer
-                                    key={timerKey}
-                                    seconds={gameState.settings.timePerQuestion}
-                                    onComplete={handleTimerComplete}
-                                    size="xxs"
-                                />
-                            )}
-                        </View>
-                        <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
-                            <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
-                        </View>
+                    <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
+                        <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
                     </View>
                 </View>
 
-                <View className="max-w-3xl mx-auto w-full space-y-10">
+                <View className={`max-w-3xl mx-auto w-full ${isCompact ? 'space-y-6' : 'space-y-10'} flex-1`}>
                     {/* Unified Round Screen (Bet + Answer) */}
                     {!isFinalRound && phase === 'question' && activeQuestion && (
-                        <View className="space-y-8">
+                        <View className={isCompact ? 'space-y-5' : 'space-y-8'}>
                             {/* Question + answers (always visible) */}
                             <QuestionCard
                                 question={activeQuestion}
@@ -729,6 +818,15 @@ export default function Game() {
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
                                 isAnswerPhase={true}
+                                density={isCompact ? 'compact' : 'default'}
+                                headerAccessory={
+                                    <Timer
+                                        key={timerKey}
+                                        seconds={gameState.settings.timePerQuestion}
+                                        onComplete={handleTimerComplete}
+                                        size="xxs"
+                                    />
+                                }
                                 showCorrectAnswer={false}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
@@ -749,7 +847,7 @@ export default function Game() {
                                 shadowRadius: 20,
                                 elevation: 10,
                             }}>
-                                <CardContent className="p-9 space-y-6">
+                                <CardContent className={`${isCompact ? 'p-6 space-y-4' : 'p-9 space-y-6'}`}>
                                     <View className="items-center">
                                         <View className="px-4 py-2 rounded-full bg-accent/20">
                                             <Text className="text-accent font-display font-bold">
@@ -764,6 +862,8 @@ export default function Game() {
                                         selectedBet={selectedBet}
                                         onSelectBet={setSelectedBet}
                                         showHeader={false}
+                                        density={isCompact ? 'compact' : 'default'}
+                                        variant={isCompact ? 'stepper' : 'grid'}
                                     />
 
                                     <View className="items-center">
@@ -780,7 +880,7 @@ export default function Game() {
                                 disabled={!selectedAnswer?.trim() || !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) || !!answerBoard[activePlayer.id]?.hasAnswered}
                                 className="w-full"
                             >
-                                <Text className="text-lg font-display font-bold text-primary-foreground">
+                                <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
                                     {t('submit')}
                                 </Text>
                             </Button>
@@ -882,7 +982,7 @@ export default function Game() {
 
                     {/* Question Phase */}
                     {(phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
-                        <View className="space-y-8">
+                        <View className={isCompact ? 'space-y-5' : 'space-y-8'}>
                             {/* Your Bet Display */}
                             <View className="items-center">
                                 <View className="px-4 py-2 rounded-full bg-accent/20">
@@ -900,6 +1000,17 @@ export default function Game() {
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
                                 isAnswerPhase={phase === 'final-question'}
+                                density={isCompact ? 'compact' : 'default'}
+                                headerAccessory={
+                                    phase === 'final-question' ? (
+                                        <Timer
+                                            key={timerKey}
+                                            seconds={gameState.settings.timePerQuestion}
+                                            onComplete={handleTimerComplete}
+                                            size="xxs"
+                                        />
+                                    ) : null
+                                }
                                 showCorrectAnswer={showCorrectAnswer}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
@@ -1041,7 +1152,8 @@ export default function Game() {
                         </View>
                     )}
                 </View>
-            </ScrollView>
+                </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
