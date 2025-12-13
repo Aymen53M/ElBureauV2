@@ -51,6 +51,7 @@ export default function Game() {
     const refreshInFlightRef = React.useRef(false);
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
+    const submitInFlightRef = React.useRef(false);
 
     const answerBoardScopeRef = React.useRef<
         | { kind: 'normal'; questionIndex: number }
@@ -119,6 +120,43 @@ export default function Game() {
             setTimerKey((prev) => prev + 1);
         }
     }, [phase, currentQuestionIndex]);
+
+    const handleSubmit = async () => {
+        if (!gameState?.roomCode || !activePlayer?.id) return;
+        if (submitInFlightRef.current) return;
+
+        const answer = (selectedAnswer || '').trim();
+        if (!answer) return;
+
+        try {
+            submitInFlightRef.current = true;
+
+            if (phase.startsWith('final')) {
+                await submitFinalAnswer({ roomCode: gameState.roomCode, playerId: activePlayer.id, answer });
+                return;
+            }
+
+            const betValue = betsByPlayerId[activePlayer.id] ?? selectedBet;
+            if (!betValue) return;
+
+            await submitBet({
+                roomCode: gameState.roomCode,
+                questionIndex: currentQuestionIndex,
+                playerId: activePlayer.id,
+                betValue,
+            });
+            await submitAnswer({
+                roomCode: gameState.roomCode,
+                questionIndex: currentQuestionIndex,
+                playerId: activePlayer.id,
+                answer,
+            });
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to submit');
+        } finally {
+            submitInFlightRef.current = false;
+        }
+    };
 
     useEffect(() => {
         if (!isSupabaseConfigured || !gameState?.roomCode) return;
@@ -374,9 +412,17 @@ export default function Game() {
                     autoAdvanceInFlightRef.current = false;
                 });
         }
-    }, [answerBoard, gameState?.players, gameState?.roomCode, isHost, phase]);
+    }, [answerBoard, currentQuestionIndex, gameState?.players, gameState?.roomCode, isHost, phase]);
 
-    if (!gameState || !activePlayer) return null;
+    if (!gameState || !activePlayer) {
+        return (
+            <SafeAreaView className="flex-1 bg-background items-center justify-center p-4">
+                <ScreenBackground variant="game" />
+                <ActivityIndicator size="large" color="#C97B4C" />
+                <Text className="text-base text-muted-foreground mt-4">{t('loading')}</Text>
+            </SafeAreaView>
+        );
+    }
 
     if (isLoading) {
         return (
@@ -399,28 +445,6 @@ export default function Game() {
     const handleAnswerSubmit = async (answer: string) => {
         if (!gameState?.roomCode || !activePlayer?.id) return;
         setSelectedAnswer(answer);
-
-        try {
-            if (phase.startsWith('final')) {
-                await submitFinalAnswer({ roomCode: gameState.roomCode, playerId: activePlayer.id, answer });
-            } else {
-                const betValue = betsByPlayerId[activePlayer.id] ?? selectedBet;
-                if (!betValue) {
-                    Alert.alert(t('placeBet'), t('placeBetFirst') || 'Choose your bet first');
-                    return;
-                }
-
-                await submitBet({
-                    roomCode: gameState.roomCode,
-                    questionIndex: currentQuestionIndex,
-                    playerId: activePlayer.id,
-                    betValue,
-                });
-                await submitAnswer({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex, playerId: activePlayer.id, answer });
-            }
-        } catch (err) {
-            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to submit');
-        }
     };
 
     const handleTimerComplete = () => {
@@ -674,20 +698,19 @@ export default function Game() {
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between mb-9 pt-12`}>
                     <Logo size="sm" animated={false} />
                     <View className="flex-row items-center gap-4">
-                        {(phase === 'question' || phase === 'final-question') && (
-                            <View className="flex-row items-center gap-2">
-                                <Text className="text-sm text-muted-foreground">{t('time')}</Text>
+                        <View className="flex-row items-center gap-2">
+                            <Text className="text-sm text-muted-foreground">
+                                {isFinalRound ? t('finalQuestion') : t('question')} {isFinalRound ? 1 : currentQuestionIndex + 1}/{totalQuestions}
+                            </Text>
+                            {(phase === 'question' || phase === 'final-question') && (
                                 <Timer
                                     key={timerKey}
                                     seconds={gameState.settings.timePerQuestion}
                                     onComplete={handleTimerComplete}
-                                    size="xs"
+                                    size="xxs"
                                 />
-                            </View>
-                        )}
-                        <Text className="text-sm text-muted-foreground">
-                            {isFinalRound ? t('finalQuestion') : t('question')} {isFinalRound ? 1 : currentQuestionIndex + 1}/{totalQuestions}
-                        </Text>
+                            )}
+                        </View>
                         <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
                             <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
                         </View>
@@ -706,11 +729,17 @@ export default function Game() {
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
                                 isAnswerPhase={true}
-                                disabled={!((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0)}
-                                disabledMessage={t('placeBetFirst') || 'Choose your bet below to submit your answer'}
                                 showCorrectAnswer={false}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
+
+                            {!((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) && (
+                                <View className="items-center">
+                                    <Text className="text-muted-foreground text-sm italic text-center">
+                                        {t('placeBetFirst') || 'Choose your bet below to confirm your answer'}
+                                    </Text>
+                                </View>
+                            )}
 
                             {/* Bet selection (no confirm; submitting answer commits the bet) */}
                             <Card className="border-accent/30 rounded-3xl" style={{
@@ -744,6 +773,17 @@ export default function Game() {
                                     </View>
                                 </CardContent>
                             </Card>
+
+                            <Button
+                                variant="hero"
+                                onPress={handleSubmit}
+                                disabled={!selectedAnswer?.trim() || !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) || !!answerBoard[activePlayer.id]?.hasAnswered}
+                                className="w-full"
+                            >
+                                <Text className="text-lg font-display font-bold text-primary-foreground">
+                                    {t('submit')}
+                                </Text>
+                            </Button>
                         </View>
                     )}
 
@@ -863,6 +903,19 @@ export default function Game() {
                                 showCorrectAnswer={showCorrectAnswer}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
+
+                            {phase === 'final-question' && (
+                                <Button
+                                    variant="hero"
+                                    onPress={handleSubmit}
+                                    disabled={!selectedAnswer?.trim() || !!answerBoard[activePlayer.id]?.hasAnswered}
+                                    className="w-full"
+                                >
+                                    <Text className="text-lg font-display font-bold text-primary-foreground">
+                                        {t('submit')}
+                                    </Text>
+                                </Button>
+                            )}
 
                             {/* Answer Preview Phase */}
                             {phase === 'preview' && !showCorrectAnswer && (

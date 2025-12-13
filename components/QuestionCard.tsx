@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { Card, CardContent } from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import { Question } from '@/contexts/GameContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -31,20 +30,11 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     disabledMessage,
 }) => {
     const { t } = useLanguage();
-    const [openEndedAnswer, setOpenEndedAnswer] = React.useState('');
     const [showHint, setShowHint] = React.useState(false);
 
     React.useEffect(() => {
-        setOpenEndedAnswer('');
         setShowHint(false);
     }, [question.id]);
-
-    const handleOpenEndedSubmit = () => {
-        if (disabled || showCorrectAnswer) return;
-        if (openEndedAnswer.trim()) {
-            onSelectAnswer(openEndedAnswer.trim());
-        }
-    };
 
     const getDifficultyColor = () => {
         switch (question.difficulty) {
@@ -182,21 +172,16 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                         {question.type === 'open-ended' && !showCorrectAnswer && (
                             <View className="flex-row gap-3">
                                 <TextInput
-                                    value={openEndedAnswer}
-                                    onChangeText={setOpenEndedAnswer}
+                                    value={selectedAnswer ?? ''}
+                                    onChangeText={(text) => {
+                                        if (disabled || showCorrectAnswer) return;
+                                        onSelectAnswer(text);
+                                    }}
                                     editable={!disabled}
                                     placeholder={t('answer') + '...'}
                                     placeholderTextColor="#7B6657"
                                     className="flex-1 h-12 px-4 rounded-xl border border-border bg-input text-foreground"
                                 />
-                                <Button
-                                    onPress={handleOpenEndedSubmit}
-                                    disabled={disabled || !openEndedAnswer.trim()}
-                                >
-                                    <Text className="font-display font-bold text-primary-foreground">
-                                        {t('submit')}
-                                    </Text>
-                                </Button>
                             </View>
                         )}
                     </View>
