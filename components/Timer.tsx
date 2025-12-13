@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet, Animated } from 'react-native';
+import { Text, StyleSheet, Animated, View, Platform } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 interface TimerProps {
@@ -56,11 +56,11 @@ const Timer: React.FC<TimerProps> = ({
     const progress = (seconds / initialSeconds) * 100;
 
     const sizeConfig = {
-        xxs: { container: 34, stroke: 4, radius: 14, fontSize: 12, lineHeight: 12 },
-        xs: { container: 44, stroke: 5, radius: 18, fontSize: 16, lineHeight: 16 },
-        sm: { container: 64, stroke: 6, radius: 27, fontSize: 22, lineHeight: 22 },
-        md: { container: 96, stroke: 8, radius: 40, fontSize: 32, lineHeight: 32 },
-        lg: { container: 128, stroke: 10, radius: 54, fontSize: 40, lineHeight: 40 },
+        xxs: { container: 34, stroke: 4, radius: 14, fontSize: 14, lineHeight: 16 },
+        xs: { container: 44, stroke: 5, radius: 18, fontSize: 18, lineHeight: 20 },
+        sm: { container: 64, stroke: 6, radius: 27, fontSize: 28, lineHeight: 30 },
+        md: { container: 96, stroke: 8, radius: 40, fontSize: 42, lineHeight: 44 },
+        lg: { container: 128, stroke: 10, radius: 54, fontSize: 56, lineHeight: 58 },
     };
 
     const config = sizeConfig[size];
@@ -110,28 +110,42 @@ const Timer: React.FC<TimerProps> = ({
             </Svg>
 
             {/* Time display */}
-            <Text
-                className="font-display font-bold"
+            <View
+                pointerEvents="none"
                 style={[
-                    { color: getColor() },
-                    {
-                        width: config.container,
-                        textAlign: 'center',
-                        textAlignVertical: 'center',
-                        includeFontPadding: false,
-                        fontSize: config.fontSize,
-                        lineHeight: config.lineHeight,
-                    },
-                    isCritical && styles.glowText,
+                    styles.timeTextContainer,
+                    { width: config.container, height: config.container },
                 ]}
             >
-                {seconds}
-            </Text>
+                <Text
+                    className="font-display font-bold"
+                    style={[
+                        { color: getColor() },
+                        {
+                            textAlign: 'center',
+                            includeFontPadding: false,
+                            fontSize: config.fontSize,
+                            lineHeight: config.lineHeight,
+                            ...(Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null),
+                        },
+                        isCritical && styles.glowText,
+                    ]}
+                >
+                    {seconds}
+                </Text>
+            </View>
         </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
+    timeTextContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     glowText: {
         textShadowColor: '#B3261E',
         textShadowOffset: { width: 0, height: 0 },

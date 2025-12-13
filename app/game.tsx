@@ -249,11 +249,7 @@ export default function Game() {
                 }
 
                 const normalizeQuestions = (raw: any[], settings: GameSettings): Question[] => {
-                    const allowedTypes = (settings.questionType === 'mixed'
-                        ? (Array.isArray(settings.questionTypes) ? settings.questionTypes : [])
-                        : [settings.questionType]) as ('multiple-choice' | 'open-ended' | 'true-false')[];
-                    const fallbackType = (allowedTypes[0] || 'multiple-choice') as 'multiple-choice' | 'open-ended' | 'true-false';
-
+                    const desiredType = settings.questionType;
                     return (Array.isArray(raw) ? raw : []).map((q: any, index: number) => {
                         const correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
                         const text = typeof q?.text === 'string' ? q.text.trim() : '';
@@ -261,40 +257,24 @@ export default function Game() {
                         const difficulty = (q?.difficulty || settings.difficulty || 'medium') as Difficulty;
                         const id = typeof q?.id === 'string' ? q.id : `q-${index}`;
 
-                        const rawType = typeof q?.type === 'string' ? q.type : '';
-                        let type: 'multiple-choice' | 'open-ended' | 'true-false' =
-                            (allowedTypes.includes(rawType as any) ? (rawType as any) : fallbackType);
-
                         let options: string[] | undefined = Array.isArray(q?.options)
                             ? (q.options as unknown[])
                                 .map((o) => (typeof o === 'string' ? o.trim() : ''))
                                 .filter((o) => o.length > 0)
                             : undefined;
 
-                        if (type === 'multiple-choice') {
+                        let type = desiredType;
+
+                        if (desiredType === 'multiple-choice') {
                             if (options && correctAnswer) {
                                 if (!options.includes(correctAnswer)) {
                                     options = [correctAnswer, ...options];
                                 }
-                                const uniq = Array.from(new Set(options));
-                                const rest = uniq.filter((o) => o !== correctAnswer);
-                                options = [correctAnswer, ...rest].slice(0, 4);
+                                options = Array.from(new Set(options)).slice(0, 4);
                             }
                             if (!options || options.length < 2) {
-                                if (allowedTypes.includes('open-ended')) {
-                                    type = 'open-ended';
-                                    options = undefined;
-                                } else {
-                                    type = fallbackType;
-                                    options = undefined;
-                                }
-                            }
-                        } else if (type === 'true-false') {
-                            options = undefined;
-                            if (correctAnswer.toLowerCase() === 'true') {
-                                // ok
-                            } else if (correctAnswer.toLowerCase() === 'false') {
-                                // ok
+                                type = 'open-ended';
+                                options = undefined;
                             }
                         } else {
                             options = undefined;
