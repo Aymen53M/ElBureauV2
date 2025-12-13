@@ -3,7 +3,7 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Alert, Platform, View, TouchableOpacity, Text } from 'react-native';
+import { Alert, Platform, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { GameProvider, useGame } from '@/contexts/GameContext';
@@ -81,29 +81,27 @@ function GlobalImmersiveToggle() {
                 pointerEvents="box-none"
                 style={{
                     position: 'absolute',
-                    top: insets.top + 10,
+                    bottom: insets.bottom + 14,
                     right: 14,
                     zIndex: 9999,
                 }}
             >
                 <TouchableOpacity
                     onPress={toggleImmersive}
+                    accessibilityLabel={isImmersive ? 'Exit fullscreen' : 'Enter fullscreen'}
                     style={{
                         backgroundColor: 'rgba(255, 248, 239, 0.92)',
-                        borderRadius: 14,
-                        paddingHorizontal: 10,
-                        paddingVertical: 8,
+                        borderRadius: 999,
+                        width: 44,
+                        height: 44,
                         borderWidth: 1,
                         borderColor: 'rgba(43, 31, 23, 0.18)',
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 8,
+                        justifyContent: 'center',
                     }}
                 >
                     <Ionicons name={isImmersive ? 'contract-outline' : 'expand-outline'} size={18} color="#2B1F17" />
-                    <Text style={{ color: '#2B1F17', fontWeight: '700' }}>
-                        {isImmersive ? 'Exit' : 'Fullscreen'}
-                    </Text>
                 </TouchableOpacity>
             </View>
         </>

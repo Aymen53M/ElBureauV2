@@ -342,6 +342,21 @@ export default function Game() {
                     const result = await generateQuestions(roomState.room.settings, hostKey);
                     if (cancelled) return;
                     if (result.error) {
+                        if (result.code === 'QUOTA_EXCEEDED') {
+                            Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
+                                { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
+                                { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                            ]);
+                            return;
+                        }
+                        if (result.code === 'INVALID_API_KEY') {
+                            Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
+                                { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
+                                { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                            ]);
+                            return;
+                        }
+
                         Alert.alert(t('loading'), result.error);
                         router.replace('/lobby');
                         return;
@@ -479,7 +494,26 @@ export default function Game() {
                             questionType: 'open-ended' as const,
                         };
                         const result = await generateQuestions(finalSettings, keyToUse);
-                        if (!cancelled && result.questions && result.questions.length > 0) {
+                        if (cancelled) return;
+                        if (result.error || !result.questions?.length) {
+                            if (result.code === 'QUOTA_EXCEEDED') {
+                                Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
+                                    { text: t('cancel'), style: 'cancel' },
+                                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                                ]);
+                            } else if (result.code === 'INVALID_API_KEY') {
+                                Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
+                                    { text: t('cancel'), style: 'cancel' },
+                                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                                ]);
+                            } else {
+                                Alert.alert(t('loading'), result.error || t('generationFailed'));
+                            }
+                            setIsLoadingFinal(false);
+                            return;
+                        }
+
+                        if (result.questions && result.questions.length > 0) {
                             await upsertFinalQuestion({ roomCode, playerId: currentPlayer.id, question: result.questions[0] });
                         }
                         setIsLoadingFinal(false);
@@ -852,7 +886,19 @@ export default function Game() {
             };
             const result = await generateQuestions(finalSettings, hostKey);
             if (result.error || !result.questions?.length) {
-                Alert.alert(t('loading'), result.error || t('generationFailed'));
+                if (result.code === 'QUOTA_EXCEEDED') {
+                    Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
+                        { text: t('cancel'), style: 'cancel' },
+                        { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                    ]);
+                } else if (result.code === 'INVALID_API_KEY') {
+                    Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
+                        { text: t('cancel'), style: 'cancel' },
+                        { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                    ]);
+                } else {
+                    Alert.alert(t('loading'), result.error || t('generationFailed'));
+                }
                 setIsLoadingFinal(false);
                 return;
             }

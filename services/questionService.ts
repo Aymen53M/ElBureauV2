@@ -63,6 +63,34 @@ async function fetchGeminiJsonText(args: {
     if (!response.ok) {
         const body = await response.text();
         console.error('Gemini error', response.status, body);
+
+        const bodyLower = body.toLowerCase();
+        const looksLikeQuota =
+            bodyLower.includes('quota') ||
+            bodyLower.includes('resource_exhausted') ||
+            bodyLower.includes('exhausted') ||
+            bodyLower.includes('exceeded') ||
+            bodyLower.includes('insufficient quota');
+
+        const looksLikeInvalidKey =
+            bodyLower.includes('api key') && (bodyLower.includes('invalid') || bodyLower.includes('not valid') || bodyLower.includes('expired'));
+
+        if ((response.status === 429 || response.status === 403) && looksLikeQuota) {
+            return {
+                ok: false,
+                code: 'QUOTA_EXCEEDED',
+                error: 'Gemini API quota exceeded for this key. Please update your API key in Settings.',
+            };
+        }
+
+        if ((response.status === 401 || response.status === 403) && (looksLikeInvalidKey || bodyLower.includes('api_key_invalid') || bodyLower.includes('permission'))) {
+            return {
+                ok: false,
+                code: 'INVALID_API_KEY',
+                error: 'Invalid Gemini API key or missing access. Please update your API key in Settings.',
+            };
+        }
+
         const notFound = response.status === 404;
         const code: GeminiErrorCode =
             response.status === 429 ? 'HTTP_429' :
@@ -110,6 +138,8 @@ const MODEL = 'gemini-2.5-flash';
 
 type GeminiErrorCode =
     | 'MISSING_API_KEY'
+    | 'INVALID_API_KEY'
+    | 'QUOTA_EXCEEDED'
     | 'HTTP_429'
     | 'HTTP_500'
     | 'HTTP_400'
