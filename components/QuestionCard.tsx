@@ -14,6 +14,8 @@ interface QuestionCardProps {
     isAnswerPhase: boolean;
     showCorrectAnswer?: boolean;
     hintsEnabled?: boolean;
+    disabled?: boolean;
+    disabledMessage?: string;
 }
 
 const QuestionCard: React.FC<QuestionCardProps> = ({
@@ -25,6 +27,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     isAnswerPhase,
     showCorrectAnswer = false,
     hintsEnabled = false,
+    disabled = false,
+    disabledMessage,
 }) => {
     const { t } = useLanguage();
     const [openEndedAnswer, setOpenEndedAnswer] = React.useState('');
@@ -36,6 +40,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     }, [question.id]);
 
     const handleOpenEndedSubmit = () => {
+        if (disabled || showCorrectAnswer) return;
         if (openEndedAnswer.trim()) {
             onSelectAnswer(openEndedAnswer.trim());
         }
@@ -96,6 +101,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 {/* Answer options */}
                 {isAnswerPhase && (
                     <View className="space-y-3">
+                        {disabled && !!disabledMessage && (
+                            <View className="items-center">
+                                <Text className="text-muted-foreground text-sm italic text-center">
+                                    {disabledMessage}
+                                </Text>
+                            </View>
+                        )}
                         {question.type === 'multiple-choice' && question.options && (
                             <View className="space-y-3">
                                 {question.options.map((option, index) => {
@@ -103,11 +115,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
                                     const isWrong = showCorrectAnswer && isSelected && option !== question.correctAnswer;
 
+                                    const isDisabled = showCorrectAnswer || disabled;
+
                                     return (
                                         <TouchableOpacity
                                             key={index}
-                                            onPress={() => !showCorrectAnswer && onSelectAnswer(option)}
-                                            disabled={showCorrectAnswer}
+                                            onPress={() => !isDisabled && onSelectAnswer(option)}
+                                            disabled={isDisabled}
                                             className={`flex-row items-center p-4 rounded-xl border-2 ${isCorrect
                                                 ? 'border-neon-green bg-neon-green/20'
                                                 : isWrong
@@ -139,11 +153,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
                                     const isWrong = showCorrectAnswer && isSelected && option !== question.correctAnswer;
 
+                                    const isDisabled = showCorrectAnswer || disabled;
+
                                     return (
                                         <TouchableOpacity
                                             key={option}
-                                            onPress={() => !showCorrectAnswer && onSelectAnswer(option)}
-                                            disabled={showCorrectAnswer}
+                                            onPress={() => !isDisabled && onSelectAnswer(option)}
+                                            disabled={isDisabled}
                                             className={`w-32 py-4 rounded-xl items-center border-2 ${isCorrect
                                                 ? 'border-neon-green bg-neon-green/20'
                                                 : isWrong
@@ -168,13 +184,14 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                 <TextInput
                                     value={openEndedAnswer}
                                     onChangeText={setOpenEndedAnswer}
+                                    editable={!disabled}
                                     placeholder={t('answer') + '...'}
                                     placeholderTextColor="#7B6657"
                                     className="flex-1 h-12 px-4 rounded-xl border border-border bg-input text-foreground"
                                 />
                                 <Button
                                     onPress={handleOpenEndedSubmit}
-                                    disabled={!openEndedAnswer.trim()}
+                                    disabled={disabled || !openEndedAnswer.trim()}
                                 >
                                     <Text className="font-display font-bold text-primary-foreground">
                                         {t('submit')}

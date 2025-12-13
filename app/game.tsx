@@ -48,6 +48,10 @@ export default function Game() {
         gameStateRef.current = gameState;
     }, [gameState]);
 
+    const refreshInFlightRef = React.useRef(false);
+    const lastQuestionsSignatureRef = React.useRef<string>('');
+    const autoAdvanceInFlightRef = React.useRef(false);
+
     const [phase, setPhase] = useState<GamePhase>('betting');
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -77,6 +81,7 @@ export default function Game() {
 
     const activeQuestion = useMemo(() => {
         if (phase.startsWith('final')) return finalQuestion;
+        if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) return undefined;
         return questions[currentQuestionIndex];
     }, [phase, finalQuestion, questions, currentQuestionIndex]);
 
@@ -102,6 +107,8 @@ export default function Game() {
         let cancelled = false;
 
         const refresh = async () => {
+            if (refreshInFlightRef.current) return;
+            refreshInFlightRef.current = true;
             try {
                 const roomCode = gameState.roomCode;
 
@@ -112,12 +119,16 @@ export default function Game() {
 
                 if (cancelled) return;
 
-                setPhase(meta.phase as GamePhase);
-                setCurrentQuestionIndex(meta.currentQuestionIndex);
-                setFinalMode(meta.finalMode);
+                setPhase((prev) => (prev === (meta.phase as GamePhase) ? prev : (meta.phase as GamePhase)));
+                setCurrentQuestionIndex((prev) => (prev === meta.currentQuestionIndex ? prev : meta.currentQuestionIndex));
+                setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
                 if (Array.isArray(meta.questions) && meta.questions.length > 0) {
-                    setQuestions(meta.questions);
+                    const signature = `${meta.questions.length}:${(meta.questions as any)?.[0]?.id || ''}:${(meta.questions as any)?.[meta.questions.length - 1]?.id || ''}`;
+                    if (signature !== lastQuestionsSignatureRef.current) {
+                        lastQuestionsSignatureRef.current = signature;
+                        setQuestions(meta.questions as Question[]);
+                    }
                     setIsLoading(false);
                 } else {
                     setIsLoading(true);
@@ -276,6 +287,8 @@ export default function Game() {
                 if (cancelled) return;
                 console.error(err);
                 setIsLoading(false);
+            } finally {
+                refreshInFlightRef.current = false;
             }
         };
 
@@ -291,6 +304,32 @@ export default function Game() {
             subscriptionRef.current = null;
         };
     }, [apiKey, currentPlayer?.id, gameState?.roomCode, gameState?.hostApiKey, gameState?.playerApiKeys, router, setGameState, t]);
+
+    useEffect(() => {
+        if (!isHost || !gameState?.roomCode) return;
+        if (autoAdvanceInFlightRef.current) return;
+
+        const allAnswered = gameState.players.every((p) => !!answerBoard[p.id]?.hasAnswered);
+        if (!allAnswered) return;
+
+        if (phase === 'question') {
+            autoAdvanceInFlightRef.current = true;
+            setRoomPhase({ roomCode: gameState.roomCode, phase: 'preview' })
+                .catch(() => undefined)
+                .finally(() => {
+                    autoAdvanceInFlightRef.current = false;
+                });
+        }
+
+        if (phase === 'final-question') {
+            autoAdvanceInFlightRef.current = true;
+            setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' })
+                .catch(() => undefined)
+                .finally(() => {
+                    autoAdvanceInFlightRef.current = false;
+                });
+        }
+    }, [answerBoard, gameState?.players, gameState?.roomCode, isHost, phase]);
 
     if (!gameState || !activePlayer) return null;
 
@@ -614,79 +653,90 @@ export default function Game() {
                 </View>
 
                 <View className="max-w-3xl mx-auto w-full space-y-10">
-                    {/* Betting Phase - Now shows question + bet selector together */}
-                    {phase === 'betting' && !isFinalRound && activeQuestion && (
-                        <View className="space-y-7">
-                            {/* Show the Question First */}
-                            <Card className="border-primary/30 rounded-3xl" style={{
-                                shadowColor: '#C97B4C',
-                                shadowOffset: { width: 0, height: 0 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 20,
-                                elevation: 10,
-                            }}>
-                                <CardContent className="p-7 space-y-5">
-                                    {/* Question header */}
-                                    <View className="flex-row items-center justify-between">
-                                        <Text className="text-sm font-semibold text-muted-foreground">
-                                            {t('question')} {currentQuestionIndex + 1}/{totalQuestions}
-                                        </Text>
-                                        <View className={`px-3 py-1 rounded-full ${activeQuestion.difficulty === 'easy' ? 'bg-neon-green/20' :
-                                            activeQuestion.difficulty === 'medium' ? 'bg-accent/20' : 'bg-destructive/20'
-                                            }`}>
-                                            <Text className={`text-xs font-semibold ${activeQuestion.difficulty === 'easy' ? 'text-neon-green' :
-                                                activeQuestion.difficulty === 'medium' ? 'text-accent' : 'text-destructive'
-                                                }`}>
-                                                {t(activeQuestion.difficulty)}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Question text */}
-                                    <Text className="text-2xl font-display font-bold text-center text-foreground leading-tight">
-                                        {activeQuestion.text}
-                                    </Text>
-
-                                    {/* Hint that answers are hidden */}
-                                    <View className="items-center py-2">
-                                        <Text className="text-muted-foreground text-sm italic">
-                                            {t('placeBetFirst') || 'Choose your bet to reveal answer options'}
-                                        </Text>
-                                    </View>
-                                </CardContent>
-                            </Card>
-
-                            {/* Bet Selector Below Question */}
-                            <Card className="border-accent/30 rounded-3xl" style={{
-                                shadowColor: '#D4A72C',
-                                shadowOffset: { width: 0, height: 0 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 20,
-                                elevation: 10,
-                            }}>
-                                <CardContent className="p-9">
-                                    <BetSelector
-                                        totalQuestions={totalQuestions}
-                                        usedBets={usedBetsForPlayer}
-                                        selectedBet={selectedBet}
-                                        onSelectBet={setSelectedBet}
+                    {/* Unified Round Screen (Bet + Answer) */}
+                    {!isFinalRound && (phase === 'betting' || phase === 'question') && activeQuestion && (
+                        <View className="space-y-8">
+                            {/* Timer (answering only) */}
+                            {phase === 'question' && (
+                                <View className="items-center">
+                                    <Timer
+                                        key={timerKey}
+                                        seconds={gameState.settings.timePerQuestion}
+                                        onComplete={handleTimerComplete}
+                                        size="lg"
                                     />
-                                </CardContent>
-                            </Card>
-
-                            <Button
-                                variant="hero"
-                                onPress={handleBetConfirm}
-                                disabled={!selectedBet}
-                                className="w-full"
-                            >
-                                <View className="flex-row items-center gap-2">
-                                    <Text className="text-lg font-display font-bold text-primary-foreground">
-                                        {t('confirm')} {selectedBet ? `${selectedBet} ${t('points')}` : t('bet')}
-                                    </Text>
-                                    <Text className="text-lg">🎲</Text>
                                 </View>
-                            </Button>
+                            )}
+
+                            {/* Bet selection / bet summary */}
+                            {phase === 'betting' ? (
+                                <View className="space-y-6">
+                                    <Card className="border-accent/30 rounded-3xl" style={{
+                                        shadowColor: '#D4A72C',
+                                        shadowOffset: { width: 0, height: 0 },
+                                        shadowOpacity: 0.3,
+                                        shadowRadius: 20,
+                                        elevation: 10,
+                                    }}>
+                                        <CardContent className="p-9 space-y-6">
+                                            <View className="items-center">
+                                                <View className="px-4 py-2 rounded-full bg-accent/20">
+                                                    <Text className="text-accent font-display font-bold">
+                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <BetSelector
+                                                totalQuestions={totalQuestions}
+                                                usedBets={usedBetsForPlayer}
+                                                selectedBet={selectedBet}
+                                                onSelectBet={setSelectedBet}
+                                            />
+
+                                            <Button
+                                                variant="hero"
+                                                onPress={handleBetConfirm}
+                                                disabled={!selectedBet}
+                                                className="w-full"
+                                            >
+                                                <View className="flex-row items-center gap-2">
+                                                    <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                        {t('confirm')} {selectedBet ? `${selectedBet} ${t('points')}` : t('bet')}
+                                                    </Text>
+                                                    <Text className="text-lg">🎲</Text>
+                                                </View>
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                </View>
+                            ) : (
+                                <View className="items-center">
+                                    <View className="px-4 py-2 rounded-full bg-accent/20">
+                                        <Text className="text-accent font-display font-bold">
+                                            {t('yourBet')}: {currentBetDisplay ?? 0} {t('points')}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Question + answers (always visible; disabled during betting) */}
+                            <QuestionCard
+                                question={activeQuestion}
+                                questionNumber={currentQuestionIndex + 1}
+                                totalQuestions={totalQuestions}
+                                selectedAnswer={selectedAnswer}
+                                onSelectAnswer={handleAnswerSubmit}
+                                isAnswerPhase={true}
+                                disabled={phase === 'betting'}
+                                disabledMessage={
+                                    phase === 'betting'
+                                        ? (betsByPlayerId[activePlayer.id] || selectedBet ? (t('waitingForPlayers') || 'Waiting for other players...') : (t('placeBetFirst') || 'Select and confirm your bet to start answering'))
+                                        : undefined
+                                }
+                                showCorrectAnswer={false}
+                                hintsEnabled={gameState.settings.hintsEnabled}
+                            />
                         </View>
                     )}
 
@@ -702,31 +752,38 @@ export default function Game() {
                                         {t('finalWagerDesc')}
                                     </Text>
 
-                                    <View className="flex-row justify-center gap-2">
-                                        {(['personalized', 'shared'] as const).map((mode) => (
-                                            <TouchableOpacity
-                                                key={mode}
-                                                onPress={async () => {
-                                                    if (!isHost || !gameState?.roomCode) return;
-                                                    setFinalMode(mode);
-                                                    try {
-                                                        await updateRoomMeta({
-                                                            roomCode: gameState.roomCode,
-                                                            patch: { final_mode: mode },
-                                                        });
-                                                    } catch (err) {
-                                                        Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update final mode');
-                                                    }
-                                                }}
-                                                disabled={!isHost}
-                                                className={`flex-1 px-3 py-2 rounded-xl border ${finalMode === mode ? 'border-primary bg-primary/20' : 'border-border bg-muted'} ${!isHost ? 'opacity-60' : ''}`}
-                                            >
-                                                <Text className="text-center font-display font-semibold text-foreground">
-                                                    {mode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
+                                    {isHost ? (
+                                        <View className="flex-row justify-center gap-2">
+                                            {(['personalized', 'shared'] as const).map((mode) => (
+                                                <TouchableOpacity
+                                                    key={mode}
+                                                    onPress={async () => {
+                                                        if (!gameState?.roomCode) return;
+                                                        setFinalMode(mode);
+                                                        try {
+                                                            await updateRoomMeta({
+                                                                roomCode: gameState.roomCode,
+                                                                patch: { final_mode: mode },
+                                                            });
+                                                        } catch (err) {
+                                                            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update final mode');
+                                                        }
+                                                    }}
+                                                    className={`flex-1 px-3 py-2 rounded-xl border ${finalMode === mode ? 'border-primary bg-primary/20' : 'border-border bg-muted'}`}
+                                                >
+                                                    <Text className="text-center font-display font-semibold text-foreground">
+                                                        {mode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    ) : (
+                                        <View className="items-center">
+                                            <Text className="text-muted-foreground">
+                                                {t('finalMode')}: {finalMode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
+                                            </Text>
+                                        </View>
+                                    )}
 
                                     <View className="flex-row justify-center gap-3">
                                         {[0, 10, 20].map((w) => (
@@ -755,26 +812,32 @@ export default function Game() {
                                         </View>
                                     </View>
 
-                                    <Button
-                                        variant="hero"
-                                        disabled={currentFinalChoice.wager === null || isLoadingFinal}
-                                        onPress={startFinalQuestion}
-                                        className="w-full"
-                                    >
-                                        <Text className="text-lg font-display font-bold text-primary-foreground">
-                                            {isLoadingFinal ? t('loading') : t('startFinal')}
-                                        </Text>
-                                    </Button>
+                                    {isHost ? (
+                                        <Button
+                                            variant="hero"
+                                            disabled={currentFinalChoice.wager === null || isLoadingFinal}
+                                            onPress={startFinalQuestion}
+                                            className="w-full"
+                                        >
+                                            <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                {isLoadingFinal ? t('loading') : t('startFinal')}
+                                            </Text>
+                                        </Button>
+                                    ) : (
+                                        <View className="items-center">
+                                            <Text className="text-muted-foreground">Waiting for host...</Text>
+                                        </View>
+                                    )}
                                 </CardContent>
                             </Card>
                         </View>
                     )}
 
                     {/* Question Phase */}
-                    {(phase === 'question' || phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
+                    {(phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
                         <View className="space-y-8">
                             {/* Timer */}
-                            {(phase === 'question' || phase === 'final-question') && (
+                            {phase === 'final-question' && (
                                 <View className="items-center">
                                     <Timer
                                         key={timerKey}
@@ -801,7 +864,7 @@ export default function Game() {
                                 totalQuestions={totalQuestions}
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
-                                isAnswerPhase={phase === 'question'}
+                                isAnswerPhase={phase === 'final-question'}
                                 showCorrectAnswer={showCorrectAnswer}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
@@ -834,20 +897,27 @@ export default function Game() {
                                             })}
                                         </CardContent>
                                     </Card>
-                                    <Button
-                                        variant="secondary"
-                                        size="lg"
-                                        onPress={handleRevealAnswer}
-                                        disabled={!isHost}
-                                        className="w-full"
-                                    >
-                                        <View className="flex-row items-center gap-2">
-                                            <Text className="font-display font-bold text-secondary-foreground">
-                                                {t('revealNow')}
-                                            </Text>
-                                            <Text>🎯</Text>
-                                        </View>
-                                    </Button>
+                                    {isHost && (
+                                        <Button
+                                            variant="secondary"
+                                            size="lg"
+                                            onPress={handleRevealAnswer}
+                                            className="w-full"
+                                        >
+                                            <View className="flex-row items-center gap-2">
+                                                <Text className="font-display font-bold text-secondary-foreground">
+                                                    {t('revealNow')}
+                                                </Text>
+                                                <Text>🎯</Text>
+                                            </View>
+                                        </Button>
+                                    )}
+                                </View>
+                            )}
+
+                            {phase === 'preview' && !showCorrectAnswer && !isHost && (
+                                <View className="items-center">
+                                    <Text className="text-muted-foreground">Waiting for host...</Text>
                                 </View>
                             )}
 
@@ -868,7 +938,7 @@ export default function Game() {
                                                             {entry?.answer || t('waitingForAnswer')}
                                                         </Text>
                                                     </View>
-                                                    {entry?.hasAnswered && (
+                                                    {isHost && entry?.hasAnswered && (
                                                         <View className="flex-row gap-2">
                                                             <TouchableOpacity
                                                                 onPress={() => toggleValidation(player.id, true)}
@@ -888,11 +958,13 @@ export default function Game() {
                                             );
                                         })}
 
-                                        <Button variant="hero" onPress={applyScores} className="w-full">
-                                            <Text className="text-lg font-display font-bold text-primary-foreground">
-                                                {t('applyScores')}
-                                            </Text>
-                                        </Button>
+                                        {isHost && (
+                                            <Button variant="hero" onPress={applyScores} className="w-full">
+                                                <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                    {t('applyScores')}
+                                                </Text>
+                                            </Button>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )}
@@ -907,11 +979,15 @@ export default function Game() {
                                                 ? `${t('incorrect')} -${currentFinalChoice.wager || 0}`
                                                 : t('incorrect')}
                                     </Text>
-                                    <Button variant="hero" onPress={handleNextQuestion} className="w-full">
-                                        <Text className="text-lg font-display font-bold text-primary-foreground">
-                                            {isFinalRound ? `${t('seeResults')} 🏆` : `${t('next')} ${t('question')} ➡️`}
-                                        </Text>
-                                    </Button>
+                                    {isHost ? (
+                                        <Button variant="hero" onPress={handleNextQuestion} className="w-full">
+                                            <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                {isFinalRound ? `${t('seeResults')} 🏆` : `${t('next')} ${t('question')} ➡️`}
+                                            </Text>
+                                        </Button>
+                                    ) : (
+                                        <Text className="text-muted-foreground">Waiting for host...</Text>
+                                    )}
                                 </View>
                             )}
                         </View>
