@@ -17,7 +17,6 @@ import { fetchRoomState, updateRoomQuestions, updatePlayerState } from '@/servic
 import {
     subscribeToGame,
     fetchBets,
-    fetchPlayerBets,
     submitBet,
     submitAnswer,
     fetchAnswers,
@@ -37,6 +36,31 @@ import {
 
 type AnswerBoard = Record<string, { answer?: string; isCorrect?: boolean; hasAnswered: boolean }>;
 
+function shallowEqualNumberRecord(a: Record<string, number>, b: Record<string, number>) {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const k of aKeys) {
+        if (a[k] !== b[k]) return false;
+    }
+    return true;
+}
+
+function shallowEqualAnswerBoard(a: AnswerBoard, b: AnswerBoard) {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const k of aKeys) {
+        const av = a[k];
+        const bv = b[k];
+        if (!bv) return false;
+        if (av.hasAnswered !== bv.hasAnswered) return false;
+        if ((av.answer || '') !== (bv.answer || '')) return false;
+        if ((av.isCorrect ?? undefined) !== (bv.isCorrect ?? undefined)) return false;
+    }
+    return true;
+}
+
 export default function Game() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
@@ -53,6 +77,7 @@ export default function Game() {
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
     const submitInFlightRef = React.useRef(false);
+    const roomQuestionsCountRef = React.useRef<number>(0);
 
     const answerBoardScopeRef = React.useRef<
         | { kind: 'normal'; questionIndex: number }
@@ -170,7 +195,7 @@ export default function Game() {
         let cancelled = false;
         let refreshQueued = false;
         let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-        const debounceMs = Platform.OS === 'web' ? 180 : 60;
+        const debounceMs = Platform.OS === 'web' ? 240 : 60;
 
         const scheduleRefresh = () => {
             refreshQueued = true;
@@ -196,6 +221,26 @@ export default function Game() {
                     finalMode: (roomState.room.final_mode === 'personalized' ? 'personalized' : 'shared') as 'shared' | 'personalized',
                     questions: Array.isArray(roomState.room.questions) ? roomState.room.questions : [],
                 };
+
+                roomQuestionsCountRef.current = Array.isArray(meta.questions) ? meta.questions.length : 0;
+
+                // Guard: if DB says final-wager but we still have remaining normal questions, auto-correct back.
+                if (
+                    meta.phase === 'final-wager' &&
+                    Array.isArray(meta.questions) &&
+                    meta.questions.length > 0 &&
+                    meta.currentQuestionIndex < meta.questions.length - 1 &&
+                    currentPlayer?.id === roomState.room.host_player_id
+                ) {
+                    await updateRoomMeta({
+                        roomCode,
+                        patch: {
+                            phase: 'question',
+                            phase_started_at: new Date().toISOString(),
+                        },
+                    });
+                    return;
+                }
 
                 const normalizeQuestions = (raw: any[], settings: GameSettings): Question[] => {
                     const desiredType = settings.questionType;
@@ -311,9 +356,8 @@ export default function Game() {
                         meta.phase === 'validation' ||
                         meta.phase === 'scoring';
 
-                    const [bets, myBets, answers, validations] = await Promise.all([
+                    const [bets, answers, validations] = await Promise.all([
                         fetchBets({ roomCode, questionIndex: meta.currentQuestionIndex }),
-                        fetchPlayerBets({ roomCode, playerId: currentPlayer.id }),
                         fetchAnswers({ roomCode, questionIndex: meta.currentQuestionIndex }),
                         shouldFetchValidations
                             ? fetchValidations({ roomCode, questionIndex: meta.currentQuestionIndex })
@@ -324,8 +368,17 @@ export default function Game() {
                     bets.forEach((b) => {
                         betMap[b.player_id] = b.bet_value;
                     });
-                    setBetsByPlayerId(betMap);
-                    setUsedBetsForPlayer(Array.from(new Set(myBets.map((b) => b.bet_value))).sort((a, b) => a - b));
+                    setBetsByPlayerId((prev) => (shallowEqualNumberRecord(prev, betMap) ? prev : betMap));
+
+                    const meFromRoom = roomState.players.find((p) => p.id === currentPlayer.id);
+                    const nextUsed = Array.from(new Set([...(meFromRoom?.usedBets || [])])).sort((a, b) => a - b);
+                    setUsedBetsForPlayer((prev) => {
+                        if (prev.length !== nextUsed.length) return nextUsed;
+                        for (let i = 0; i < prev.length; i++) {
+                            if (prev[i] !== nextUsed[i]) return nextUsed;
+                        }
+                        return prev;
+                    });
 
                     const answerMap: Record<string, string> = {};
                     answers.forEach((a) => {
@@ -346,7 +399,7 @@ export default function Game() {
                             isCorrect: validationMap[p.id],
                         };
                     });
-                    setAnswerBoard(board);
+                    setAnswerBoard((prev) => (shallowEqualAnswerBoard(prev, board) ? prev : board));
                     answerBoardScopeRef.current = { kind: 'normal', questionIndex: meta.currentQuestionIndex };
                     const serverAnswer = answerMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
@@ -383,7 +436,18 @@ export default function Game() {
                         const difficulty = (c.difficulty as Difficulty) || 'medium';
                         nextChoices[c.player_id] = { wager, difficulty };
                     });
-                    setFinalChoices(nextChoices);
+                    setFinalChoices((prev) => {
+                        const aKeys = Object.keys(prev);
+                        const bKeys = Object.keys(nextChoices);
+                        if (aKeys.length !== bKeys.length) return nextChoices;
+                        for (const k of bKeys) {
+                            const av = prev[k];
+                            const bv = nextChoices[k];
+                            if (!av || !bv) return nextChoices;
+                            if (av.wager !== bv.wager || av.difficulty !== bv.difficulty) return nextChoices;
+                        }
+                        return prev;
+                    });
 
                     setFinalQuestion(myQuestion);
 
@@ -432,7 +496,7 @@ export default function Game() {
                             isCorrect: valMap[p.id],
                         };
                     });
-                    setAnswerBoard(board);
+                    setAnswerBoard((prev) => (shallowEqualAnswerBoard(prev, board) ? prev : board));
                     answerBoardScopeRef.current = { kind: 'final' };
                     const serverAnswer = ansMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
@@ -461,7 +525,7 @@ export default function Game() {
         subscriptionRef.current?.unsubscribe();
         subscriptionRef.current = subscribeToGame({ roomCode: gameState.roomCode, onChange: scheduleRefresh });
 
-        const pollMs = Platform.OS === 'web' ? 10000 : 2500;
+        const pollMs = Platform.OS === 'web' ? 15000 : 2500;
         const poll = setInterval(() => scheduleRefresh(), pollMs);
         return () => {
             cancelled = true;
@@ -706,8 +770,18 @@ export default function Game() {
             return;
         }
 
+        const normalCount =
+            questions.length ||
+            roomQuestionsCountRef.current ||
+            gameState.settings.numberOfQuestions ||
+            0;
+        if (!normalCount) {
+            Alert.alert(t('loading'), t('loading'));
+            return;
+        }
+
         const nextIndex = currentQuestionIndex + 1;
-        if (nextIndex < questions.length) {
+        if (nextIndex < normalCount) {
             await updateRoomMeta({
                 roomCode: gameState.roomCode,
                 patch: {
