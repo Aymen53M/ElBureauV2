@@ -129,7 +129,7 @@ function ResumeBootstrap() {
                 }
 
                 try {
-                    let { room, players } = await fetchRoomState(lastRoomCode);
+                    let { room, players } = await fetchRoomState(lastRoomCode, { includeQuestions: false });
                     let me = players.find((p) => p.id === playerId);
                     if (!me) {
                         const joined = await joinRoom({

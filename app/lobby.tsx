@@ -25,6 +25,7 @@ export default function Lobby() {
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
     const hasNavigatedRef = React.useRef(false);
     const refreshInFlightRef = React.useRef(false);
+    const lastSnapshotRef = React.useRef<string>('');
     const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
 
@@ -46,7 +47,7 @@ export default function Lobby() {
         let cancelled = false;
         let refreshQueued = false;
         let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-        const debounceMs = Platform.OS === 'web' ? 180 : 60;
+        const debounceMs = Platform.OS === 'web' ? 240 : 60;
 
         const scheduleRefresh = () => {
             refreshQueued = true;
@@ -63,19 +64,27 @@ export default function Lobby() {
             if (refreshInFlightRef.current) return;
             refreshInFlightRef.current = true;
             try {
-                const { room, players } = await fetchRoomState(gameState.roomCode);
+                const { room, players } = await fetchRoomState(gameState.roomCode, { includeQuestions: false });
                 if (cancelled) return;
-                setGameState((prev) => {
-                    if (!prev) return prev;
-                    return {
-                        ...prev,
-                        roomCode: room.room_code,
-                        hostId: room.host_player_id,
-                        phase: (room.phase as any) || prev.phase,
-                        settings: room.settings,
-                        players: players.length ? players : prev.players,
-                    };
-                });
+
+                const playersSig = players
+                    .map((p) => `${p.id}:${p.score}:${p.isReady ? 1 : 0}:${p.isHost ? 1 : 0}:${(p.usedBets || []).join(',')}:${p.hasApiKey ? 1 : 0}`)
+                    .join('|');
+                const nextSnapshot = `${room.room_code}|${room.host_player_id}|${room.phase}|${JSON.stringify(room.settings)}|${playersSig}`;
+                if (nextSnapshot !== lastSnapshotRef.current) {
+                    lastSnapshotRef.current = nextSnapshot;
+                    setGameState((prev) => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            roomCode: room.room_code,
+                            hostId: room.host_player_id,
+                            phase: (room.phase as any) || prev.phase,
+                            settings: room.settings,
+                            players: players.length ? players : prev.players,
+                        };
+                    });
+                }
                 setRealtimeStatus('connected');
 
                 if (room.phase && room.phase !== 'lobby' && !hasNavigatedRef.current) {
@@ -101,7 +110,7 @@ export default function Lobby() {
             onRoomChange: scheduleRefresh,
         });
 
-        const pollMs = Platform.OS === 'web' ? 10000 : 3000;
+        const pollMs = Platform.OS === 'web' ? 15000 : 3000;
         const poll = setInterval(() => {
             scheduleRefresh();
         }, pollMs);

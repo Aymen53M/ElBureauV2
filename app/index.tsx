@@ -94,9 +94,7 @@ export default function Index() {
                                     onError={() => setLogoError(true)}
                                 />
                             ) : (
-                                <View style={{ width: logoWidth, height: logoHeight }} className="items-center justify-center">
-                                    <Text className="text-5xl font-display font-bold text-primary">ElBureau</Text>
-                                </View>
+                                <View style={{ width: logoWidth, height: logoHeight }} />
                             )}
                         </Animated.View>
                     </View>

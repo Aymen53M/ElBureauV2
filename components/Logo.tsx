@@ -1,14 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image, Pressable, Alert } from 'react-native';
 import { twMerge } from 'tailwind-merge';
+import { usePathname, useRouter } from 'expo-router';
 
 interface LogoProps {
     size?: 'sm' | 'md' | 'lg' | 'xl';
     animated?: boolean;
     className?: string;
+    goHomeOnPress?: boolean;
 }
 
 const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) => {
+    const router = useRouter();
+    const pathname = usePathname();
     const animatedValue = React.useRef(new Animated.Value(0)).current;
 
     React.useEffect(() => {
@@ -32,44 +36,59 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
         }
     }, [animated, animatedValue]);
 
-    const getSizeClasses = () => {
+    const sizePx = (() => {
         switch (size) {
-            case 'sm': return { text: 'text-2xl', sparkle1: 'text-sm', sparkle2: 'text-xs' };
-            case 'md': return { text: 'text-4xl', sparkle1: 'text-base', sparkle2: 'text-sm' };
-            case 'lg': return { text: 'text-5xl', sparkle1: 'text-lg', sparkle2: 'text-base' };
-            case 'xl': return { text: 'text-6xl', sparkle1: 'text-xl', sparkle2: 'text-lg' };
+            case 'sm':
+                return { w: 110, h: 44 };
+            case 'md':
+                return { w: 160, h: 64 };
+            case 'lg':
+                return { w: 220, h: 88 };
+            case 'xl':
+                return { w: 280, h: 112 };
         }
+    })();
+
+    const enableHomeNav = (size === 'sm' && !animated);
+
+    const handlePress = () => {
+        if (!enableHomeNav) return;
+        if (pathname === '/') return;
+        Alert.alert('Go Home?', 'Do you want to leave this screen and go to Home?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Go Home', onPress: () => router.replace('/') },
+        ]);
     };
 
-    const sizes = getSizeClasses();
+    const logoSource = require('../assets/Flowting Logo.png');
 
     return (
-        <View className={twMerge("relative", className)}>
+        <Pressable
+            onPress={handlePress}
+            className={twMerge('relative', className)}
+            accessibilityRole={enableHomeNav ? 'button' : undefined}
+        >
             {/* Glow effect behind */}
             <View className="absolute inset-0" style={styles.glow}>
-                <Text className={`font-display font-bold text-primary ${sizes.text}`} style={styles.glowText}>
-                    ElBureau
-                </Text>
+                <Image
+                    source={logoSource}
+                    style={[{ width: sizePx.w, height: sizePx.h, opacity: 0.55 }, styles.glowImage]}
+                    resizeMode="contain"
+                />
             </View>
 
             {/* Main logo */}
-            <Animated.View
-                style={animated ? { transform: [{ translateY: animatedValue }] } : undefined}
-            >
-                <View className="flex-row items-center">
-                    <Text className={`font-display font-bold text-primary ${sizes.text}`}>
-                        El
-                    </Text>
-                    <Text className={`font-display font-bold text-foreground ${sizes.text}`}>
-                        Bureau
-                    </Text>
-                </View>
+            <Animated.View style={animated ? { transform: [{ translateY: animatedValue }] } : undefined}>
+                <Image
+                    source={logoSource}
+                    style={{ width: sizePx.w, height: sizePx.h }}
+                    resizeMode="contain"
+                />
 
                 {/* Sparkle decorations */}
-                <Text className={`absolute -top-2 -right-4 text-accent ${sizes.sparkle1}`}>✦</Text>
-                <Text className={`absolute -bottom-1 -left-3 text-secondary ${sizes.sparkle2}`}>✦</Text>
+                <Text style={styles.hiddenSparkle}> </Text>
             </Animated.View>
-        </View>
+        </Pressable>
     );
 };
 
@@ -77,10 +96,17 @@ const styles = StyleSheet.create({
     glow: {
         opacity: 0.4,
     },
-    glowText: {
-        textShadowColor: '#C97B4C',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 20,
+    glowImage: {
+        shadowColor: '#C97B4C',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.45,
+        shadowRadius: 20,
+    },
+    hiddenSparkle: {
+        position: 'absolute',
+        opacity: 0,
+        width: 0,
+        height: 0,
     },
 });
 

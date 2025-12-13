@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import QuestionCard from '@/components/QuestionCard';
@@ -98,6 +99,7 @@ export default function Game() {
     const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('shared');
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
+    const [isImmersive, setIsImmersive] = useState(false);
 
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
     const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
@@ -138,6 +140,53 @@ export default function Game() {
         phase === 'scoring' ||
         phase === 'final-validation' ||
         phase === 'final-scoring';
+
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const doc = (globalThis as any).document as any;
+        if (!doc?.addEventListener) return;
+        const handler = () => {
+            setIsImmersive(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+        };
+        handler();
+        doc.addEventListener('fullscreenchange', handler);
+        doc.addEventListener('webkitfullscreenchange', handler);
+        return () => {
+            doc.removeEventListener('fullscreenchange', handler);
+            doc.removeEventListener('webkitfullscreenchange', handler);
+        };
+    }, []);
+
+    const toggleImmersive = async () => {
+        if (Platform.OS === 'web') {
+            const doc = (globalThis as any).document as any;
+            if (!doc) return;
+
+            const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+            try {
+                if (isFs) {
+                    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
+                    if (exit) {
+                        await exit.call(doc);
+                    }
+                    return;
+                }
+
+                const target = doc.documentElement || doc.body;
+                const request = target?.requestFullscreen || target?.webkitRequestFullscreen;
+                if (!request) {
+                    Alert.alert('Fullscreen', 'Fullscreen is not supported in this browser. Try “Add to Home Screen” for a more immersive experience.');
+                    return;
+                }
+                await request.call(target);
+            } catch {
+                Alert.alert('Fullscreen', 'Unable to enter fullscreen on this device.');
+            }
+            return;
+        }
+
+        setIsImmersive((prev) => !prev);
+    };
 
     useEffect(() => {
         if (!phase.startsWith('final')) {
@@ -214,22 +263,28 @@ export default function Game() {
             try {
                 const roomCode = gameState.roomCode;
 
-                const roomState = await fetchRoomState(roomCode);
+                const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
+                const roomState = await fetchRoomState(roomCode, { includeQuestions });
+                const questionsRaw = includeQuestions && Array.isArray(roomState.room.questions) ? roomState.room.questions : null;
                 const meta: any = {
                     phase: roomState.room.phase,
                     currentQuestionIndex: roomState.room.current_question_index ?? 0,
                     finalMode: (roomState.room.final_mode === 'personalized' ? 'personalized' : 'shared') as 'shared' | 'personalized',
-                    questions: Array.isArray(roomState.room.questions) ? roomState.room.questions : [],
+                    questions: Array.isArray(questionsRaw) ? questionsRaw : [],
                 };
 
-                roomQuestionsCountRef.current = Array.isArray(meta.questions) ? meta.questions.length : 0;
+                const normalCount =
+                    (Array.isArray(meta.questions) && meta.questions.length > 0 ? meta.questions.length : 0) ||
+                    roomQuestionsCountRef.current ||
+                    roomState.room.settings.numberOfQuestions ||
+                    0;
+                roomQuestionsCountRef.current = normalCount;
 
                 // Guard: if DB says final-wager but we still have remaining normal questions, auto-correct back.
                 if (
                     meta.phase === 'final-wager' &&
-                    Array.isArray(meta.questions) &&
-                    meta.questions.length > 0 &&
-                    meta.currentQuestionIndex < meta.questions.length - 1 &&
+                    normalCount > 0 &&
+                    meta.currentQuestionIndex < normalCount - 1 &&
                     currentPlayer?.id === roomState.room.host_player_id
                 ) {
                     await updateRoomMeta({
@@ -292,17 +347,19 @@ export default function Game() {
                 setCurrentQuestionIndex((prev) => (prev === meta.currentQuestionIndex ? prev : meta.currentQuestionIndex));
                 setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
-                if (Array.isArray(meta.questions) && meta.questions.length > 0) {
-                    const normalized = normalizeQuestions(meta.questions, roomState.room.settings);
-                    const typeSig = normalized.map((q) => `${q.type}:${q.options?.length || 0}`).join('|');
-                    const signature = `${roomState.room.settings.questionType}:${normalized.length}:${typeSig}`;
-                    if (signature !== lastQuestionsSignatureRef.current) {
-                        lastQuestionsSignatureRef.current = signature;
-                        setQuestions(normalized);
+                if (includeQuestions) {
+                    if (Array.isArray(meta.questions) && meta.questions.length > 0) {
+                        const normalized = normalizeQuestions(meta.questions, roomState.room.settings);
+                        const typeSig = normalized.map((q) => `${q.type}:${q.options?.length || 0}`).join('|');
+                        const signature = `${roomState.room.settings.questionType}:${normalized.length}:${typeSig}`;
+                        if (signature !== lastQuestionsSignatureRef.current) {
+                            lastQuestionsSignatureRef.current = signature;
+                            setQuestions(normalized);
+                        }
+                        setIsLoading(false);
+                    } else {
+                        setIsLoading(true);
                     }
-                    setIsLoading(false);
-                } else {
-                    setIsLoading(true);
                 }
 
                 setGameState((prev) => {
@@ -865,6 +922,7 @@ export default function Game() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="game" />
+            <StatusBar hidden={isImmersive} />
             <KeyboardAvoidingView
                 className="flex-1"
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -875,8 +933,19 @@ export default function Game() {
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-4 pt-4' : 'mb-9 pt-12'}`}>
                     <Logo size="sm" animated={false} />
-                    <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
-                        <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
+                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-3`}>
+                        <TouchableOpacity
+                            onPress={toggleImmersive}
+                            className="px-3 py-2 rounded-xl bg-muted border border-border"
+                        >
+                            <Text className="text-foreground font-semibold">
+                                {isImmersive ? 'Exit' : 'Fullscreen'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
+                            <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
+                        </View>
                     </View>
                 </View>
 
@@ -937,7 +1006,7 @@ export default function Game() {
                                         onSelectBet={setSelectedBet}
                                         showHeader={false}
                                         density={isCompact ? 'compact' : 'default'}
-                                        variant={isCompact ? 'stepper' : 'grid'}
+                                        variant="grid"
                                     />
 
                                     <View className="items-center">

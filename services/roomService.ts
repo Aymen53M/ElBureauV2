@@ -49,21 +49,28 @@ function toPlayer(row: RoomPlayerRow): Player {
     };
 }
 
-export async function fetchRoomState(roomCode: string): Promise<RoomState> {
+export async function fetchRoomState(
+    roomCode: string,
+    opts?: {
+        includeQuestions?: boolean;
+    }
+): Promise<RoomState> {
     const client = requireSupabase();
     const normalized = roomCode.toUpperCase();
 
+    const includeQuestions = !!opts?.includeQuestions;
+    const select = includeQuestions
+        ? 'room_code, host_player_id, settings, phase, questions, current_question_index, phase_started_at, final_mode'
+        : 'room_code, host_player_id, settings, phase, current_question_index, phase_started_at, final_mode';
+
     const { data: room, error: roomError } = await client
         .from('elbureau_rooms')
-        .select('room_code, host_player_id, settings, phase, questions, current_question_index, phase_started_at, final_mode')
+        .select(select)
         .eq('room_code', normalized)
         .single();
 
-    const missingColumn = (msg?: string) =>
-        (msg || '').toLowerCase().includes('questions') ||
-        (msg || '').toLowerCase().includes('current_question_index') ||
-        (msg || '').toLowerCase().includes('phase_started_at') ||
-        (msg || '').toLowerCase().includes('final_mode');
+    const requestedColumns = ['current_question_index', 'phase_started_at', 'final_mode', ...(includeQuestions ? ['questions'] : [])];
+    const missingColumn = (msg?: string) => requestedColumns.some((c) => (msg || '').toLowerCase().includes(c));
 
     if (roomError && missingColumn(roomError.message)) {
         const { data: fallbackRoom, error: fallbackError } = await client
@@ -109,7 +116,7 @@ export async function fetchRoomState(roomCode: string): Promise<RoomState> {
         .map((r) => toPlayer(r as RoomPlayerRow))
         .sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
 
-    return { room: room as RoomRow, players };
+    return { room: room as unknown as RoomRow, players };
 }
 
 export async function createRoom(args: {

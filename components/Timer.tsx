@@ -56,11 +56,11 @@ const Timer: React.FC<TimerProps> = ({
     const progress = (seconds / initialSeconds) * 100;
 
     const sizeConfig = {
-        xxs: { container: 34, stroke: 4, text: 'text-xs', radius: 14 },
-        xs: { container: 44, stroke: 5, text: 'text-base', radius: 18 },
-        sm: { container: 64, stroke: 6, text: 'text-xl', radius: 27 },
-        md: { container: 96, stroke: 8, text: 'text-3xl', radius: 40 },
-        lg: { container: 128, stroke: 10, text: 'text-4xl', radius: 54 },
+        xxs: { container: 34, stroke: 4, radius: 14, fontSize: 12, lineHeight: 12 },
+        xs: { container: 44, stroke: 5, radius: 18, fontSize: 16, lineHeight: 16 },
+        sm: { container: 64, stroke: 6, radius: 27, fontSize: 22, lineHeight: 22 },
+        md: { container: 96, stroke: 8, radius: 40, fontSize: 32, lineHeight: 32 },
+        lg: { container: 128, stroke: 10, radius: 54, fontSize: 40, lineHeight: 40 },
     };
 
     const config = sizeConfig[size];
@@ -111,9 +111,17 @@ const Timer: React.FC<TimerProps> = ({
 
             {/* Time display */}
             <Text
-                className={`font-display font-bold ${config.text}`}
+                className="font-display font-bold"
                 style={[
                     { color: getColor() },
+                    {
+                        width: config.container,
+                        textAlign: 'center',
+                        textAlignVertical: 'center',
+                        includeFontPadding: false,
+                        fontSize: config.fontSize,
+                        lineHeight: config.lineHeight,
+                    },
                     isCritical && styles.glowText,
                 ]}
             >

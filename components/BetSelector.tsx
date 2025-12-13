@@ -27,9 +27,14 @@ const BetSelector: React.FC<BetSelectorProps> = ({
     const betOptions = Array.from({ length: totalQuestions }, (_, i) => i + 1);
 
     const isCompact = density === 'compact';
-    const cellClass = isCompact ? 'w-11 h-11 rounded-lg' : 'w-14 h-14 rounded-xl';
-    const cellTextClass = isCompact ? 'text-base' : 'text-xl';
-    const gridClass = isCompact ? 'gap-2 py-2' : 'gap-3 py-4';
+    const isTight = isCompact && totalQuestions > 12;
+    const cellClass = isTight
+        ? 'w-9 h-9 rounded-md'
+        : isCompact
+            ? 'w-11 h-11 rounded-lg'
+            : 'w-14 h-14 rounded-xl';
+    const cellTextClass = isTight ? 'text-sm' : isCompact ? 'text-base' : 'text-xl';
+    const gridClass = isTight ? 'gap-1 py-2' : isCompact ? 'gap-2 py-2' : 'gap-3 py-4';
 
     const firstAvailable = betOptions.find((b) => !usedBets.includes(b)) ?? null;
     const current = selectedBet ?? firstAvailable;
