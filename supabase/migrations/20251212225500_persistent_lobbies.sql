@@ -3,9 +3,13 @@ create table if not exists public.elbureau_rooms (
     host_player_id text not null,
     settings jsonb not null,
     phase text not null default 'lobby',
+    questions jsonb not null default '[]'::jsonb,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+alter table public.elbureau_rooms
+    add column if not exists questions jsonb not null default '[]'::jsonb;
 
 create table if not exists public.elbureau_room_players (
     room_code text not null references public.elbureau_rooms(room_code) on delete cascade,

@@ -6,6 +6,7 @@ type RoomRow = {
     host_player_id: string;
     settings: GameSettings;
     phase: string;
+    questions?: unknown;
 };
 
 type RoomPlayerRow = {
@@ -51,9 +52,36 @@ export async function fetchRoomState(roomCode: string): Promise<RoomState> {
 
     const { data: room, error: roomError } = await client
         .from('elbureau_rooms')
-        .select('room_code, host_player_id, settings, phase')
+        .select('room_code, host_player_id, settings, phase, questions')
         .eq('room_code', normalized)
         .single();
+
+    if (roomError && roomError.message?.toLowerCase?.().includes('questions')) {
+        const { data: fallbackRoom, error: fallbackError } = await client
+            .from('elbureau_rooms')
+            .select('room_code, host_player_id, settings, phase')
+            .eq('room_code', normalized)
+            .single();
+
+        if (fallbackError || !fallbackRoom) {
+            throw new Error(fallbackError?.message || 'ROOM_NOT_FOUND');
+        }
+
+        const { data: playerRows, error: playersError } = await client
+            .from('elbureau_room_players')
+            .select('room_code, player_id, name, score, is_host, is_ready, has_api_key, used_bets, avatar')
+            .eq('room_code', normalized);
+
+        if (playersError) {
+            throw new Error(playersError.message);
+        }
+
+        const players = (playerRows || [])
+            .map((r) => toPlayer(r as RoomPlayerRow))
+            .sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
+
+        return { room: fallbackRoom as RoomRow, players };
+    }
 
     if (roomError || !room) {
         throw new Error(roomError?.message || 'ROOM_NOT_FOUND');
@@ -111,6 +139,43 @@ export async function createRoom(args: {
     }
 
     return fetchRoomState(roomCode);
+}
+
+export async function updateRoomPhase(args: {
+    roomCode: string;
+    phase: string;
+}): Promise<void> {
+    const client = requireSupabase();
+    const roomCode = args.roomCode.toUpperCase();
+
+    const { error } = await client
+        .from('elbureau_rooms')
+        .update({ phase: args.phase })
+        .eq('room_code', roomCode);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+}
+
+export async function updateRoomQuestions(args: {
+    roomCode: string;
+    questions: unknown;
+}): Promise<void> {
+    const client = requireSupabase();
+    const roomCode = args.roomCode.toUpperCase();
+
+    const { error } = await client
+        .from('elbureau_rooms')
+        .update({ questions: args.questions })
+        .eq('room_code', roomCode);
+
+    if (error) {
+        if (error.message?.toLowerCase?.().includes('questions')) {
+            throw new Error('MIGRATION_REQUIRED_ADD_ROOMS_QUESTIONS');
+        }
+        throw new Error(error.message);
+    }
 }
 
 export async function leaveRoom(args: {

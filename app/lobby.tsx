@@ -13,6 +13,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { fetchRoomState, subscribeToRoom, updatePlayerState, leaveRoom } from '@/services/roomService';
+import { resetGameplayForRoom } from '@/services/gameService';
 
 export default function Lobby() {
     const router = useRouter();
@@ -20,6 +21,7 @@ export default function Lobby() {
     const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
+    const hasNavigatedRef = React.useRef(false);
     const [realtimeStatus, setRealtimeStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
 
@@ -50,11 +52,17 @@ export default function Lobby() {
                         ...prev,
                         roomCode: room.room_code,
                         hostId: room.host_player_id,
+                        phase: (room.phase as any) || prev.phase,
                         settings: room.settings,
                         players: players.length ? players : prev.players,
                     };
                 });
                 setRealtimeStatus('connected');
+
+                if (room.phase && room.phase !== 'lobby' && !hasNavigatedRef.current) {
+                    hasNavigatedRef.current = true;
+                    router.replace('/game');
+                }
             } catch (err) {
                 if (cancelled) return;
                 setRealtimeStatus('error');
@@ -79,8 +87,9 @@ export default function Lobby() {
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
             setRealtimeStatus('idle');
+            hasNavigatedRef.current = false;
         };
-    }, [gameState?.roomCode]);
+    }, [gameState?.roomCode, router, setGameState]);
 
     if (!gameState) {
         return (
@@ -149,7 +158,7 @@ export default function Lobby() {
         }
     };
 
-    const startGame = () => {
+    const startGame = async () => {
         if (!gameState.hostApiKey) {
             Alert.alert(t('apiKey'), t('missingApiKeyHost'));
             router.push('/settings');
@@ -159,7 +168,19 @@ export default function Lobby() {
             Alert.alert(t('notReadyTitle'), t('notReadyDesc'));
             return;
         }
-        router.push('/game');
+
+        if (isSupabaseConfigured && gameState?.roomCode) {
+            try {
+                await resetGameplayForRoom({ roomCode: gameState.roomCode, keepQuestions: false });
+            } catch (err) {
+                Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to start game');
+                return;
+            }
+        }
+
+        setGameState((prev) => (prev ? { ...prev, phase: 'betting' } : prev));
+        hasNavigatedRef.current = true;
+        router.replace('/game');
     };
 
     return (

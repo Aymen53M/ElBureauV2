@@ -15,6 +15,8 @@ export type GamePhase =
     | 'scoring'
     | 'final-wager'
     | 'final-question'
+    | 'final-validation'
+    | 'final-scoring'
     | 'results';
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'mixed';

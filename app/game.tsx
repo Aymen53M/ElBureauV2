@@ -11,16 +11,32 @@ import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player } from '@/contexts/GameContext';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { generateQuestions } from '@/services/questionService';
+import { fetchRoomState, updateRoomQuestions, updatePlayerState } from '@/services/roomService';
+import {
+    fetchGameMeta,
+    subscribeToGame,
+    fetchBets,
+    fetchPlayerBets,
+    submitBet,
+    submitAnswer,
+    fetchAnswers,
+    fetchValidations,
+    upsertValidation,
+    updateRoomMeta,
+    setRoomPhase,
+    fetchFinalChoices,
+    upsertFinalChoice,
+    fetchFinalQuestion,
+    upsertFinalQuestion,
+    submitFinalAnswer,
+    fetchFinalAnswers,
+    fetchFinalValidations,
+    upsertFinalValidation,
+} from '@/services/gameService';
 
 type AnswerBoard = Record<string, { answer?: string; isCorrect?: boolean; hasAnswered: boolean }>;
-
-const LOADING_MESSAGES = [
-    { en: 'Brewing questions...', fr: 'Préparation des questions...', ar: 'جاري تحضير الأسئلة...' },
-    { en: 'Consulting the AI oracle...', fr: "Consultation de l'oracle IA...", ar: 'استشارة أوراكل الذكاء الاصطناعي...' },
-    { en: 'Making it fun...', fr: 'On rend ça fun...', ar: 'نجعلها ممتعة...' },
-    { en: 'Almost ready!', fr: 'Presque prêt!', ar: 'تقريباً جاهز!' },
-] as const;
 
 export default function Game() {
     const router = useRouter();
@@ -36,18 +52,20 @@ export default function Game() {
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [showCorrectAnswer, setShowCorrectAnswer] = useState(false);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const [score, setScore] = useState(0);
     const [answerBoard, setAnswerBoard] = useState<AnswerBoard>({});
-    const [isFinalRound, setIsFinalRound] = useState(false);
     const [finalChoices, setFinalChoices] = useState<Record<string, { wager: number | null; difficulty: Difficulty }>>({});
-    const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('personalized');
+    const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('shared');
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
+
+    const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
+    const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
+
+    const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
 
     const activePlayer: Player | undefined = useMemo(() => {
         if (!gameState) return undefined;
@@ -58,85 +76,221 @@ export default function Game() {
     }, [gameState, currentPlayer]);
 
     const activeQuestion = useMemo(() => {
-        if (isFinalRound) return finalQuestion;
+        if (phase.startsWith('final')) return finalQuestion;
         return questions[currentQuestionIndex];
-    }, [isFinalRound, finalQuestion, questions, currentQuestionIndex]);
+    }, [phase, finalQuestion, questions, currentQuestionIndex]);
 
+    const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
     const currentFinalChoice = activePlayer
         ? (finalChoices[activePlayer.id] || { wager: null, difficulty: 'medium' as Difficulty })
         : { wager: null, difficulty: 'medium' as Difficulty };
-    const usedBetsForPlayer = activePlayer?.usedBets ?? [];
-    const currentBetDisplay = isFinalRound ? currentFinalChoice.wager : activePlayer?.currentBet ?? selectedBet ?? null;
+    const currentBetDisplay = isFinalRound
+        ? currentFinalChoice.wager
+        : (betsByPlayerId[activePlayer?.id || ''] ?? selectedBet ?? null);
 
-    const resetForNewQuestion = () => {
-        setSelectedAnswer(null);
-        setShowCorrectAnswer(false);
-        setTimerKey((prev) => prev + 1);
-        const board: AnswerBoard = {};
-        gameState?.players.forEach((p) => {
-            board[p.id] = { hasAnswered: false };
-        });
-        setAnswerBoard(board);
-    };
+    const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
+    const showCorrectAnswer =
+        phase === 'validation' ||
+        phase === 'scoring' ||
+        phase === 'final-validation' ||
+        phase === 'final-scoring';
 
     useEffect(() => {
-        const snapshot = gameStateRef.current;
-        if (!snapshot) {
-            router.replace('/');
-            return;
-        }
+        if (!isSupabaseConfigured || !gameState?.roomCode) return;
 
-        const board: AnswerBoard = {};
-        snapshot.players.forEach((p) => {
-            board[p.id] = { hasAnswered: false };
-        });
-        setAnswerBoard(board);
+        let cancelled = false;
 
-        const loadQuestions = async () => {
-            setIsLoading(true);
-
-            let messageIndex = 0;
-            const messageInterval = setInterval(() => {
-                const msg = LOADING_MESSAGES[messageIndex % LOADING_MESSAGES.length];
-                setLoadingMessage(msg[snapshot.settings.language] || msg.en);
-                messageIndex++;
-            }, 1500);
-
+        const refresh = async () => {
             try {
-                const hostKey = snapshot.hostApiKey || apiKey;
-                if (!hostKey) {
-                    Alert.alert(t('apiKey'), t('missingApiKeyHost'));
-                    router.replace('/settings');
-                    return;
-                }
+                const roomCode = gameState.roomCode;
 
-                const result = await generateQuestions(snapshot.settings, hostKey);
+                const [roomState, meta] = await Promise.all([
+                    fetchRoomState(roomCode),
+                    fetchGameMeta(roomCode),
+                ]);
 
-                clearInterval(messageInterval);
+                if (cancelled) return;
 
-                if (result.error) {
-                    console.error('Question generation error:', result.error);
-                    Alert.alert(t('loading'), result.error);
-                    router.replace('/lobby');
-                    return;
-                }
+                setPhase(meta.phase as GamePhase);
+                setCurrentQuestionIndex(meta.currentQuestionIndex);
+                setFinalMode(meta.finalMode);
 
-                if (result.questions && result.questions.length > 0) {
-                    setQuestions(result.questions);
+                if (Array.isArray(meta.questions) && meta.questions.length > 0) {
+                    setQuestions(meta.questions);
                     setIsLoading(false);
                 } else {
-                    router.replace('/lobby');
+                    setIsLoading(true);
                 }
-            } catch (error) {
-                clearInterval(messageInterval);
-                console.error('Error loading questions:', error);
-                router.replace('/lobby');
+
+                setGameState((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        roomCode: roomState.room.room_code,
+                        hostId: roomState.room.host_player_id,
+                        settings: roomState.room.settings,
+                        phase: meta.phase as any,
+                        players: roomState.players,
+                    };
+                });
+
+                if (meta.phase === 'results') {
+                    router.replace('/results');
+                    return;
+                }
+
+                // Ensure normal questions exist (generated once by host).
+                if ((!meta.questions || meta.questions.length === 0) && (currentPlayer?.id === roomState.room.host_player_id)) {
+                    const hostKey = gameState.hostApiKey || apiKey;
+                    if (!hostKey) {
+                        setLoadingMessage(t('missingApiKeyHost'));
+                        return;
+                    }
+
+                    setLoadingMessage(t('generatingQuestions'));
+                    const result = await generateQuestions(roomState.room.settings, hostKey);
+                    if (cancelled) return;
+                    if (result.error) {
+                        Alert.alert(t('loading'), result.error);
+                        router.replace('/lobby');
+                        return;
+                    }
+                    if (result.questions && result.questions.length > 0) {
+                        await updateRoomQuestions({ roomCode, questions: result.questions });
+                        return;
+                    }
+                }
+
+                if ((!meta.questions || meta.questions.length === 0) && currentPlayer?.id !== roomState.room.host_player_id) {
+                    setLoadingMessage('Waiting for host...');
+                }
+
+                // Load gameplay state for current phase
+                if (!currentPlayer?.id) return;
+
+                if (!meta.phase.startsWith('final')) {
+                    const [bets, myBets, answers, validations] = await Promise.all([
+                        fetchBets({ roomCode, questionIndex: meta.currentQuestionIndex }),
+                        fetchPlayerBets({ roomCode, playerId: currentPlayer.id }),
+                        fetchAnswers({ roomCode, questionIndex: meta.currentQuestionIndex }),
+                        fetchValidations({ roomCode, questionIndex: meta.currentQuestionIndex }),
+                    ]);
+
+                    const betMap: Record<string, number> = {};
+                    bets.forEach((b) => {
+                        betMap[b.player_id] = b.bet_value;
+                    });
+                    setBetsByPlayerId(betMap);
+                    setUsedBetsForPlayer(Array.from(new Set(myBets.map((b) => b.bet_value))).sort((a, b) => a - b));
+
+                    const answerMap: Record<string, string> = {};
+                    answers.forEach((a) => {
+                        answerMap[a.player_id] = a.answer;
+                    });
+                    const validationMap: Record<string, boolean> = {};
+                    validations.forEach((v) => {
+                        validationMap[v.player_id] = v.is_correct;
+                    });
+
+                    const board: AnswerBoard = {};
+                    roomState.players.forEach((p) => {
+                        const ans = answerMap[p.id];
+                        const hasAnswered = typeof ans === 'string' && ans.length > 0;
+                        board[p.id] = {
+                            hasAnswered,
+                            answer: hasAnswered ? ans : undefined,
+                            isCorrect: validationMap[p.id],
+                        };
+                    });
+                    setAnswerBoard(board);
+                    setSelectedAnswer(answerMap[currentPlayer.id] ?? null);
+                    setSelectedBet(betMap[currentPlayer.id] ?? null);
+                } else {
+                    const [choices, myQuestion, finalAnswers, finalValidations] = await Promise.all([
+                        fetchFinalChoices(roomCode),
+                        fetchFinalQuestion({ roomCode, playerId: currentPlayer.id }),
+                        fetchFinalAnswers(roomCode),
+                        fetchFinalValidations(roomCode),
+                    ]);
+
+                    const nextChoices: Record<string, { wager: number | null; difficulty: Difficulty }> = {};
+                    choices.forEach((c) => {
+                        const wager = typeof c.wager === 'number' ? c.wager : null;
+                        const difficulty = (c.difficulty as Difficulty) || 'medium';
+                        nextChoices[c.player_id] = { wager, difficulty };
+                    });
+                    setFinalChoices(nextChoices);
+
+                    setFinalQuestion(myQuestion);
+
+                    // Personalized final: generate own question if missing.
+                    if (meta.phase === 'final-question' && meta.finalMode === 'personalized' && !myQuestion) {
+                        const choice = nextChoices[currentPlayer.id];
+                        if (!choice || choice.wager === null) {
+                            return;
+                        }
+                        const keyToUse = gameState.playerApiKeys?.[currentPlayer.id] || apiKey;
+                        if (!keyToUse) {
+                            setLoadingMessage(t('missingApiKeyPersonal'));
+                            return;
+                        }
+
+                        setIsLoadingFinal(true);
+                        const finalSettings = {
+                            ...roomState.room.settings,
+                            numberOfQuestions: 1,
+                            difficulty: choice.difficulty,
+                            questionType: 'open-ended' as const,
+                        };
+                        const result = await generateQuestions(finalSettings, keyToUse);
+                        if (!cancelled && result.questions && result.questions.length > 0) {
+                            await upsertFinalQuestion({ roomCode, playerId: currentPlayer.id, question: result.questions[0] });
+                        }
+                        setIsLoadingFinal(false);
+                    }
+
+                    const ansMap: Record<string, string> = {};
+                    finalAnswers.forEach((a) => {
+                        ansMap[a.player_id] = a.answer;
+                    });
+                    const valMap: Record<string, boolean> = {};
+                    finalValidations.forEach((v) => {
+                        valMap[v.player_id] = v.is_correct;
+                    });
+
+                    const board: AnswerBoard = {};
+                    roomState.players.forEach((p) => {
+                        const ans = ansMap[p.id];
+                        const hasAnswered = typeof ans === 'string' && ans.length > 0;
+                        board[p.id] = {
+                            hasAnswered,
+                            answer: hasAnswered ? ans : undefined,
+                            isCorrect: valMap[p.id],
+                        };
+                    });
+                    setAnswerBoard(board);
+                    setSelectedAnswer(ansMap[currentPlayer.id] ?? null);
+                }
+            } catch (err) {
+                if (cancelled) return;
+                console.error(err);
+                setIsLoading(false);
             }
         };
 
-        loadQuestions();
-    }, [apiKey, router, t]);
+        refresh();
+        subscriptionRef.current?.unsubscribe();
+        subscriptionRef.current = subscribeToGame({ roomCode: gameState.roomCode, onChange: refresh });
+
+        const poll = setInterval(refresh, 2000);
+        return () => {
+            cancelled = true;
+            clearInterval(poll);
+            subscriptionRef.current?.unsubscribe();
+            subscriptionRef.current = null;
+        };
+    }, [apiKey, currentPlayer?.id, gameState?.roomCode, gameState?.hostApiKey, gameState?.playerApiKeys, router, setGameState, t]);
 
     if (!gameState || !activePlayer) return null;
 
@@ -158,204 +312,285 @@ export default function Game() {
         );
     }
 
-    const handleBetConfirm = () => {
-        if (!selectedBet) return;
+    const handleBetConfirm = async () => {
+        if (!gameState?.roomCode || !activePlayer?.id || !selectedBet) return;
 
-        if (activePlayer.usedBets?.includes(selectedBet)) {
-            Alert.alert(t('placeBet'), t('betAlreadyUsed'));
-            setSelectedBet(null);
+        try {
+            await submitBet({
+                roomCode: gameState.roomCode,
+                questionIndex: currentQuestionIndex,
+                playerId: activePlayer.id,
+                betValue: selectedBet,
+            });
+        } catch (err) {
+            Alert.alert(t('placeBet'), err instanceof Error ? err.message : t('betAlreadyUsed'));
             return;
         }
 
-        setGameState((prev) => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                players: prev.players.map((p) => {
-                    if (p.id !== activePlayer.id) return p;
-                    const mergedUsed = Array.from(new Set([...(p.usedBets || []), selectedBet]));
-                    return {
-                        ...p,
-                        currentBet: selectedBet,
-                        usedBets: mergedUsed,
-                    };
-                }),
-            };
-        });
-
-        setPhase('question');
-        setTimerKey((prev) => prev + 1);
+        if (isHost) {
+            const bets = await fetchBets({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex });
+            if (bets.length < gameState.players.length) {
+                Alert.alert(t('waiting'), t('waitingForPlayers'));
+                return;
+            }
+            await setRoomPhase({ roomCode: gameState.roomCode, phase: 'question' });
+            setTimerKey((prev) => prev + 1);
+        }
     };
 
-    const handleAnswerSubmit = (answer: string) => {
+    const handleAnswerSubmit = async (answer: string) => {
+        if (!gameState?.roomCode || !activePlayer?.id) return;
         setSelectedAnswer(answer);
-        setPhase('preview');
 
-        setAnswerBoard((prev) => ({
-            ...prev,
-            [activePlayer.id]: { ...prev[activePlayer.id], answer, hasAnswered: true },
-        }));
-
-        setGameState((prev) => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                answers: {
-                    ...prev.answers,
-                    [activePlayer.id]: { playerId: activePlayer.id, answer },
-                },
-            };
-        });
+        try {
+            if (phase.startsWith('final')) {
+                await submitFinalAnswer({ roomCode: gameState.roomCode, playerId: activePlayer.id, answer });
+            } else {
+                await submitAnswer({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex, playerId: activePlayer.id, answer });
+            }
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to submit');
+        }
     };
 
     const handleTimerComplete = () => {
+        if (!isHost || !gameState?.roomCode) return;
         if (phase === 'question') {
-            setPhase('preview');
+            setRoomPhase({ roomCode: gameState.roomCode, phase: 'preview' }).catch(() => undefined);
+        }
+        if (phase === 'final-question') {
+            setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' }).catch(() => undefined);
         }
     };
 
-    const handleRevealAnswer = () => {
-        if (!activeQuestion) return;
-        setShowCorrectAnswer(true);
-        setPhase('validation');
+    const handleRevealAnswer = async () => {
+        if (!isHost || !gameState?.roomCode || !activeQuestion) return;
 
-        setAnswerBoard((prev) => {
-            const clone = { ...prev };
-            Object.keys(clone).forEach((playerId) => {
-                const entry = clone[playerId];
-                if (entry.hasAnswered && entry.answer) {
-                    clone[playerId] = {
-                        ...entry,
-                        isCorrect: entry.answer.trim().toLowerCase() === activeQuestion.correctAnswer.trim().toLowerCase(),
-                    };
-                }
+        // Auto-validate based on exact match; host can override via toggles.
+        try {
+            if (!phase.startsWith('final')) {
+                const answers = await fetchAnswers({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex });
+                await Promise.all(
+                    answers.map((a) =>
+                        upsertValidation({
+                            roomCode: gameState.roomCode,
+                            questionIndex: currentQuestionIndex,
+                            playerId: a.player_id,
+                            isCorrect: a.answer.trim().toLowerCase() === activeQuestion.correctAnswer.trim().toLowerCase(),
+                            validatedBy: currentPlayer?.id,
+                        })
+                    )
+                );
+                await setRoomPhase({ roomCode: gameState.roomCode, phase: 'validation' });
+            } else {
+                const answers = await fetchFinalAnswers(gameState.roomCode);
+                await Promise.all(
+                    answers.map((a) =>
+                        upsertFinalValidation({
+                            roomCode: gameState.roomCode,
+                            playerId: a.player_id,
+                            isCorrect: a.answer.trim().toLowerCase() === activeQuestion.correctAnswer.trim().toLowerCase(),
+                            validatedBy: currentPlayer?.id,
+                        })
+                    )
+                );
+                await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' });
+            }
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to reveal');
+        }
+    };
+
+    const toggleValidation = async (playerId: string, isCorrect: boolean) => {
+        if (!isHost || !gameState?.roomCode) return;
+        try {
+            if (!phase.startsWith('final')) {
+                await upsertValidation({
+                    roomCode: gameState.roomCode,
+                    questionIndex: currentQuestionIndex,
+                    playerId,
+                    isCorrect,
+                    validatedBy: currentPlayer?.id,
+                });
+            } else {
+                await upsertFinalValidation({
+                    roomCode: gameState.roomCode,
+                    playerId,
+                    isCorrect,
+                    validatedBy: currentPlayer?.id,
+                });
+            }
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to validate');
+        }
+    };
+
+    const applyScores = async () => {
+        if (!isHost || !gameState?.roomCode) return;
+
+        try {
+            if (!phase.startsWith('final')) {
+                const [bets, validations] = await Promise.all([
+                    fetchBets({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex }),
+                    fetchValidations({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex }),
+                ]);
+                const betMap: Record<string, number> = {};
+                bets.forEach((b) => {
+                    betMap[b.player_id] = b.bet_value;
+                });
+                const valMap: Record<string, boolean> = {};
+                validations.forEach((v) => {
+                    valMap[v.player_id] = v.is_correct;
+                });
+
+                await Promise.all(
+                    gameState.players.map(async (p) => {
+                        const wager = betMap[p.id] || 0;
+                        const correct = valMap[p.id];
+                        const delta = correct ? wager : 0;
+                        const nextUsed = Array.from(new Set([...(p.usedBets || []), ...(wager ? [wager] : [])]));
+                        await updatePlayerState({
+                            roomCode: gameState.roomCode,
+                            playerId: p.id,
+                            patch: {
+                                score: p.score + delta,
+                                used_bets: nextUsed,
+                            },
+                        });
+                    })
+                );
+
+                await setRoomPhase({ roomCode: gameState.roomCode, phase: 'scoring' });
+                return;
+            }
+
+            const [choices, validations] = await Promise.all([
+                fetchFinalChoices(gameState.roomCode),
+                fetchFinalValidations(gameState.roomCode),
+            ]);
+
+            const wagerMap: Record<string, number> = {};
+            choices.forEach((c) => {
+                wagerMap[c.player_id] = c.wager;
             });
-            return clone;
-        });
-    };
+            const valMap: Record<string, boolean> = {};
+            validations.forEach((v) => {
+                valMap[v.player_id] = v.is_correct;
+            });
 
-    const toggleValidation = (playerId: string, isCorrect: boolean) => {
-        setAnswerBoard((prev) => ({
-            ...prev,
-            [playerId]: { ...prev[playerId], isCorrect },
-        }));
-    };
+            await Promise.all(
+                gameState.players.map(async (p) => {
+                    const wager = wagerMap[p.id] || 0;
+                    const correct = valMap[p.id];
+                    const delta = correct ? wager : -wager;
+                    await updatePlayerState({
+                        roomCode: gameState.roomCode,
+                        playerId: p.id,
+                        patch: {
+                            score: p.score + delta,
+                        },
+                    });
+                })
+            );
 
-    const applyScores = () => {
-        const wagerForPlayer = (playerId: string) => {
-            if (isFinalRound) return finalChoices[playerId]?.wager || 0;
-            const player = gameState?.players.find((p) => p.id === playerId);
-            return player?.currentBet || 0;
-        };
-
-        setGameState((prev) => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                players: prev.players.map((p) => {
-                    const entry = answerBoard[p.id];
-                    const wager = wagerForPlayer(p.id);
-                    if (!entry?.hasAnswered || entry.isCorrect === undefined || wager === 0) {
-                        return { ...p, currentBet: undefined };
-                    }
-
-                    const delta = entry.isCorrect ? wager : isFinalRound ? -wager : 0;
-                    return { ...p, score: p.score + delta, currentBet: undefined };
-                }),
-            };
-        });
-
-        const selfEntry = answerBoard[activePlayer.id];
-        const selfWager = wagerForPlayer(activePlayer.id);
-        if (selfEntry?.isCorrect !== undefined) {
-            const delta = selfEntry.isCorrect ? selfWager : isFinalRound ? -selfWager : 0;
-            setScore((prev) => prev + delta);
+            await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-scoring' });
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to score');
         }
-
-        setPhase('scoring');
     };
 
-    const handleNextQuestion = () => {
-        if (isFinalRound) {
-            router.replace('/results');
+    const handleNextQuestion = async () => {
+        if (!isHost || !gameState?.roomCode) return;
+
+        if (phase === 'final-scoring') {
+            await setRoomPhase({ roomCode: gameState.roomCode, phase: 'results' });
             return;
         }
 
-        if (currentQuestionIndex < totalQuestions - 1) {
-            setCurrentQuestionIndex((prev) => prev + 1);
-            setSelectedBet(null);
-            resetForNewQuestion();
-            setPhase('betting');
-        } else {
-            setIsFinalRound(true);
-            resetForNewQuestion();
-            setPhase('final-wager');
+        if (phase.startsWith('final')) {
+            return;
         }
 
-        // Clear transient bets between questions so the next pick is clean.
-        setGameState((prev) => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                players: prev.players.map((p) => ({ ...p, currentBet: undefined })),
-            };
-        });
+        const nextIndex = currentQuestionIndex + 1;
+        if (nextIndex < questions.length) {
+            await updateRoomMeta({
+                roomCode: gameState.roomCode,
+                patch: {
+                    current_question_index: nextIndex,
+                    phase: 'betting',
+                    phase_started_at: new Date().toISOString(),
+                },
+            });
+            setTimerKey((prev) => prev + 1);
+            return;
+        }
+
+        await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-wager' });
     };
 
-    const updateFinalChoice = (updates: Partial<{ wager: number | null; difficulty: Difficulty }>) => {
-        setFinalChoices((prev) => ({
-            ...prev,
-            [activePlayer.id]: {
-                wager: updates.wager ?? (prev[activePlayer.id]?.wager ?? null),
-                difficulty: updates.difficulty ?? prev[activePlayer.id]?.difficulty ?? 'medium',
-            },
-        }));
+    const updateFinalChoice = async (updates: Partial<{ wager: number | null; difficulty: Difficulty }>) => {
+        if (!gameState?.roomCode || !activePlayer?.id) return;
+        const next = {
+            wager: updates.wager ?? (finalChoices[activePlayer.id]?.wager ?? null),
+            difficulty: updates.difficulty ?? finalChoices[activePlayer.id]?.difficulty ?? 'medium',
+        };
+        setFinalChoices((prev) => ({ ...prev, [activePlayer.id]: next }));
+
+        if (next.wager === null) return;
+        try {
+            await upsertFinalChoice({
+                roomCode: gameState.roomCode,
+                playerId: activePlayer.id,
+                wager: next.wager,
+                difficulty: next.difficulty,
+                mode: finalMode,
+            });
+        } catch (err) {
+            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to save final choice');
+        }
     };
 
     const startFinalQuestion = async () => {
-        if (!gameState) return;
-        const choice = finalChoices[activePlayer.id] || { wager: null, difficulty: 'medium' as Difficulty };
-        if (choice.wager === null) return;
+        if (!isHost || !gameState?.roomCode) return;
 
-        const keyToUse = finalMode === 'personalized'
-            ? gameState.playerApiKeys?.[activePlayer.id] || apiKey
-            : gameState.hostApiKey || apiKey;
-        if (!keyToUse) {
-            Alert.alert(t('apiKey'), t('missingApiKeyPersonal'));
+        const hostChoice = finalChoices[currentPlayer?.id || ''] || { wager: null, difficulty: 'medium' as Difficulty };
+        if (finalMode === 'shared' && hostChoice.wager === null) {
+            Alert.alert(t('finalWager'), t('finalWagerDesc'));
             return;
         }
 
-        setIsLoadingFinal(true);
-        resetForNewQuestion();
+        if (finalMode === 'shared') {
+            const hostKey = gameState.hostApiKey || apiKey;
+            if (!hostKey) {
+                Alert.alert(t('apiKey'), t('missingApiKeyHost'));
+                return;
+            }
 
-        const finalSettings = {
-            ...gameState.settings,
-            numberOfQuestions: 1,
-            difficulty: choice.difficulty,
-            questionType: 'open-ended' as const,
-        };
+            setIsLoadingFinal(true);
+            const finalSettings = {
+                ...gameState.settings,
+                numberOfQuestions: 1,
+                difficulty: hostChoice.difficulty,
+                questionType: 'open-ended' as const,
+            };
+            const result = await generateQuestions(finalSettings, hostKey);
+            if (result.error || !result.questions?.length) {
+                Alert.alert(t('loading'), result.error || t('generationFailed'));
+                setIsLoadingFinal(false);
+                return;
+            }
 
-        const result = await generateQuestions(finalSettings, keyToUse);
-        if (result.error) {
-            Alert.alert(t('loading'), result.error);
+            await Promise.all(
+                gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: result.questions![0] }))
+            );
             setIsLoadingFinal(false);
-            return;
         }
 
-        if (result.questions && result.questions.length > 0) {
-            setFinalQuestion(result.questions[0]);
-            setShowCorrectAnswer(false);
-            setSelectedAnswer(null);
-            setTimerKey((prev) => prev + 1);
-            setPhase('question');
-        } else {
-            Alert.alert(t('loading'), t('generationFailed'));
-            router.replace('/results');
-        }
-        setIsLoadingFinal(false);
+        await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-question' });
+        setTimerKey((prev) => prev + 1);
     };
 
-    const isCorrectAnswer = selectedAnswer?.toLowerCase().trim() === activeQuestion?.correctAnswer?.toLowerCase().trim();
+    const isCorrectAnswer = !!answerBoard[activePlayer.id]?.isCorrect;
     const viewerHasAnswered = answerBoard[activePlayer.id]?.hasAnswered;
 
     return (
@@ -373,7 +608,7 @@ export default function Game() {
                             {isFinalRound ? t('finalQuestion') : t('question')} {isFinalRound ? 1 : currentQuestionIndex + 1}/{totalQuestions}
                         </Text>
                         <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
-                            <Text className="text-primary font-bold">{score} pts</Text>
+                            <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
                         </View>
                     </View>
                 </View>
@@ -471,8 +706,20 @@ export default function Game() {
                                         {(['personalized', 'shared'] as const).map((mode) => (
                                             <TouchableOpacity
                                                 key={mode}
-                                                onPress={() => setFinalMode(mode)}
-                                                className={`flex-1 px-3 py-2 rounded-xl border ${finalMode === mode ? 'border-primary bg-primary/20' : 'border-border bg-muted'}`}
+                                                onPress={async () => {
+                                                    if (!isHost || !gameState?.roomCode) return;
+                                                    setFinalMode(mode);
+                                                    try {
+                                                        await updateRoomMeta({
+                                                            roomCode: gameState.roomCode,
+                                                            patch: { final_mode: mode },
+                                                        });
+                                                    } catch (err) {
+                                                        Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update final mode');
+                                                    }
+                                                }}
+                                                disabled={!isHost}
+                                                className={`flex-1 px-3 py-2 rounded-xl border ${finalMode === mode ? 'border-primary bg-primary/20' : 'border-border bg-muted'} ${!isHost ? 'opacity-60' : ''}`}
                                             >
                                                 <Text className="text-center font-display font-semibold text-foreground">
                                                     {mode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
@@ -524,10 +771,10 @@ export default function Game() {
                     )}
 
                     {/* Question Phase */}
-                    {(phase === 'question' || phase === 'preview' || phase === 'validation' || phase === 'scoring') && activeQuestion && (
+                    {(phase === 'question' || phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
                         <View className="space-y-8">
                             {/* Timer */}
-                            {phase === 'question' && (
+                            {(phase === 'question' || phase === 'final-question') && (
                                 <View className="items-center">
                                     <Timer
                                         key={timerKey}
@@ -591,6 +838,7 @@ export default function Game() {
                                         variant="secondary"
                                         size="lg"
                                         onPress={handleRevealAnswer}
+                                        disabled={!isHost}
                                         className="w-full"
                                     >
                                         <View className="flex-row items-center gap-2">
@@ -604,7 +852,7 @@ export default function Game() {
                             )}
 
                             {/* Validation Phase */}
-                            {phase === 'validation' && (
+                            {(phase === 'validation' || phase === 'final-validation') && (
                                 <Card className="rounded-3xl">
                                     <CardContent className="p-5 space-y-4">
                                         <Text className="text-lg font-display font-semibold text-foreground">
@@ -650,7 +898,7 @@ export default function Game() {
                             )}
 
                             {/* Scoring / progression */}
-                            {phase === 'scoring' && (
+                            {(phase === 'scoring' || phase === 'final-scoring') && (
                                 <View className="items-center space-y-4">
                                     <Text className={`text-3xl font-display font-bold ${isCorrectAnswer ? 'text-neon-green' : 'text-destructive'}`}>
                                         {isCorrectAnswer
