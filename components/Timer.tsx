@@ -6,7 +6,7 @@ interface TimerProps {
     seconds: number;
     onComplete?: () => void;
     isPaused?: boolean;
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 const Timer: React.FC<TimerProps> = ({
@@ -56,6 +56,7 @@ const Timer: React.FC<TimerProps> = ({
     const progress = (seconds / initialSeconds) * 100;
 
     const sizeConfig = {
+        xs: { container: 44, stroke: 5, text: 'text-base', radius: 18 },
         sm: { container: 64, stroke: 6, text: 'text-xl', radius: 27 },
         md: { container: 96, stroke: 8, text: 'text-3xl', radius: 40 },
         lg: { container: 128, stroke: 10, text: 'text-4xl', radius: 54 },

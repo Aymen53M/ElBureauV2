@@ -52,6 +52,12 @@ export default function Game() {
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
 
+    const answerBoardScopeRef = React.useRef<
+        | { kind: 'normal'; questionIndex: number }
+        | { kind: 'final' }
+        | null
+    >(null);
+
     const [phase, setPhase] = useState<GamePhase>('question');
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -100,6 +106,19 @@ export default function Game() {
         phase === 'scoring' ||
         phase === 'final-validation' ||
         phase === 'final-scoring';
+
+    useEffect(() => {
+        if (!phase.startsWith('final')) {
+            setSelectedAnswer(null);
+            setSelectedBet(null);
+        }
+    }, [currentQuestionIndex, phase]);
+
+    useEffect(() => {
+        if (phase === 'question' || phase === 'final-question') {
+            setTimerKey((prev) => prev + 1);
+        }
+    }, [phase, currentQuestionIndex]);
 
     useEffect(() => {
         if (!isSupabaseConfigured || !gameState?.roomCode) return;
@@ -215,6 +234,7 @@ export default function Game() {
                         };
                     });
                     setAnswerBoard(board);
+                    answerBoardScopeRef.current = { kind: 'normal', questionIndex: meta.currentQuestionIndex };
                     const serverAnswer = answerMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
                         setSelectedAnswer(serverAnswer);
@@ -288,6 +308,7 @@ export default function Game() {
                         };
                     });
                     setAnswerBoard(board);
+                    answerBoardScopeRef.current = { kind: 'final' };
                     const serverAnswer = ansMap[currentPlayer.id];
                     if (typeof serverAnswer === 'string') {
                         setSelectedAnswer(serverAnswer);
@@ -318,6 +339,20 @@ export default function Game() {
     useEffect(() => {
         if (!isHost || !gameState?.roomCode) return;
         if (autoAdvanceInFlightRef.current) return;
+
+        if (phase === 'question') {
+            const scope = answerBoardScopeRef.current;
+            if (!scope || scope.kind !== 'normal' || scope.questionIndex !== currentQuestionIndex) {
+                return;
+            }
+        }
+
+        if (phase === 'final-question') {
+            const scope = answerBoardScopeRef.current;
+            if (!scope || scope.kind !== 'final') {
+                return;
+            }
+        }
 
         const allAnswered = gameState.players.every((p) => !!answerBoard[p.id]?.hasAnswered);
         if (!allAnswered) return;
@@ -639,6 +674,17 @@ export default function Game() {
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between mb-9 pt-12`}>
                     <Logo size="sm" animated={false} />
                     <View className="flex-row items-center gap-4">
+                        {(phase === 'question' || phase === 'final-question') && (
+                            <View className="flex-row items-center gap-2">
+                                <Text className="text-sm text-muted-foreground">{t('time')}</Text>
+                                <Timer
+                                    key={timerKey}
+                                    seconds={gameState.settings.timePerQuestion}
+                                    onComplete={handleTimerComplete}
+                                    size="xs"
+                                />
+                            </View>
+                        )}
                         <Text className="text-sm text-muted-foreground">
                             {isFinalRound ? t('finalQuestion') : t('question')} {isFinalRound ? 1 : currentQuestionIndex + 1}/{totalQuestions}
                         </Text>
@@ -652,16 +698,6 @@ export default function Game() {
                     {/* Unified Round Screen (Bet + Answer) */}
                     {!isFinalRound && phase === 'question' && activeQuestion && (
                         <View className="space-y-8">
-                            {/* Timer (answering only) */}
-                            <View className="items-center">
-                                <Timer
-                                    key={timerKey}
-                                    seconds={gameState.settings.timePerQuestion}
-                                    onComplete={handleTimerComplete}
-                                    size="lg"
-                                />
-                            </View>
-
                             {/* Question + answers (always visible) */}
                             <QuestionCard
                                 question={activeQuestion}
@@ -807,18 +843,6 @@ export default function Game() {
                     {/* Question Phase */}
                     {(phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
                         <View className="space-y-8">
-                            {/* Timer */}
-                            {phase === 'final-question' && (
-                                <View className="items-center">
-                                    <Timer
-                                        key={timerKey}
-                                        seconds={gameState.settings.timePerQuestion}
-                                        onComplete={handleTimerComplete}
-                                        size="lg"
-                                    />
-                                </View>
-                            )}
-
                             {/* Your Bet Display */}
                             <View className="items-center">
                                 <View className="px-4 py-2 rounded-full bg-accent/20">
