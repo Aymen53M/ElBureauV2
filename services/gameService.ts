@@ -507,7 +507,7 @@ export async function resetGameplayForRoom(args: {
     }
 
     const patch: any = {
-        phase: 'betting',
+        phase: 'question',
         current_question_index: 0,
         phase_started_at: new Date().toISOString(),
         final_mode: 'shared',

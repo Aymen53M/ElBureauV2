@@ -52,7 +52,7 @@ export default function Game() {
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
 
-    const [phase, setPhase] = useState<GamePhase>('betting');
+    const [phase, setPhase] = useState<GamePhase>('question');
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -215,8 +215,15 @@ export default function Game() {
                         };
                     });
                     setAnswerBoard(board);
-                    setSelectedAnswer(answerMap[currentPlayer.id] ?? null);
-                    setSelectedBet(betMap[currentPlayer.id] ?? null);
+                    const serverAnswer = answerMap[currentPlayer.id];
+                    if (typeof serverAnswer === 'string') {
+                        setSelectedAnswer(serverAnswer);
+                    }
+
+                    const serverBet = betMap[currentPlayer.id];
+                    if (typeof serverBet === 'number') {
+                        setSelectedBet(serverBet);
+                    }
                 } else {
                     const [choices, myQuestion, finalAnswers, finalValidations] = await Promise.all([
                         fetchFinalChoices(roomCode),
@@ -281,7 +288,10 @@ export default function Game() {
                         };
                     });
                     setAnswerBoard(board);
-                    setSelectedAnswer(ansMap[currentPlayer.id] ?? null);
+                    const serverAnswer = ansMap[currentPlayer.id];
+                    if (typeof serverAnswer === 'string') {
+                        setSelectedAnswer(serverAnswer);
+                    }
                 }
             } catch (err) {
                 if (cancelled) return;
@@ -351,32 +361,6 @@ export default function Game() {
         );
     }
 
-    const handleBetConfirm = async () => {
-        if (!gameState?.roomCode || !activePlayer?.id || !selectedBet) return;
-
-        try {
-            await submitBet({
-                roomCode: gameState.roomCode,
-                questionIndex: currentQuestionIndex,
-                playerId: activePlayer.id,
-                betValue: selectedBet,
-            });
-        } catch (err) {
-            Alert.alert(t('placeBet'), err instanceof Error ? err.message : t('betAlreadyUsed'));
-            return;
-        }
-
-        if (isHost) {
-            const bets = await fetchBets({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex });
-            if (bets.length < gameState.players.length) {
-                Alert.alert(t('waiting'), t('waitingForPlayers'));
-                return;
-            }
-            await setRoomPhase({ roomCode: gameState.roomCode, phase: 'question' });
-            setTimerKey((prev) => prev + 1);
-        }
-    };
-
     const handleAnswerSubmit = async (answer: string) => {
         if (!gameState?.roomCode || !activePlayer?.id) return;
         setSelectedAnswer(answer);
@@ -385,6 +369,18 @@ export default function Game() {
             if (phase.startsWith('final')) {
                 await submitFinalAnswer({ roomCode: gameState.roomCode, playerId: activePlayer.id, answer });
             } else {
+                const betValue = betsByPlayerId[activePlayer.id] ?? selectedBet;
+                if (!betValue) {
+                    Alert.alert(t('placeBet'), t('placeBetFirst') || 'Choose your bet first');
+                    return;
+                }
+
+                await submitBet({
+                    roomCode: gameState.roomCode,
+                    questionIndex: currentQuestionIndex,
+                    playerId: activePlayer.id,
+                    betValue,
+                });
                 await submitAnswer({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex, playerId: activePlayer.id, answer });
             }
         } catch (err) {
@@ -556,7 +552,7 @@ export default function Game() {
                 roomCode: gameState.roomCode,
                 patch: {
                     current_question_index: nextIndex,
-                    phase: 'betting',
+                    phase: 'question',
                     phase_started_at: new Date().toISOString(),
                 },
             });
@@ -654,73 +650,19 @@ export default function Game() {
 
                 <View className="max-w-3xl mx-auto w-full space-y-10">
                     {/* Unified Round Screen (Bet + Answer) */}
-                    {!isFinalRound && (phase === 'betting' || phase === 'question') && activeQuestion && (
+                    {!isFinalRound && phase === 'question' && activeQuestion && (
                         <View className="space-y-8">
                             {/* Timer (answering only) */}
-                            {phase === 'question' && (
-                                <View className="items-center">
-                                    <Timer
-                                        key={timerKey}
-                                        seconds={gameState.settings.timePerQuestion}
-                                        onComplete={handleTimerComplete}
-                                        size="lg"
-                                    />
-                                </View>
-                            )}
+                            <View className="items-center">
+                                <Timer
+                                    key={timerKey}
+                                    seconds={gameState.settings.timePerQuestion}
+                                    onComplete={handleTimerComplete}
+                                    size="lg"
+                                />
+                            </View>
 
-                            {/* Bet selection / bet summary */}
-                            {phase === 'betting' ? (
-                                <View className="space-y-6">
-                                    <Card className="border-accent/30 rounded-3xl" style={{
-                                        shadowColor: '#D4A72C',
-                                        shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: 0.3,
-                                        shadowRadius: 20,
-                                        elevation: 10,
-                                    }}>
-                                        <CardContent className="p-9 space-y-6">
-                                            <View className="items-center">
-                                                <View className="px-4 py-2 rounded-full bg-accent/20">
-                                                    <Text className="text-accent font-display font-bold">
-                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <BetSelector
-                                                totalQuestions={totalQuestions}
-                                                usedBets={usedBetsForPlayer}
-                                                selectedBet={selectedBet}
-                                                onSelectBet={setSelectedBet}
-                                            />
-
-                                            <Button
-                                                variant="hero"
-                                                onPress={handleBetConfirm}
-                                                disabled={!selectedBet}
-                                                className="w-full"
-                                            >
-                                                <View className="flex-row items-center gap-2">
-                                                    <Text className="text-lg font-display font-bold text-primary-foreground">
-                                                        {t('confirm')} {selectedBet ? `${selectedBet} ${t('points')}` : t('bet')}
-                                                    </Text>
-                                                    <Text className="text-lg">🎲</Text>
-                                                </View>
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                </View>
-                            ) : (
-                                <View className="items-center">
-                                    <View className="px-4 py-2 rounded-full bg-accent/20">
-                                        <Text className="text-accent font-display font-bold">
-                                            {t('yourBet')}: {currentBetDisplay ?? 0} {t('points')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Question + answers (always visible; disabled during betting) */}
+                            {/* Question + answers (always visible) */}
                             <QuestionCard
                                 question={activeQuestion}
                                 questionNumber={currentQuestionIndex + 1}
@@ -728,15 +670,44 @@ export default function Game() {
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
                                 isAnswerPhase={true}
-                                disabled={phase === 'betting'}
-                                disabledMessage={
-                                    phase === 'betting'
-                                        ? (betsByPlayerId[activePlayer.id] || selectedBet ? (t('waitingForPlayers') || 'Waiting for other players...') : (t('placeBetFirst') || 'Select and confirm your bet to start answering'))
-                                        : undefined
-                                }
+                                disabled={!((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0)}
+                                disabledMessage={t('placeBetFirst') || 'Choose your bet below to submit your answer'}
                                 showCorrectAnswer={false}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
+
+                            {/* Bet selection (no confirm; submitting answer commits the bet) */}
+                            <Card className="border-accent/30 rounded-3xl" style={{
+                                shadowColor: '#D4A72C',
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 20,
+                                elevation: 10,
+                            }}>
+                                <CardContent className="p-9 space-y-6">
+                                    <View className="items-center">
+                                        <View className="px-4 py-2 rounded-full bg-accent/20">
+                                            <Text className="text-accent font-display font-bold">
+                                                {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <BetSelector
+                                        totalQuestions={totalQuestions}
+                                        usedBets={usedBetsForPlayer}
+                                        selectedBet={selectedBet}
+                                        onSelectBet={setSelectedBet}
+                                        showHeader={false}
+                                    />
+
+                                    <View className="items-center">
+                                        <Text className="text-sm text-muted-foreground text-center">
+                                            {t('betDescription')}
+                                        </Text>
+                                    </View>
+                                </CardContent>
+                            </Card>
                         </View>
                     )}
 

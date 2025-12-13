@@ -178,7 +178,7 @@ export default function Lobby() {
             }
         }
 
-        setGameState((prev) => (prev ? { ...prev, phase: 'betting' } : prev));
+        setGameState((prev) => (prev ? { ...prev, phase: 'question' } : prev));
         hasNavigatedRef.current = true;
         router.replace('/game');
     };

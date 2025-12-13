@@ -7,6 +7,7 @@ interface BetSelectorProps {
     usedBets: number[];
     selectedBet: number | null;
     onSelectBet: (bet: number) => void;
+    showHeader?: boolean;
 }
 
 const BetSelector: React.FC<BetSelectorProps> = ({
@@ -14,6 +15,7 @@ const BetSelector: React.FC<BetSelectorProps> = ({
     usedBets,
     selectedBet,
     onSelectBet,
+    showHeader = true,
 }) => {
     const { t } = useLanguage();
 
@@ -22,14 +24,16 @@ const BetSelector: React.FC<BetSelectorProps> = ({
 
     return (
         <View className="space-y-4">
-            <View className="items-center">
-                <Text className="text-2xl font-display font-bold text-foreground mb-2">
-                    {t('placeBet')}
-                </Text>
-                <Text className="text-sm text-muted-foreground text-center">
-                    {t('betDescription')}
-                </Text>
-            </View>
+            {showHeader && (
+                <View className="items-center">
+                    <Text className="text-2xl font-display font-bold text-foreground mb-2">
+                        {t('placeBet')}
+                    </Text>
+                    <Text className="text-sm text-muted-foreground text-center">
+                        {t('betDescription')}
+                    </Text>
+                </View>
+            )}
 
             {/* Bet grid */}
             <View className="flex-row flex-wrap gap-3 justify-center py-4">
