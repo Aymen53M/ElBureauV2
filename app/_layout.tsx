@@ -2,8 +2,9 @@ import React from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Alert, Platform } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Platform, View, TouchableOpacity, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { GameProvider, useGame } from '@/contexts/GameContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +23,91 @@ function isMobileWeb() {
     } catch {
         return false;
     }
+}
+
+function GlobalImmersiveToggle() {
+    const insets = useSafeAreaInsets();
+    const [isImmersive, setIsImmersive] = React.useState(false);
+
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const doc = (globalThis as any).document as any;
+        if (!doc?.addEventListener) return;
+        const handler = () => {
+            setIsImmersive(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+        };
+        handler();
+        doc.addEventListener('fullscreenchange', handler);
+        doc.addEventListener('webkitfullscreenchange', handler);
+        return () => {
+            doc.removeEventListener('fullscreenchange', handler);
+            doc.removeEventListener('webkitfullscreenchange', handler);
+        };
+    }, []);
+
+    const toggleImmersive = async () => {
+        if (Platform.OS === 'web') {
+            const doc = (globalThis as any).document as any;
+            if (!doc) return;
+
+            const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+            try {
+                if (isFs) {
+                    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
+                    if (exit) await exit.call(doc);
+                    return;
+                }
+
+                const target = doc.documentElement || doc.body;
+                const request = target?.requestFullscreen || target?.webkitRequestFullscreen;
+                if (!request) {
+                    Alert.alert('Fullscreen', 'Fullscreen is not supported in this browser. Try “Add to Home Screen” for a more immersive experience.');
+                    return;
+                }
+                await request.call(target);
+            } catch {
+                Alert.alert('Fullscreen', 'Unable to enter fullscreen on this device.');
+            }
+            return;
+        }
+
+        setIsImmersive((prev) => !prev);
+    };
+
+    return (
+        <>
+            <StatusBar style="dark" hidden={isImmersive} />
+            <View
+                pointerEvents="box-none"
+                style={{
+                    position: 'absolute',
+                    top: insets.top + 10,
+                    right: 14,
+                    zIndex: 9999,
+                }}
+            >
+                <TouchableOpacity
+                    onPress={toggleImmersive}
+                    style={{
+                        backgroundColor: 'rgba(255, 248, 239, 0.92)',
+                        borderRadius: 14,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        borderWidth: 1,
+                        borderColor: 'rgba(43, 31, 23, 0.18)',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                    }}
+                >
+                    <Ionicons name={isImmersive ? 'contract-outline' : 'expand-outline'} size={18} color="#2B1F17" />
+                    <Text style={{ color: '#2B1F17', fontWeight: '700' }}>
+                        {isImmersive ? 'Exit' : 'Fullscreen'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </>
+    );
 }
 
 async function setLastRoomCode(value: string) {
@@ -213,12 +299,11 @@ export default function RootLayout() {
                 <LanguageProvider>
                     <GameProvider>
                         <ResumeBootstrap />
-                        <StatusBar style="dark" />
+                        <GlobalImmersiveToggle />
                         <Stack
                             screenOptions={{
                                 headerShown: false,
                                 contentStyle: { backgroundColor: '#F7F1E6' },
-                                animation: 'slide_from_right',
                             }}
                         />
                     </GameProvider>

@@ -10,7 +10,7 @@ import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import ThemeSelector from '@/components/ThemeSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useGame, Difficulty, QuestionType } from '@/contexts/GameContext';
+import { useGame, Difficulty, QuestionType, QuestionMode } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { createRoom } from '@/services/roomService';
 
@@ -33,7 +33,7 @@ export default function CreateRoom() {
     const [difficulty, setDifficulty] = useState<Difficulty>('medium');
     const [questionCount, setQuestionCount] = useState(10);
     const [timePerQuestion, setTimePerQuestion] = useState(30);
-    const [questionType, setQuestionType] = useState<QuestionType>('multiple-choice');
+    const [questionTypesSelected, setQuestionTypesSelected] = useState<QuestionType[]>(['multiple-choice']);
 
     const [step, setStep] = useState(0);
     const maxStep = 3;
@@ -90,7 +90,8 @@ export default function CreateRoom() {
             difficulty,
             numberOfQuestions: questionCount,
             timePerQuestion,
-            questionType,
+            questionType: (questionTypesSelected.length === 1 ? questionTypesSelected[0] : 'mixed') as QuestionMode,
+            questionTypes: questionTypesSelected,
             language,
             hintsEnabled: true,
         };
@@ -247,22 +248,32 @@ export default function CreateRoom() {
                                     </CardHeader>
                                     <CardContent>
                                         <View className="flex-row gap-2">
-                                            {questionTypes.map(({ type, icon }) => (
+                                            {questionTypes.map(({ type, icon }) => {
+                                                const isSelected = questionTypesSelected.includes(type);
+                                                return (
                                                 <TouchableOpacity
                                                     key={type}
-                                                    onPress={() => setQuestionType(type)}
-                                                    className={`flex-1 ${isCompact ? 'py-3' : 'py-4'} rounded-xl items-center border-2 ${questionType === type
+                                                    onPress={() => {
+                                                        setQuestionTypesSelected((prev) => {
+                                                            const next = prev.includes(type)
+                                                                ? prev.filter((t) => t !== type)
+                                                                : [...prev, type];
+                                                            return next.length ? next : prev;
+                                                        });
+                                                    }}
+                                                    className={`flex-1 ${isCompact ? 'py-3' : 'py-4'} rounded-xl items-center border-2 ${isSelected
                                                         ? 'bg-primary/20 border-primary'
                                                         : 'bg-muted border-transparent'
                                                         }`}
                                                 >
                                                     <Text className={isCompact ? 'text-lg mb-0.5' : 'text-xl mb-1'}>{icon}</Text>
-                                                    <Text className={`text-xs font-display ${questionType === type ? 'text-primary' : 'text-muted-foreground'
+                                                    <Text className={`text-xs font-display ${isSelected ? 'text-primary' : 'text-muted-foreground'
                                                         }`}>
                                                         {t(type === 'multiple-choice' ? 'multipleChoice' : type === 'open-ended' ? 'openEnded' : 'trueFalse')}
                                                     </Text>
                                                 </TouchableOpacity>
-                                            ))}
+                                                );
+                                            })}
                                         </View>
                                     </CardContent>
                                 </Card>

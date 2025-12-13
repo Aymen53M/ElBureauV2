@@ -35,6 +35,159 @@ const MAX_RETRIES = 5;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 15000;
 
+const ALL_QUESTION_TYPES = ['multiple-choice', 'open-ended', 'true-false'] as const;
+type ConcreteQuestionType = (typeof ALL_QUESTION_TYPES)[number];
+
+function normalizeQuestionTypes(settings: GameSettings): ConcreteQuestionType[] {
+    const raw = settings.questionType === 'mixed'
+        ? (Array.isArray(settings.questionTypes) ? settings.questionTypes : [])
+        : [settings.questionType];
+
+    const cleaned = raw
+        .filter((t): t is ConcreteQuestionType => (ALL_QUESTION_TYPES as readonly string[]).includes(t))
+        .filter((t, idx, arr) => arr.indexOf(t) === idx);
+
+    return cleaned.length ? cleaned : ['multiple-choice'];
+}
+
+function computeCounts(total: number, types: ConcreteQuestionType[]): Record<ConcreteQuestionType, number> {
+    const counts: Record<ConcreteQuestionType, number> = {
+        'multiple-choice': 0,
+        'open-ended': 0,
+        'true-false': 0,
+    };
+
+    if (types.length === 0) return counts;
+
+    const base = Math.floor(total / types.length);
+    const remainder = total % types.length;
+    types.forEach((t, i) => {
+        counts[t] = base + (i < remainder ? 1 : 0);
+    });
+    return counts;
+}
+
+function sumCounts(counts: Record<ConcreteQuestionType, number>): number {
+    return (counts['multiple-choice'] || 0) + (counts['open-ended'] || 0) + (counts['true-false'] || 0);
+}
+
+function normalizeDifficulty(value: unknown, fallback: GameSettings['difficulty']): 'easy' | 'medium' | 'hard' {
+    const v = typeof value === 'string' ? value.toLowerCase().trim() : '';
+    if (v === 'easy' || v === 'medium' || v === 'hard') return v;
+    if (fallback === 'easy' || fallback === 'medium' || fallback === 'hard') return fallback;
+    return 'medium';
+}
+
+function normalizeTrueFalseAnswer(value: unknown): 'True' | 'False' | null {
+    const v = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (v === 'true') return 'True';
+    if (v === 'false') return 'False';
+    return null;
+}
+
+function parseGeminiJsonArray(content: string): unknown[] | null {
+    let cleaned = content.trim();
+    if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+    }
+
+    try {
+        const parsed: any = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed?.questions)) return parsed.questions;
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+function validateAndNormalizeQuestions(args: {
+    raw: unknown[];
+    allowedTypes: ConcreteQuestionType[];
+    settings: GameSettings;
+}): Question[] {
+    const allowedSet = new Set(args.allowedTypes);
+    const out: Question[] = [];
+
+    for (let i = 0; i < args.raw.length; i++) {
+        const q: any = args.raw[i];
+        const text = typeof q?.text === 'string' ? q.text.trim() : '';
+        const hint = typeof q?.hint === 'string' ? q.hint.trim() : undefined;
+        const difficulty = normalizeDifficulty(q?.difficulty, args.settings.difficulty);
+
+        if (!text) continue;
+
+        const rawType = typeof q?.type === 'string' ? q.type.trim() : '';
+        const type = allowedSet.has(rawType as ConcreteQuestionType) ? (rawType as ConcreteQuestionType) : null;
+        if (!type) continue;
+
+        if (type === 'multiple-choice') {
+            const correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+            if (!correctAnswer) continue;
+            if (!Array.isArray(q?.options)) continue;
+            let options = (q.options as unknown[])
+                .map((o) => (typeof o === 'string' ? o.trim() : ''))
+                .filter((o) => o.length > 0);
+            options = Array.from(new Set(options));
+
+            // Ensure correctAnswer is always part of options, then trim to exactly 4.
+            if (!options.includes(correctAnswer)) {
+                options = [correctAnswer, ...options];
+            }
+            const rest = options.filter((o) => o !== correctAnswer);
+            options = [correctAnswer, ...rest].slice(0, 4);
+
+            if (options.length !== 4) continue;
+
+            out.push({
+                id: `q-${Date.now()}-${i}`,
+                text,
+                type: 'multiple-choice',
+                options,
+                correctAnswer,
+                hint,
+                difficulty,
+            });
+            continue;
+        }
+
+        if (type === 'true-false') {
+            const tf = normalizeTrueFalseAnswer(q?.correctAnswer);
+            if (!tf) continue;
+            out.push({
+                id: `q-${Date.now()}-${i}`,
+                text,
+                type: 'true-false',
+                correctAnswer: tf,
+                hint,
+                difficulty,
+            });
+            continue;
+        }
+
+        // open-ended
+        const correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+        if (!correctAnswer) continue;
+        out.push({
+            id: `q-${Date.now()}-${i}`,
+            text,
+            type: 'open-ended',
+            correctAnswer,
+            hint,
+            difficulty,
+        });
+    }
+
+    // De-dupe by (type + text)
+    const seen = new Set<string>();
+    return out.filter((q) => {
+        const key = `${q.type}|${q.text}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 /**
  * Retry fetch with exponential backoff and jitter.
  * Handles network errors and retryable HTTP status codes (429, 503, 5xx).
@@ -96,17 +249,8 @@ Keep wording concise for mobile UI.`;
         return base;
     };
 
-    const questionTypeInstructions = (() => {
-        switch (settings.questionType) {
-            case 'multiple-choice':
-                return 'Each question must include exactly 4 options with one correct answer.';
-            case 'true-false':
-                return 'Write a statement that is clearly True or False.';
-            case 'open-ended':
-            default:
-                return 'Provide questions with short, clear answers (usually 1-4 words).';
-        }
-    })();
+    const allowedTypes = normalizeQuestionTypes(settings);
+    const desiredCounts = computeCounts(settings.numberOfQuestions, allowedTypes);
 
     const difficultyInstructions = (() => {
         switch (settings.difficulty) {
@@ -122,133 +266,136 @@ Keep wording concise for mobile UI.`;
         ? settings.customTheme || 'custom theme'
         : settings.theme;
 
-    const userPrompt = `Generate ${settings.numberOfQuestions} ${settings.questionType} trivia questions about "${themeDescription}".
+    const buildUserPrompt = (counts: Record<ConcreteQuestionType, number>, avoidTexts: string[] = []) => {
+        const total = sumCounts(counts);
+        const distribution = allowedTypes
+            .filter((t) => (counts[t] || 0) > 0)
+            .map((t) => `- ${t}: ${counts[t]}`)
+            .join('\n');
 
-Requirements:
-- Difficulty: ${difficultyInstructions}
-- ${questionTypeInstructions}
-- Language: ${languageLabel}
-- Keep answers unambiguous, factually correct, and culturally safe.
-- Add light fun where appropriate, but keep answers concise.
+        const avoidBlock = avoidTexts.length
+            ? `\nDo NOT repeat any of these questions:\n${avoidTexts.map((t) => `- ${t}`).join('\n')}\n`
+            : '';
 
-Return ONLY a valid JSON array with this exact shape (no extra text):
-[
-  {
-    "text": "Question text",
-    "type": "${settings.questionType}",
-    ${settings.questionType === 'multiple-choice' ? '"options": ["Option A", "Option B", "Option C", "Option D"],' : ''}
-    "correctAnswer": "Correct answer text",
-    "hint": "Optional short hint",
-    "difficulty": "easy" | "medium" | "hard"
-  }
-]`;
+        return `Generate ${total} trivia questions about "${themeDescription}".\n\nRequirements:\n- Difficulty: ${difficultyInstructions}\n- Language: ${languageLabel}\n- Keep answers unambiguous, factually correct, and culturally safe.\n- Keep wording concise for mobile UI.\n\nQuestion types (generate exactly these counts):\n${distribution}${avoidBlock}\nHard rules:\n- Allowed "type" values: ${allowedTypes.join(', ')}\n- Return ONLY JSON (no markdown / no prose).\n- Each item MUST match the schema for its type:\n  - multiple-choice: type="multiple-choice", options: exactly 4 distinct strings, correctAnswer must be one of the options.\n  - true-false: type="true-false", correctAnswer must be exactly "True" or "False" (no options).\n  - open-ended: type="open-ended", correctAnswer is short and clear (no options).\n\nReturn ONLY a JSON array of objects.`;
+    };
+
+    const userPrompt = buildUserPrompt(desiredCounts);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
     try {
-        const response = await retryFetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
-                contents: [
-                    { role: 'user', parts: [{ text: userPrompt }] },
-                ],
-                safetySettings: [
-                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-                ],
-                generationConfig: {
-                    temperature: 0.8,
-                    topP: 0.9,
-                    responseMimeType: 'application/json',
-                },
-            }),
-        });
+        const callOnce = async (prompt: string) => {
+            const response = await retryFetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
+                    contents: [
+                        { role: 'user', parts: [{ text: prompt }] },
+                    ],
+                    safetySettings: [
+                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                    ],
+                    generationConfig: {
+                        temperature: 0.6,
+                        topP: 0.9,
+                        responseMimeType: 'application/json',
+                    },
+                }),
+            });
 
-        if (!response.ok) {
-            const body = await response.text();
-            console.error('Gemini error', response.status, body);
-            const notFound = response.status === 404;
-            const code: GeminiErrorCode =
-                response.status === 429 ? 'HTTP_429' :
-                    response.status >= 500 ? 'HTTP_500' :
-                        notFound ? 'MODEL_UNAVAILABLE' : 'HTTP_400';
-            const error =
-                response.status === 429
-                    ? 'Gemini is busy. Retried multiple times but rate limit persists. Try again soon.'
-                    : notFound
-                        ? 'Model not available for this key. Ensure Gemini 1.5/2.0 access.'
-                        : 'Failed to generate questions after retries. Check your Gemini key or try again.';
-            return { error, code };
-        }
+            if (!response.ok) {
+                const body = await response.text();
+                console.error('Gemini error', response.status, body);
+                const notFound = response.status === 404;
+                const code: GeminiErrorCode =
+                    response.status === 429 ? 'HTTP_429' :
+                        response.status >= 500 ? 'HTTP_500' :
+                            notFound ? 'MODEL_UNAVAILABLE' : 'HTTP_400';
+                const error =
+                    response.status === 429
+                        ? 'Gemini is busy. Retried multiple times but rate limit persists. Try again soon.'
+                        : notFound
+                            ? 'Model not available for this key. Ensure Gemini 1.5/2.0 access.'
+                            : 'Failed to generate questions after retries. Check your Gemini key or try again.';
+                return { error, code } as const;
+            }
 
-        const data = await response.json();
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-        const content: string | undefined = parts.find((p: any) => p.text)?.text;
+            const data = await response.json();
+            const parts = data?.candidates?.[0]?.content?.parts || [];
+            const content: string | undefined = parts.find((p: any) => p.text)?.text;
+            if (!content) {
+                return { error: 'Gemini returned no content', code: 'NO_CONTENT' as const };
+            }
+            return { content } as const;
+        };
 
-        if (!content) {
-            return { error: 'Gemini returned no content', code: 'NO_CONTENT' };
-        }
+        const first = await callOnce(userPrompt);
+        if ('error' in first) return { error: first.error, code: first.code };
 
-        // Clean potential markdown fencing
-        let cleaned = content.trim();
-        if (cleaned.startsWith('```')) {
-            cleaned = cleaned.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
-        }
-
-        let parsed;
-        try {
-            parsed = JSON.parse(cleaned);
-        } catch (parseErr) {
-            console.error('Gemini parse error', parseErr, cleaned);
+        const rawFirst = parseGeminiJsonArray(first.content);
+        if (!rawFirst) {
             return { error: 'Received unparseable response from Gemini.', code: 'PARSING_ERROR' };
         }
 
-        const questions: Question[] = parsed.map((q: any, index: number) => {
-            const desiredType = settings.questionType;
-            const correctAnswer = typeof q.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
-            const text = typeof q.text === 'string' ? q.text.trim() : '';
-            const hint = typeof q.hint === 'string' ? q.hint.trim() : undefined;
+        let validated = validateAndNormalizeQuestions({ raw: rawFirst, allowedTypes, settings });
 
-            let options: string[] | undefined = Array.isArray(q.options)
-                ? (q.options as unknown[])
-                    .map((o) => (typeof o === 'string' ? o.trim() : ''))
-                    .filter((o) => o.length > 0)
-                : undefined;
-
-            let finalType = desiredType;
-
-            if (desiredType === 'multiple-choice') {
-                if (options && correctAnswer) {
-                    if (!options.includes(correctAnswer)) {
-                        options = [correctAnswer, ...options];
-                    }
-                    options = Array.from(new Set(options)).slice(0, 4);
-                }
-
-                // If Gemini didn't provide valid options, fallback to open-ended so the UI still works.
-                if (!options || options.length < 2) {
-                    finalType = 'open-ended';
-                    options = undefined;
-                }
-            } else {
-                options = undefined;
-            }
-
-            return {
-                id: `q-${Date.now()}-${index}`,
-                text,
-                type: finalType,
-                options,
-                correctAnswer,
-                hint,
-                difficulty: (q.difficulty || settings.difficulty || 'medium') as any,
+        const pickToCounts = (qs: Question[], counts: Record<ConcreteQuestionType, number>) => {
+            const byType: Record<ConcreteQuestionType, Question[]> = {
+                'multiple-choice': [],
+                'open-ended': [],
+                'true-false': [],
             };
-        });
+            qs.forEach((q) => {
+                if (q.type === 'multiple-choice') byType['multiple-choice'].push(q);
+                if (q.type === 'open-ended') byType['open-ended'].push(q);
+                if (q.type === 'true-false') byType['true-false'].push(q);
+            });
 
-        return { questions };
+            const picked: Question[] = [];
+            const missing: Record<ConcreteQuestionType, number> = { ...counts };
+            (Object.keys(missing) as ConcreteQuestionType[]).forEach((k) => {
+                if (!allowedTypes.includes(k)) missing[k] = 0;
+            });
+
+            allowedTypes.forEach((t) => {
+                const need = missing[t] || 0;
+                if (need <= 0) return;
+                const take = Math.min(need, byType[t].length);
+                picked.push(...byType[t].slice(0, take));
+                missing[t] = need - take;
+            });
+
+            return { picked, missing };
+        };
+
+        let { picked, missing } = pickToCounts(validated, desiredCounts);
+
+        if (sumCounts(missing) > 0) {
+            const avoid = picked.map((q) => q.text).slice(0, 20);
+            const fillPrompt = buildUserPrompt(missing, avoid);
+            const second = await callOnce(fillPrompt);
+            if (!('error' in second)) {
+                const rawSecond = parseGeminiJsonArray(second.content);
+                if (rawSecond) {
+                    const secondValidated = validateAndNormalizeQuestions({ raw: rawSecond, allowedTypes, settings });
+                    validated = [...picked, ...secondValidated];
+                    ({ picked, missing } = pickToCounts(validated, desiredCounts));
+                }
+            }
+        }
+
+        if (picked.length < settings.numberOfQuestions) {
+            return {
+                error: 'The AI did not generate enough valid questions for the selected modes. Please try again.',
+                code: 'PARSING_ERROR',
+            };
+        }
+
+        return { questions: picked.slice(0, settings.numberOfQuestions) };
     } catch (err) {
         console.error('Unexpected error generating questions:', err);
         return {

@@ -39,13 +39,13 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
     const sizePx = (() => {
         switch (size) {
             case 'sm':
-                return { w: 110, h: 44 };
+                return { w: 140, h: 56 };
             case 'md':
-                return { w: 160, h: 64 };
+                return { w: 200, h: 80 };
             case 'lg':
-                return { w: 220, h: 88 };
-            case 'xl':
                 return { w: 280, h: 112 };
+            case 'xl':
+                return { w: 340, h: 136 };
         }
     })();
 

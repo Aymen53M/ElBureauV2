@@ -66,7 +66,7 @@ export default function Index() {
         outputRange: ['0deg', isRTL ? '-1.2deg' : '1.2deg'],
     });
 
-    const logoWidth = Math.max(260, Math.min(520, Math.round(width * 0.92)));
+    const logoWidth = Math.max(300, Math.min(620, Math.round(width * 0.96)));
     const logoHeight = Math.round(logoWidth * 0.62);
 
     return (

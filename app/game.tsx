@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import QuestionCard from '@/components/QuestionCard';
@@ -99,7 +98,6 @@ export default function Game() {
     const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('shared');
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
-    const [isImmersive, setIsImmersive] = useState(false);
 
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
     const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
@@ -140,53 +138,6 @@ export default function Game() {
         phase === 'scoring' ||
         phase === 'final-validation' ||
         phase === 'final-scoring';
-
-    useEffect(() => {
-        if (Platform.OS !== 'web') return;
-        const doc = (globalThis as any).document as any;
-        if (!doc?.addEventListener) return;
-        const handler = () => {
-            setIsImmersive(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
-        };
-        handler();
-        doc.addEventListener('fullscreenchange', handler);
-        doc.addEventListener('webkitfullscreenchange', handler);
-        return () => {
-            doc.removeEventListener('fullscreenchange', handler);
-            doc.removeEventListener('webkitfullscreenchange', handler);
-        };
-    }, []);
-
-    const toggleImmersive = async () => {
-        if (Platform.OS === 'web') {
-            const doc = (globalThis as any).document as any;
-            if (!doc) return;
-
-            const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
-            try {
-                if (isFs) {
-                    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
-                    if (exit) {
-                        await exit.call(doc);
-                    }
-                    return;
-                }
-
-                const target = doc.documentElement || doc.body;
-                const request = target?.requestFullscreen || target?.webkitRequestFullscreen;
-                if (!request) {
-                    Alert.alert('Fullscreen', 'Fullscreen is not supported in this browser. Try “Add to Home Screen” for a more immersive experience.');
-                    return;
-                }
-                await request.call(target);
-            } catch {
-                Alert.alert('Fullscreen', 'Unable to enter fullscreen on this device.');
-            }
-            return;
-        }
-
-        setIsImmersive((prev) => !prev);
-    };
 
     useEffect(() => {
         if (!phase.startsWith('final')) {
@@ -298,7 +249,11 @@ export default function Game() {
                 }
 
                 const normalizeQuestions = (raw: any[], settings: GameSettings): Question[] => {
-                    const desiredType = settings.questionType;
+                    const allowedTypes = (settings.questionType === 'mixed'
+                        ? (Array.isArray(settings.questionTypes) ? settings.questionTypes : [])
+                        : [settings.questionType]) as ('multiple-choice' | 'open-ended' | 'true-false')[];
+                    const fallbackType = (allowedTypes[0] || 'multiple-choice') as 'multiple-choice' | 'open-ended' | 'true-false';
+
                     return (Array.isArray(raw) ? raw : []).map((q: any, index: number) => {
                         const correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
                         const text = typeof q?.text === 'string' ? q.text.trim() : '';
@@ -306,24 +261,40 @@ export default function Game() {
                         const difficulty = (q?.difficulty || settings.difficulty || 'medium') as Difficulty;
                         const id = typeof q?.id === 'string' ? q.id : `q-${index}`;
 
+                        const rawType = typeof q?.type === 'string' ? q.type : '';
+                        let type: 'multiple-choice' | 'open-ended' | 'true-false' =
+                            (allowedTypes.includes(rawType as any) ? (rawType as any) : fallbackType);
+
                         let options: string[] | undefined = Array.isArray(q?.options)
                             ? (q.options as unknown[])
                                 .map((o) => (typeof o === 'string' ? o.trim() : ''))
                                 .filter((o) => o.length > 0)
                             : undefined;
 
-                        let type = desiredType;
-
-                        if (desiredType === 'multiple-choice') {
+                        if (type === 'multiple-choice') {
                             if (options && correctAnswer) {
                                 if (!options.includes(correctAnswer)) {
                                     options = [correctAnswer, ...options];
                                 }
-                                options = Array.from(new Set(options)).slice(0, 4);
+                                const uniq = Array.from(new Set(options));
+                                const rest = uniq.filter((o) => o !== correctAnswer);
+                                options = [correctAnswer, ...rest].slice(0, 4);
                             }
                             if (!options || options.length < 2) {
-                                type = 'open-ended';
-                                options = undefined;
+                                if (allowedTypes.includes('open-ended')) {
+                                    type = 'open-ended';
+                                    options = undefined;
+                                } else {
+                                    type = fallbackType;
+                                    options = undefined;
+                                }
+                            }
+                        } else if (type === 'true-false') {
+                            options = undefined;
+                            if (correctAnswer.toLowerCase() === 'true') {
+                                // ok
+                            } else if (correctAnswer.toLowerCase() === 'false') {
+                                // ok
                             }
                         } else {
                             options = undefined;
@@ -922,7 +893,6 @@ export default function Game() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="game" />
-            <StatusBar hidden={isImmersive} />
             <KeyboardAvoidingView
                 className="flex-1"
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -933,19 +903,8 @@ export default function Game() {
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-4 pt-4' : 'mb-9 pt-12'}`}>
                     <Logo size="sm" animated={false} />
-                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-3`}>
-                        <TouchableOpacity
-                            onPress={toggleImmersive}
-                            className="px-3 py-2 rounded-xl bg-muted border border-border"
-                        >
-                            <Text className="text-foreground font-semibold">
-                                {isImmersive ? 'Exit' : 'Fullscreen'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
-                            <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
-                        </View>
+                    <View className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30">
+                        <Text className="text-primary font-bold">{activePlayer.score} pts</Text>
                     </View>
                 </View>
 

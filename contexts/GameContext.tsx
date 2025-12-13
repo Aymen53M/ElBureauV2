@@ -21,6 +21,7 @@ export type GamePhase =
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'mixed';
 export type QuestionType = 'multiple-choice' | 'open-ended' | 'true-false';
+export type QuestionMode = QuestionType | 'mixed';
 
 export interface Player {
     id: string;
@@ -51,7 +52,8 @@ export interface GameSettings {
     difficulty: Difficulty;
     numberOfQuestions: number;
     timePerQuestion: number;
-    questionType: QuestionType;
+    questionType: QuestionMode;
+    questionTypes?: QuestionType[];
     language: Language;
     hintsEnabled: boolean;
 }
