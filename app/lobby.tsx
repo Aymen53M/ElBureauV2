@@ -18,7 +18,7 @@ import { resetGameplayForRoom } from '@/services/gameService';
 export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { gameState, setGameState, currentPlayer, setCurrentPlayer } = useGame();
+    const { gameState, setGameState, currentPlayer, setCurrentPlayer, apiKey } = useGame();
     const { height: windowHeight } = useWindowDimensions();
     const isCompact = windowHeight < 760;
 
@@ -197,7 +197,8 @@ export default function Lobby() {
     };
 
     const startGame = async () => {
-        if (!gameState.hostApiKey) {
+        const hostKey = (gameState.hostApiKey || apiKey || '').trim();
+        if (!hostKey) {
             Alert.alert(t('apiKey'), t('missingApiKeyHost'));
             router.push('/settings');
             return;
@@ -216,7 +217,7 @@ export default function Lobby() {
             }
         }
 
-        setGameState((prev) => (prev ? { ...prev, phase: 'question' } : prev));
+        setGameState((prev) => (prev ? { ...prev, phase: 'question', hostApiKey: prev.hostApiKey || hostKey } : prev));
         hasNavigatedRef.current = true;
         router.replace('/game');
     };

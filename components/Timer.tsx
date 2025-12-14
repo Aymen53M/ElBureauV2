@@ -6,6 +6,7 @@ interface TimerProps {
     seconds: number;
     onComplete?: () => void;
     isPaused?: boolean;
+    endsAt?: number;
     size?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
 }
 
@@ -13,31 +14,46 @@ const Timer: React.FC<TimerProps> = ({
     seconds: initialSeconds,
     onComplete,
     isPaused = false,
+    endsAt,
     size = 'md',
 }) => {
     const [seconds, setSeconds] = useState(initialSeconds);
     const shakeAnim = React.useRef(new Animated.Value(0)).current;
+    const completedRef = React.useRef(false);
+
+    const computeSecondsLeft = React.useCallback(() => {
+        if (typeof endsAt === 'number' && Number.isFinite(endsAt)) {
+            const diffMs = endsAt - Date.now();
+            return Math.max(0, Math.ceil(diffMs / 1000));
+        }
+        return initialSeconds;
+    }, [endsAt, initialSeconds]);
 
     useEffect(() => {
-        setSeconds(initialSeconds);
-    }, [initialSeconds]);
+        completedRef.current = false;
+        setSeconds(computeSecondsLeft());
+    }, [computeSecondsLeft]);
 
     useEffect(() => {
         if (isPaused) return;
 
         const interval = setInterval(() => {
             setSeconds((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
+                const next = typeof endsAt === 'number' && Number.isFinite(endsAt)
+                    ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+                    : Math.max(0, prev - 1);
+
+                if (next <= 0 && !completedRef.current) {
+                    completedRef.current = true;
                     onComplete?.();
-                    return 0;
                 }
-                return prev - 1;
+
+                return next;
             });
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [isPaused, onComplete, initialSeconds]);
+    }, [endsAt, isPaused, onComplete]);
 
     // Shake animation when critical
     useEffect(() => {
@@ -53,7 +69,8 @@ const Timer: React.FC<TimerProps> = ({
 
     const isWarning = seconds <= 10 && seconds > 5;
     const isCritical = seconds <= 5;
-    const progress = (seconds / initialSeconds) * 100;
+    const safeInitial = initialSeconds > 0 ? initialSeconds : 1;
+    const progress = (seconds / safeInitial) * 100;
 
     const sizeConfig = {
         xxs: { container: 34, stroke: 4, radius: 14, fontSize: 14, lineHeight: 16 },

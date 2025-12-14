@@ -69,6 +69,8 @@ export const translations: Translations = {
     multipleChoice: { en: 'Multiple Choice', fr: 'Choix Multiple', ar: 'اختيار متعدد' },
     openEnded: { en: 'Open Ended', fr: 'Réponse Libre', ar: 'إجابة مفتوحة' },
     trueFalse: { en: 'True/False', fr: 'Vrai/Faux', ar: 'صح/خطأ' },
+    trueOption: { en: 'True', fr: 'Vrai', ar: 'صح' },
+    falseOption: { en: 'False', fr: 'Faux', ar: 'خطأ' },
 
     // Gameplay
     question: { en: 'Question', fr: 'Question', ar: 'سؤال' },
@@ -90,8 +92,12 @@ export const translations: Translations = {
     applyScores: { en: 'Apply scores', fr: 'Appliquer les scores', ar: 'تطبيق الدرجات' },
     finalWager: { en: 'Final wager round', fr: 'Manche de mise finale', ar: 'جولة الرهان الأخيرة' },
     finalWagerDesc: { en: 'Risk 0, 10, or 20 points. Correct wins, wrong loses.', fr: 'Misez 0, 10 ou 20 points. Bonne réponse gagne, mauvaise perd.', ar: 'اختر 0 أو 10 أو 20 نقطة. الصحيح يكسب والخطأ يخسر.' },
+    finalMode: { en: 'Final mode', fr: 'Mode final', ar: 'وضع الجولة النهائية' },
     personalFinal: { en: 'Personalized', fr: 'Personnalisée', ar: 'شخصية' },
     sharedFinal: { en: 'Shared question', fr: 'Question partagée', ar: 'سؤال مشترك' },
+    waitingForHost: { en: 'Waiting for host...', fr: 'En attente de l’hôte...', ar: 'بانتظار المضيف...' },
+    waitingForWagers: { en: 'Waiting for all players to choose their wager...', fr: 'En attente que tous les joueurs choisissent leur mise...', ar: 'بانتظار أن يختار جميع اللاعبين رهاناتهم...' },
+    playersMissingKeys: { en: 'Some players must save their Gemini API key for a personalized final:', fr: 'Certains joueurs doivent enregistrer leur clé Gemini pour une finale personnalisée :', ar: 'بعض اللاعبين يجب أن يحفظوا مفتاح جيميني للنهائي الشخصي:' },
     submitToSee: { en: 'Submit your answer to preview others.', fr: 'Soumettez votre réponse pour voir celles des autres.', ar: 'قدّم إجابتك لرؤية إجابات الآخرين.' },
     missingApiKeyHost: { en: 'Host needs a Gemini key saved to start the game.', fr: 'L’hôte doit enregistrer une clé Gemini pour démarrer la partie.', ar: 'يجب على المضيف حفظ مفتاح جيميني لبدء اللعبة.' },
     missingApiKeyPersonal: { en: 'Save your Gemini key in settings to generate your final question.', fr: 'Enregistrez votre clé Gemini dans les paramètres pour générer votre question finale.', ar: 'احفظ مفتاح جيميني في الإعدادات لإنشاء سؤالك النهائي.' },

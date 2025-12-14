@@ -11,11 +11,13 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { updatePlayerState } from '@/services/roomService';
 
 export default function Settings() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { apiKey, setApiKey, playerName, setPlayerName } = useGame();
+    const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer } = useGame();
 
     const [localApiKey, setLocalApiKey] = useState(apiKey);
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
@@ -26,6 +28,34 @@ export default function Settings() {
         setIsSaving(true);
         await setApiKey(localApiKey);
         await setPlayerName(localPlayerName);
+
+        if (isSupabaseConfigured && gameState?.roomCode && currentPlayer?.id) {
+            const hasKey = !!localApiKey?.trim();
+            try {
+                await updatePlayerState({
+                    roomCode: gameState.roomCode,
+                    playerId: currentPlayer.id,
+                    patch: {
+                        has_api_key: hasKey,
+                        name: localPlayerName,
+                    },
+                });
+
+                setCurrentPlayer((prev) => (prev ? { ...prev, hasApiKey: hasKey, name: localPlayerName } : prev));
+                setGameState((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        players: prev.players.map((p) =>
+                            p.id === currentPlayer.id ? { ...p, hasApiKey: hasKey, name: localPlayerName } : p
+                        ),
+                    };
+                });
+            } catch {
+                // noop
+            }
+        }
+
         setIsSaving(false);
         router.back();
     };

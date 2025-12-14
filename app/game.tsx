@@ -61,6 +61,40 @@ function shallowEqualAnswerBoard(a: AnswerBoard, b: AnswerBoard) {
     return true;
 }
 
+function normalizeAnswerText(raw: string): string {
+    let s = (raw || '').trim().toLowerCase();
+    try {
+        s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch {
+        // noop
+    }
+
+    // Strip Arabic diacritics and tatweel
+    s = s.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '');
+
+    // Keep latin, digits, and Arabic letters; collapse separators
+    s = s.replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ');
+
+    // Remove common articles for latin languages
+    s = s.replace(/\b(the|a|an|le|la|les|un|une|des|el|al)\b/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+}
+
+function isAnswerCorrect(answer: string, question: Question): boolean {
+    const a = (answer || '').trim();
+    const c = (question.correctAnswer || '').trim();
+    if (!a || !c) return false;
+
+    if (question.type === 'multiple-choice' || question.type === 'true-false') {
+        return a.toLowerCase() === c.toLowerCase();
+    }
+
+    const na = normalizeAnswerText(a);
+    const nc = normalizeAnswerText(c);
+    return !!na && !!nc && na === nc;
+}
+
 export default function Game() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
@@ -86,9 +120,14 @@ export default function Game() {
     >(null);
 
     const [phase, setPhase] = useState<GamePhase>('question');
+    const phaseRef = React.useRef<GamePhase>('question');
+    useEffect(() => {
+        phaseRef.current = phase;
+    }, [phase]);
     const [selectedBet, setSelectedBet] = useState<number | null>(null);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [phaseStartedAt, setPhaseStartedAt] = useState<string | null>(null);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +161,14 @@ export default function Game() {
         if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) return undefined;
         return questions[currentQuestionIndex];
     }, [phase, finalQuestion, questions, currentQuestionIndex]);
+
+    const phaseEndsAtMs = useMemo(() => {
+        if (!phaseStartedAt) return undefined;
+        if (!(phase === 'question' || phase === 'final-question')) return undefined;
+        const started = new Date(phaseStartedAt).getTime();
+        if (!Number.isFinite(started)) return undefined;
+        return started + (gameState?.settings?.timePerQuestion || 0) * 1000;
+    }, [gameState?.settings?.timePerQuestion, phase, phaseStartedAt]);
 
     const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
@@ -170,6 +217,11 @@ export default function Game() {
             const betValue = betsByPlayerId[activePlayer.id] ?? selectedBet;
             if (!betValue) return;
 
+            if (usedBetsForPlayer.includes(betValue)) {
+                Alert.alert(t('placeBet'), t('betAlreadyUsed'));
+                return;
+            }
+
             await submitBet({
                 roomCode: gameState.roomCode,
                 questionIndex: currentQuestionIndex,
@@ -182,8 +234,26 @@ export default function Game() {
                 playerId: activePlayer.id,
                 answer,
             });
+
+            const nextUsed = Array.from(new Set([...(usedBetsForPlayer || []), betValue])).sort((a, b) => a - b);
+            setUsedBetsForPlayer(nextUsed);
+            await updatePlayerState({
+                roomCode: gameState.roomCode,
+                playerId: activePlayer.id,
+                patch: {
+                    used_bets: nextUsed,
+                },
+            });
         } catch (err) {
-            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to submit');
+            const msg = err instanceof Error ? err.message : 'Failed to submit';
+            const msgLower = msg.toLowerCase();
+            const duplicateBet =
+                msgLower.includes('unique') && (msgLower.includes('bet_value') || msgLower.includes('bets'));
+            if (duplicateBet) {
+                Alert.alert(t('placeBet'), t('betAlreadyUsed'));
+            } else {
+                Alert.alert('Supabase', msg);
+            }
         } finally {
             submitInFlightRef.current = false;
         }
@@ -220,6 +290,7 @@ export default function Game() {
                 const meta: any = {
                     phase: roomState.room.phase,
                     currentQuestionIndex: roomState.room.current_question_index ?? 0,
+                    phaseStartedAt: roomState.room.phase_started_at ?? new Date().toISOString(),
                     finalMode: (roomState.room.final_mode === 'personalized' ? 'personalized' : 'shared') as 'shared' | 'personalized',
                     questions: Array.isArray(questionsRaw) ? questionsRaw : [],
                 };
@@ -296,6 +367,7 @@ export default function Game() {
 
                 setPhase((prev) => (prev === (meta.phase as GamePhase) ? prev : (meta.phase as GamePhase)));
                 setCurrentQuestionIndex((prev) => (prev === meta.currentQuestionIndex ? prev : meta.currentQuestionIndex));
+                setPhaseStartedAt((prev) => (prev === meta.phaseStartedAt ? prev : meta.phaseStartedAt));
                 setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
                 if (includeQuestions) {
@@ -368,7 +440,7 @@ export default function Game() {
                 }
 
                 if ((!meta.questions || meta.questions.length === 0) && currentPlayer?.id !== roomState.room.host_player_id) {
-                    setLoadingMessage('Waiting for host...');
+                    setLoadingMessage(t('waitingForHost'));
                 }
 
                 // Load gameplay state for current phase
@@ -498,12 +570,12 @@ export default function Game() {
                         if (result.error || !result.questions?.length) {
                             if (result.code === 'QUOTA_EXCEEDED') {
                                 Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
-                                    { text: t('cancel'), style: 'cancel' },
+                                    { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
                                     { text: t('goToSettings'), onPress: () => router.push('/settings') },
                                 ]);
                             } else if (result.code === 'INVALID_API_KEY') {
                                 Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
-                                    { text: t('cancel'), style: 'cancel' },
+                                    { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
                                     { text: t('goToSettings'), onPress: () => router.push('/settings') },
                                 ]);
                             } else {
@@ -567,11 +639,35 @@ export default function Game() {
         subscriptionRef.current?.unsubscribe();
         subscriptionRef.current = subscribeToGame({ roomCode: gameState.roomCode, onChange: scheduleRefresh });
 
-        const pollMs = Platform.OS === 'web' ? 15000 : 2500;
-        const poll = setInterval(() => scheduleRefresh(), pollMs);
+        let pollTimeout: ReturnType<typeof setTimeout> | null = null;
+        const schedulePoll = () => {
+            const web = Platform.OS === 'web';
+            const hostId = gameStateRef.current?.hostId;
+            const isHostNow = !!currentPlayer?.id && !!hostId && currentPlayer.id === hostId;
+            const p = phaseRef.current;
+            const isActivePhase =
+                p === 'question' ||
+                p === 'preview' ||
+                p === 'validation' ||
+                p === 'scoring' ||
+                p === 'final-wager' ||
+                p === 'final-question' ||
+                p === 'final-validation' ||
+                p === 'final-scoring';
+
+            const pollMs = web ? (isHostNow || isActivePhase ? 2500 : 12000) : 2500;
+            pollTimeout = setTimeout(() => {
+                scheduleRefresh();
+                schedulePoll();
+            }, pollMs);
+        };
+        schedulePoll();
         return () => {
             cancelled = true;
-            clearInterval(poll);
+            if (pollTimeout) {
+                clearTimeout(pollTimeout);
+                pollTimeout = null;
+            }
             if (refreshTimer) {
                 clearTimeout(refreshTimer);
                 refreshTimer = null;
@@ -677,7 +773,7 @@ export default function Game() {
                             roomCode: gameState.roomCode,
                             questionIndex: currentQuestionIndex,
                             playerId: a.player_id,
-                            isCorrect: a.answer.trim().toLowerCase() === activeQuestion.correctAnswer.trim().toLowerCase(),
+                            isCorrect: isAnswerCorrect(a.answer, activeQuestion),
                             validatedBy: currentPlayer?.id,
                         })
                     )
@@ -690,7 +786,7 @@ export default function Game() {
                         upsertFinalValidation({
                             roomCode: gameState.roomCode,
                             playerId: a.player_id,
-                            isCorrect: a.answer.trim().toLowerCase() === activeQuestion.correctAnswer.trim().toLowerCase(),
+                            isCorrect: isAnswerCorrect(a.answer, activeQuestion),
                             validatedBy: currentPlayer?.id,
                         })
                     )
@@ -864,6 +960,24 @@ export default function Game() {
     const startFinalQuestion = async () => {
         if (!isHost || !gameState?.roomCode) return;
 
+        const missingWagers = gameState.players.filter((p) => {
+            const choice = finalChoices[p.id];
+            return choice?.wager === null || typeof choice?.wager !== 'number';
+        });
+        if (missingWagers.length > 0) {
+            Alert.alert(t('finalWager'), t('waitingForWagers'));
+            return;
+        }
+
+        if (finalMode === 'personalized') {
+            const missingKeys = gameState.players.filter((p) => !p.hasApiKey);
+            if (missingKeys.length > 0) {
+                const list = missingKeys.map((p) => p.name).join(', ');
+                Alert.alert(t('finalWager'), `${t('playersMissingKeys')}\n${list}`);
+                return;
+            }
+        }
+
         const hostChoice = finalChoices[currentPlayer?.id || ''] || { wager: null, difficulty: 'medium' as Difficulty };
         if (finalMode === 'shared' && hostChoice.wager === null) {
             Alert.alert(t('finalWager'), t('finalWagerDesc'));
@@ -952,6 +1066,7 @@ export default function Game() {
                                         key={timerKey}
                                         seconds={gameState.settings.timePerQuestion}
                                         onComplete={handleTimerComplete}
+                                        endsAt={phaseEndsAtMs}
                                         size="xxs"
                                     />
                                 }
@@ -1100,7 +1215,7 @@ export default function Game() {
                                         </Button>
                                     ) : (
                                         <View className="items-center">
-                                            <Text className="text-muted-foreground">Waiting for host...</Text>
+                                            <Text className="text-muted-foreground">{t('waitingForHost')}</Text>
                                         </View>
                                     )}
                                 </CardContent>
@@ -1135,6 +1250,7 @@ export default function Game() {
                                             key={timerKey}
                                             seconds={gameState.settings.timePerQuestion}
                                             onComplete={handleTimerComplete}
+                                            endsAt={phaseEndsAtMs}
                                             size="xxs"
                                         />
                                     ) : null
@@ -1171,7 +1287,7 @@ export default function Game() {
                                                     </Text>
                                                 </View>
                                             )}
-                                            {viewerHasAnswered && gameState.players.map((player) => {
+                                            {(viewerHasAnswered || isHost) && gameState.players.map((player) => {
                                                 const entry = answerBoard[player.id];
                                                 return (
                                                     <View key={player.id} className="flex-row justify-between items-center py-2 border-b border-border/40">
@@ -1204,7 +1320,7 @@ export default function Game() {
 
                             {phase === 'preview' && !showCorrectAnswer && !isHost && (
                                 <View className="items-center">
-                                    <Text className="text-muted-foreground">Waiting for host...</Text>
+                                    <Text className="text-muted-foreground">{t('waitingForHost')}</Text>
                                 </View>
                             )}
 
@@ -1273,7 +1389,7 @@ export default function Game() {
                                             </Text>
                                         </Button>
                                     ) : (
-                                        <Text className="text-muted-foreground">Waiting for host...</Text>
+                                        <Text className="text-muted-foreground">{t('waitingForHost')}</Text>
                                     )}
                                 </View>
                             )}

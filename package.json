@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "build": "expo export -p web",
     "build:web": "expo export -p web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",

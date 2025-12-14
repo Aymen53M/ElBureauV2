@@ -158,6 +158,29 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loadSavedData();
     }, []);
 
+    useEffect(() => {
+        if (!apiKey || !currentPlayer?.id) return;
+        setGameState((prev) => {
+            if (!prev) return prev;
+            const nextHostApiKey = currentPlayer.id === prev.hostId ? apiKey : prev.hostApiKey;
+            const nextPlayerApiKeys = {
+                ...prev.playerApiKeys,
+                [currentPlayer.id]: apiKey,
+            };
+
+            const noChange =
+                (prev.hostApiKey || '') === (nextHostApiKey || '') &&
+                (prev.playerApiKeys?.[currentPlayer.id] || '') === apiKey;
+            if (noChange) return prev;
+
+            return {
+                ...prev,
+                hostApiKey: nextHostApiKey,
+                playerApiKeys: nextPlayerApiKeys,
+            };
+        });
+    }, [apiKey, currentPlayer?.id]);
+
     const playerId = Platform.OS === 'web'
         ? (deviceId && sessionId ? `${deviceId}:${sessionId}` : deviceId)
         : deviceId;

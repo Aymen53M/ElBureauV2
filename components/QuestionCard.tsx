@@ -147,10 +147,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
                         {question.type === 'true-false' && (
                             <View className="flex-row justify-center gap-4">
-                                {['True', 'False'].map((option) => {
+                                {(['True', 'False'] as const).map((option) => {
                                     const isSelected = selectedAnswer === option;
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
                                     const isWrong = showCorrectAnswer && isSelected && option !== question.correctAnswer;
+
+                                    const label = option === 'True' ? t('trueOption') : t('falseOption');
 
                                     const isDisabled = showCorrectAnswer || disabled;
 
@@ -170,7 +172,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                         >
                                             <Text className={`font-display font-bold ${isCompact ? 'text-base' : 'text-lg'} ${isCorrect ? 'text-neon-green' : isWrong ? 'text-destructive' : 'text-foreground'
                                                 }`}>
-                                                {option}
+                                                {label}
                                             </Text>
                                         </TouchableOpacity>
                                     );
