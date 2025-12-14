@@ -114,6 +114,7 @@ export default function Game() {
     const submitInFlightRef = React.useRef(false);
     const roomQuestionsCountRef = React.useRef<number>(0);
     const questionsGenerationInFlightRef = React.useRef(false);
+    const questionsGenerationCooldownUntilRef = React.useRef<number>(0);
 
     const answerBoardScopeRef = React.useRef<
         | { kind: 'normal'; questionIndex: number }
@@ -327,7 +328,9 @@ export default function Game() {
                         setClockSkewMs((prev) => (Math.abs(prev - nextSkew) > 1000 ? nextSkew : prev));
                     }
                 }
-                const questionsRaw = includeQuestions && Array.isArray(roomState.room.questions) ? roomState.room.questions : null;
+                const questionsRaw = includeQuestions
+                    ? (Array.isArray(roomState.room.questions) ? roomState.room.questions : [])
+                    : null;
                 const nextPhase = roomState.room.phase as GamePhase;
                 const phaseChanged = phaseRef.current !== nextPhase;
                 const serverPhaseStartedAt = (roomState.room as any)?.phase_started_at;
@@ -338,15 +341,14 @@ export default function Game() {
                         ? serverPhaseStartedAt
                         : (phaseChanged ? new Date().toISOString() : null),
                     finalMode: 'shared' as const,
-                    questions: Array.isArray(questionsRaw) ? questionsRaw : [],
+                    questions: questionsRaw,
                 };
 
-                const normalCount =
-                    (Array.isArray(meta.questions) && meta.questions.length > 0 ? meta.questions.length : 0) ||
-                    roomQuestionsCountRef.current ||
-                    roomState.room.settings.numberOfQuestions ||
-                    0;
-                roomQuestionsCountRef.current = normalCount;
+                const loadedCount = Array.isArray(meta.questions) ? meta.questions.length : 0;
+                if (loadedCount > 0 && roomQuestionsCountRef.current !== loadedCount) {
+                    roomQuestionsCountRef.current = loadedCount;
+                }
+                const normalCount = roomQuestionsCountRef.current || loadedCount || roomState.room.settings.numberOfQuestions || 0;
 
                 // Guard: if DB says final-wager but we still have remaining normal questions, auto-correct back.
                 if (
@@ -455,7 +457,14 @@ export default function Game() {
                 }
 
                 // Ensure normal questions exist (generated once by host).
-                if ((!meta.questions || meta.questions.length === 0) && (currentPlayer?.id === roomState.room.host_player_id)) {
+                // IMPORTANT: only attempt generation if we actually fetched questions from the DB (includeQuestions).
+                // When includeQuestions=false, meta.questions is null (unknown), so do not treat it as "missing".
+                const fetchedQuestionsEmpty = includeQuestions && Array.isArray(meta.questions) && meta.questions.length === 0;
+                if (fetchedQuestionsEmpty && (currentPlayer?.id === roomState.room.host_player_id)) {
+                    if (Date.now() < questionsGenerationCooldownUntilRef.current) {
+                        setLoadingMessage(t('generatingQuestions'));
+                        return;
+                    }
                     if (questionsGenerationInFlightRef.current) {
                         setLoadingMessage(t('generatingQuestions'));
                         return;
@@ -472,6 +481,7 @@ export default function Game() {
                     questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
                     if (result.error) {
+                        questionsGenerationCooldownUntilRef.current = Date.now() + 60_000;
                         if (result.code === 'QUOTA_EXCEEDED') {
                             Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
                                 { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
@@ -493,11 +503,14 @@ export default function Game() {
                     }
                     if (result.questions && result.questions.length > 0) {
                         await updateRoomQuestions({ roomCode, questions: result.questions });
+                        // Force the next refresh to re-fetch questions from the DB.
+                        lastQuestionsSignatureRef.current = '';
+                        roomQuestionsCountRef.current = 0;
                         return;
                     }
                 }
 
-                if ((!meta.questions || meta.questions.length === 0) && currentPlayer?.id !== roomState.room.host_player_id) {
+                if (fetchedQuestionsEmpty && currentPlayer?.id !== roomState.room.host_player_id) {
                     setLoadingMessage(t('waitingForHost'));
                 }
 
