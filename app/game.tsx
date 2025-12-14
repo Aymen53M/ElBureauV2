@@ -32,6 +32,7 @@ import {
     fetchFinalAnswers,
     fetchFinalValidations,
     upsertFinalValidation,
+    setRoomPhaseIfCurrent,
 } from '@/services/gameService';
 
 type AnswerBoard = Record<string, { answer?: string; isCorrect?: boolean; hasAnswered: boolean }>;
@@ -129,6 +130,7 @@ export default function Game() {
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [phaseStartedAt, setPhaseStartedAt] = useState<string | null>(null);
+    const [clockSkewMs, setClockSkewMs] = useState<number>(0);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -177,14 +179,8 @@ export default function Game() {
         if (!(phase === 'question' || phase === 'final-question')) return undefined;
         const started = new Date(phaseStartedAt).getTime();
         if (!Number.isFinite(started)) return undefined;
-        const durationMs = timePerQuestionSeconds * 1000;
-        const now = Date.now();
-        const rawEndsAt = started + durationMs;
-        const remainingMs = rawEndsAt - now;
-        // Clamp remaining time to [0..duration] to avoid freezes when clocks drift.
-        const clampedRemainingMs = Math.max(0, Math.min(durationMs, remainingMs));
-        return now + clampedRemainingMs;
-    }, [phase, phaseStartedAt, timePerQuestionSeconds]);
+        return started + timePerQuestionSeconds * 1000 - (clockSkewMs || 0);
+    }, [clockSkewMs, phase, phaseStartedAt, timePerQuestionSeconds]);
 
     const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
@@ -195,19 +191,12 @@ export default function Game() {
         ? currentFinalChoice.wager
         : (betsByPlayerId[activePlayer?.id || ''] ?? selectedBet ?? null);
 
-    const isHost = !!activePlayer?.isHost || (!!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId);
+    const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
     const showCorrectAnswer =
         phase === 'validation' ||
         phase === 'scoring' ||
         phase === 'final-validation' ||
         phase === 'final-scoring';
-
-    useEffect(() => {
-        if (phase === 'question' || phase === 'final-question') {
-            setAnswerBoard({});
-            answerBoardScopeRef.current = null;
-        }
-    }, [currentQuestionIndex, phase]);
 
     useEffect(() => {
         if (!phase.startsWith('final') && phase === 'question') {
@@ -221,6 +210,11 @@ export default function Game() {
             setTimerKey((prev) => prev + 1);
         }
     }, [phase, currentQuestionIndex]);
+
+    useEffect(() => {
+        if (!(phase === 'question' || phase === 'final-question')) return;
+        setPhaseStartedAt((prev) => prev || new Date().toISOString());
+    }, [phase]);
 
     const handleSubmit = async () => {
         if (!gameState?.roomCode || !activePlayer?.id) return;
@@ -322,11 +316,27 @@ export default function Game() {
 
                 const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
                 const roomState = await fetchRoomState(roomCode, { includeQuestions });
+
+                const receivedAtMs = Date.now();
+
+                const serverUpdatedAt = (roomState.room as any)?.updated_at;
+                if (typeof serverUpdatedAt === 'string') {
+                    const serverUpdatedAtMs = new Date(serverUpdatedAt).getTime();
+                    if (Number.isFinite(serverUpdatedAtMs)) {
+                        const nextSkew = serverUpdatedAtMs - receivedAtMs;
+                        setClockSkewMs((prev) => (Math.abs(prev - nextSkew) > 1000 ? nextSkew : prev));
+                    }
+                }
                 const questionsRaw = includeQuestions && Array.isArray(roomState.room.questions) ? roomState.room.questions : null;
+                const nextPhase = roomState.room.phase as GamePhase;
+                const phaseChanged = phaseRef.current !== nextPhase;
+                const serverPhaseStartedAt = (roomState.room as any)?.phase_started_at;
                 const meta: any = {
-                    phase: roomState.room.phase,
+                    phase: nextPhase,
                     currentQuestionIndex: roomState.room.current_question_index ?? 0,
-                    phaseStartedAt: roomState.room.phase_started_at ?? new Date().toISOString(),
+                    phaseStartedAt: typeof serverPhaseStartedAt === 'string'
+                        ? serverPhaseStartedAt
+                        : (phaseChanged ? new Date().toISOString() : null),
                     finalMode: 'shared' as const,
                     questions: Array.isArray(questionsRaw) ? questionsRaw : [],
                 };
@@ -403,7 +413,13 @@ export default function Game() {
 
                 setPhase((prev) => (prev === (meta.phase as GamePhase) ? prev : (meta.phase as GamePhase)));
                 setCurrentQuestionIndex((prev) => (prev === meta.currentQuestionIndex ? prev : meta.currentQuestionIndex));
-                setPhaseStartedAt((prev) => (prev === meta.phaseStartedAt ? prev : meta.phaseStartedAt));
+                setPhaseStartedAt((prev) => {
+                    if (typeof meta.phaseStartedAt === 'string') {
+                        return prev === meta.phaseStartedAt ? prev : meta.phaseStartedAt;
+                    }
+                    if (meta.phaseStartedAt === null) return prev;
+                    return prev;
+                });
                 setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
                 if (includeQuestions) {
@@ -675,7 +691,7 @@ export default function Game() {
     }, [apiKey, currentPlayer?.id, gameState?.roomCode, gameState?.hostApiKey, gameState?.playerApiKeys, router, setGameState, t]);
 
     useEffect(() => {
-        if (!isHost || !gameState?.roomCode) return;
+        if (!gameState?.roomCode) return;
         if (autoAdvanceInFlightRef.current) return;
 
         if (phase === 'question') {
@@ -697,8 +713,10 @@ export default function Game() {
 
         if (phase === 'question') {
             autoAdvanceInFlightRef.current = true;
-            setRoomPhase({ roomCode: gameState.roomCode, phase: 'preview' })
-                .catch(() => undefined)
+            setRoomPhaseIfCurrent({ roomCode: gameState.roomCode, fromPhase: 'question', toPhase: 'preview' })
+                .catch((err) => {
+                    console.error('Failed to auto-advance to preview', err);
+                })
                 .finally(() => {
                     autoAdvanceInFlightRef.current = false;
                 });
@@ -706,13 +724,15 @@ export default function Game() {
 
         if (phase === 'final-question') {
             autoAdvanceInFlightRef.current = true;
-            setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' })
-                .catch(() => undefined)
+            setRoomPhaseIfCurrent({ roomCode: gameState.roomCode, fromPhase: 'final-question', toPhase: 'final-validation' })
+                .catch((err) => {
+                    console.error('Failed to auto-advance to final-validation', err);
+                })
                 .finally(() => {
                     autoAdvanceInFlightRef.current = false;
                 });
         }
-    }, [answerBoard, currentQuestionIndex, gameState?.players, gameState?.roomCode, isHost, phase]);
+    }, [answerBoard, currentQuestionIndex, gameState?.players, gameState?.roomCode, phase]);
 
     if (!gameState || !activePlayer) {
         return (
@@ -748,12 +768,16 @@ export default function Game() {
     };
 
     const handleTimerComplete = () => {
-        if (!isHost || !gameState?.roomCode) return;
+        if (!gameState?.roomCode) return;
         if (phase === 'question') {
-            setRoomPhase({ roomCode: gameState.roomCode, phase: 'preview' }).catch(() => undefined);
+            setRoomPhaseIfCurrent({ roomCode: gameState.roomCode, fromPhase: 'question', toPhase: 'preview' }).catch((err) => {
+                console.error('Failed to advance on timer (question->preview)', err);
+            });
         }
         if (phase === 'final-question') {
-            setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' }).catch(() => undefined);
+            setRoomPhaseIfCurrent({ roomCode: gameState.roomCode, fromPhase: 'final-question', toPhase: 'final-validation' }).catch((err) => {
+                console.error('Failed to advance on timer (final-question->final-validation)', err);
+            });
         }
     };
 

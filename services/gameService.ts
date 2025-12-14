@@ -134,10 +134,34 @@ export async function updateRoomMeta(args: {
     const client = requireSupabase();
     const roomCode = args.roomCode.toUpperCase();
 
-    const { error } = await client
+    const tryUpdate = async (patch: any) => client
         .from('elbureau_rooms')
-        .update(args.patch)
+        .update(patch)
         .eq('room_code', roomCode);
+
+    let patch: any = { ...args.patch };
+    let { error } = await tryUpdate(patch);
+
+    if (error) {
+        const msg = (error.message || '').toLowerCase();
+        const maybeRemove = (key: keyof RoomMetaRow) => {
+            if (key in patch) {
+                const next = { ...patch };
+                delete next[key];
+                patch = next;
+            }
+        };
+
+        // Backwards-compatible: older deployments may not have these columns yet.
+        if (msg.includes('phase_started_at')) maybeRemove('phase_started_at');
+        if (msg.includes('current_question_index')) maybeRemove('current_question_index');
+        if (msg.includes('final_mode')) maybeRemove('final_mode');
+        if (msg.includes('questions')) maybeRemove('questions');
+
+        if (Object.keys(patch).length > 0) {
+            ({ error } = await tryUpdate(patch));
+        }
+    }
 
     if (error) {
         throw new Error(error.message);
@@ -156,6 +180,45 @@ export async function setRoomPhase(args: {
             phase_started_at: args.phaseStartedAt || new Date().toISOString(),
         },
     });
+}
+
+export async function setRoomPhaseIfCurrent(args: {
+    roomCode: string;
+    fromPhase: string;
+    toPhase: string;
+    phaseStartedAt?: string;
+}): Promise<void> {
+    const client = requireSupabase();
+    const roomCode = args.roomCode.toUpperCase();
+
+    const patch: any = {
+        phase: args.toPhase,
+        phase_started_at: args.phaseStartedAt || new Date().toISOString(),
+    };
+
+    // Backwards-compatible: if the column doesn't exist yet, updateRoomMeta will handle stripping it.
+    // But here we want the phase guard, so we keep the direct update and fall back on column removal.
+    let { error } = await client
+        .from('elbureau_rooms')
+        .update(patch)
+        .eq('room_code', roomCode)
+        .eq('phase', args.fromPhase);
+
+    if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('phase_started_at')) {
+            delete patch.phase_started_at;
+            ({ error } = await client
+                .from('elbureau_rooms')
+                .update(patch)
+                .eq('room_code', roomCode)
+                .eq('phase', args.fromPhase));
+        }
+    }
+
+    if (error) {
+        throw new Error(error.message);
+    }
 }
 
 export async function submitBet(args: {
