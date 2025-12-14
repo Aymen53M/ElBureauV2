@@ -128,6 +128,7 @@ export default function Game() {
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [phaseStartedAt, setPhaseStartedAt] = useState<string | null>(null);
+    const [clockSkewMs, setClockSkewMs] = useState<number>(0);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -162,13 +163,22 @@ export default function Game() {
         return questions[currentQuestionIndex];
     }, [phase, finalQuestion, questions, currentQuestionIndex]);
 
+    const timePerQuestionSeconds = useMemo(() => {
+        const raw = (gameState as any)?.settings?.timePerQuestion;
+        const v = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(v) || v <= 0) return 30;
+        // Safety clamp: this value should come from the Create slider (10..60).
+        if (v > 120) return 30;
+        return Math.round(v);
+    }, [gameState]);
+
     const phaseEndsAtMs = useMemo(() => {
         if (!phaseStartedAt) return undefined;
         if (!(phase === 'question' || phase === 'final-question')) return undefined;
         const started = new Date(phaseStartedAt).getTime();
         if (!Number.isFinite(started)) return undefined;
-        return started + (gameState?.settings?.timePerQuestion || 0) * 1000;
-    }, [gameState?.settings?.timePerQuestion, phase, phaseStartedAt]);
+        return started + timePerQuestionSeconds * 1000 - (clockSkewMs || 0);
+    }, [clockSkewMs, phase, phaseStartedAt, timePerQuestionSeconds]);
 
     const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
@@ -187,7 +197,7 @@ export default function Game() {
         phase === 'final-scoring';
 
     useEffect(() => {
-        if (!phase.startsWith('final')) {
+        if (!phase.startsWith('final') && phase === 'question') {
             setSelectedAnswer(null);
             setSelectedBet(null);
         }
@@ -233,6 +243,19 @@ export default function Game() {
                 questionIndex: currentQuestionIndex,
                 playerId: activePlayer.id,
                 answer,
+            });
+
+            setAnswerBoard((prev) => {
+                const existing = prev[activePlayer.id];
+                if (existing?.hasAnswered && (existing.answer || '') === answer) return prev;
+                return {
+                    ...prev,
+                    [activePlayer.id]: {
+                        ...existing,
+                        hasAnswered: true,
+                        answer,
+                    },
+                };
             });
 
             const nextUsed = Array.from(new Set([...(usedBetsForPlayer || []), betValue])).sort((a, b) => a - b);
@@ -286,6 +309,17 @@ export default function Game() {
 
                 const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
                 const roomState = await fetchRoomState(roomCode, { includeQuestions });
+
+                const receivedAtMs = Date.now();
+
+                const serverUpdatedAt = (roomState.room as any)?.updated_at;
+                if (typeof serverUpdatedAt === 'string') {
+                    const serverUpdatedAtMs = new Date(serverUpdatedAt).getTime();
+                    if (Number.isFinite(serverUpdatedAtMs)) {
+                        const nextSkew = serverUpdatedAtMs - receivedAtMs;
+                        setClockSkewMs((prev) => (Math.abs(prev - nextSkew) > 1000 ? nextSkew : prev));
+                    }
+                }
                 const questionsRaw = includeQuestions && Array.isArray(roomState.room.questions) ? roomState.room.questions : null;
                 const meta: any = {
                     phase: roomState.room.phase,
@@ -1069,7 +1103,7 @@ export default function Game() {
                                 headerAccessory={
                                     <Timer
                                         key={timerKey}
-                                        seconds={gameState.settings.timePerQuestion}
+                                        seconds={timePerQuestionSeconds}
                                         onComplete={handleRoundTimerComplete}
                                         endsAt={phaseEndsAtMs}
                                         size="xxs"
@@ -1247,13 +1281,13 @@ export default function Game() {
                                 totalQuestions={totalQuestions}
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
-                                isAnswerPhase={phase === 'final-question'}
+                                isAnswerPhase={phase === 'final-question' || (phase === 'preview' && !showCorrectAnswer && !answerBoard[activePlayer.id]?.hasAnswered)}
                                 density={isCompact ? 'compact' : 'default'}
                                 headerAccessory={
                                     phase === 'final-question' ? (
                                         <Timer
                                             key={timerKey}
-                                            seconds={gameState.settings.timePerQuestion}
+                                            seconds={timePerQuestionSeconds}
                                             onComplete={handleRoundTimerComplete}
                                             endsAt={phaseEndsAtMs}
                                             size="xxs"
@@ -1263,6 +1297,43 @@ export default function Game() {
                                 showCorrectAnswer={showCorrectAnswer}
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
+
+                            {phase === 'preview' && !showCorrectAnswer && !isFinalRound && !answerBoard[activePlayer.id]?.hasAnswered && (
+                                <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
+                                    <Card className="border-accent/30 rounded-3xl">
+                                        <CardContent className={isCompact ? 'p-6 space-y-4' : 'p-9 space-y-6'}>
+                                            <View className="items-center">
+                                                <View className="px-4 py-2 rounded-full bg-accent/20">
+                                                    <Text className="text-accent font-display font-bold">
+                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <BetSelector
+                                                totalQuestions={totalQuestions}
+                                                usedBets={usedBetsForPlayer}
+                                                selectedBet={selectedBet}
+                                                onSelectBet={setSelectedBet}
+                                                showHeader={false}
+                                                density={isCompact ? 'compact' : 'default'}
+                                                variant="grid"
+                                            />
+                                        </CardContent>
+                                    </Card>
+
+                                    <Button
+                                        variant="hero"
+                                        onPress={handleSubmit}
+                                        disabled={!selectedAnswer?.trim() || !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) || !!answerBoard[activePlayer.id]?.hasAnswered}
+                                        className="w-full"
+                                    >
+                                        <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
+                                            {t('submit')}
+                                        </Text>
+                                    </Button>
+                                </View>
+                            )}
 
                             {phase === 'final-question' && (
                                 <Button

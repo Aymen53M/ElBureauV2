@@ -24,7 +24,7 @@ const Timer: React.FC<TimerProps> = ({
     const computeSecondsLeft = React.useCallback(() => {
         if (typeof endsAt === 'number' && Number.isFinite(endsAt)) {
             const diffMs = endsAt - Date.now();
-            return Math.max(0, Math.ceil(diffMs / 1000));
+            return Math.max(0, Math.min(initialSeconds, Math.ceil(diffMs / 1000)));
         }
         return initialSeconds;
     }, [endsAt, initialSeconds]);
@@ -40,7 +40,7 @@ const Timer: React.FC<TimerProps> = ({
         const interval = setInterval(() => {
             setSeconds((prev) => {
                 const next = typeof endsAt === 'number' && Number.isFinite(endsAt)
-                    ? Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+                    ? Math.max(0, Math.min(initialSeconds, Math.ceil((endsAt - Date.now()) / 1000)))
                     : Math.max(0, prev - 1);
 
                 if (next <= 0 && !completedRef.current) {
@@ -53,7 +53,7 @@ const Timer: React.FC<TimerProps> = ({
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [endsAt, isPaused, onComplete]);
+    }, [endsAt, initialSeconds, isPaused, onComplete]);
 
     // Shake animation when critical
     useEffect(() => {

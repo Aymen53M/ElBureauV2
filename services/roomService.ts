@@ -10,6 +10,7 @@ type RoomRow = {
     current_question_index?: number;
     phase_started_at?: string;
     final_mode?: string;
+    updated_at?: string;
 };
 
 type RoomPlayerRow = {
@@ -60,8 +61,8 @@ export async function fetchRoomState(
 
     const includeQuestions = !!opts?.includeQuestions;
     const select = includeQuestions
-        ? 'room_code, host_player_id, settings, phase, questions, current_question_index, phase_started_at, final_mode'
-        : 'room_code, host_player_id, settings, phase, current_question_index, phase_started_at, final_mode';
+        ? 'room_code, host_player_id, settings, phase, questions, current_question_index, phase_started_at, final_mode, updated_at'
+        : 'room_code, host_player_id, settings, phase, current_question_index, phase_started_at, final_mode, updated_at';
 
     const { data: room, error: roomError } = await client
         .from('elbureau_rooms')
@@ -69,7 +70,7 @@ export async function fetchRoomState(
         .eq('room_code', normalized)
         .single();
 
-    const requestedColumns = ['current_question_index', 'phase_started_at', 'final_mode', ...(includeQuestions ? ['questions'] : [])];
+    const requestedColumns = ['current_question_index', 'phase_started_at', 'final_mode', 'updated_at', ...(includeQuestions ? ['questions'] : [])];
     const missingColumn = (msg?: string) => requestedColumns.some((c) => (msg || '').toLowerCase().includes(c));
 
     if (roomError && missingColumn(roomError.message)) {
