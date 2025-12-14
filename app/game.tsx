@@ -129,7 +129,6 @@ export default function Game() {
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [phaseStartedAt, setPhaseStartedAt] = useState<string | null>(null);
-    const [clockSkewMs, setClockSkewMs] = useState<number>(0);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -178,8 +177,14 @@ export default function Game() {
         if (!(phase === 'question' || phase === 'final-question')) return undefined;
         const started = new Date(phaseStartedAt).getTime();
         if (!Number.isFinite(started)) return undefined;
-        return started + timePerQuestionSeconds * 1000 - (clockSkewMs || 0);
-    }, [clockSkewMs, phase, phaseStartedAt, timePerQuestionSeconds]);
+        const durationMs = timePerQuestionSeconds * 1000;
+        const now = Date.now();
+        const rawEndsAt = started + durationMs;
+        const remainingMs = rawEndsAt - now;
+        // Clamp remaining time to [0..duration] to avoid freezes when clocks drift.
+        const clampedRemainingMs = Math.max(0, Math.min(durationMs, remainingMs));
+        return now + clampedRemainingMs;
+    }, [phase, phaseStartedAt, timePerQuestionSeconds]);
 
     const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
@@ -190,12 +195,19 @@ export default function Game() {
         ? currentFinalChoice.wager
         : (betsByPlayerId[activePlayer?.id || ''] ?? selectedBet ?? null);
 
-    const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
+    const isHost = !!activePlayer?.isHost || (!!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId);
     const showCorrectAnswer =
         phase === 'validation' ||
         phase === 'scoring' ||
         phase === 'final-validation' ||
         phase === 'final-scoring';
+
+    useEffect(() => {
+        if (phase === 'question' || phase === 'final-question') {
+            setAnswerBoard({});
+            answerBoardScopeRef.current = null;
+        }
+    }, [currentQuestionIndex, phase]);
 
     useEffect(() => {
         if (!phase.startsWith('final') && phase === 'question') {
@@ -310,17 +322,6 @@ export default function Game() {
 
                 const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
                 const roomState = await fetchRoomState(roomCode, { includeQuestions });
-
-                const receivedAtMs = Date.now();
-
-                const serverUpdatedAt = (roomState.room as any)?.updated_at;
-                if (typeof serverUpdatedAt === 'string') {
-                    const serverUpdatedAtMs = new Date(serverUpdatedAt).getTime();
-                    if (Number.isFinite(serverUpdatedAtMs)) {
-                        const nextSkew = serverUpdatedAtMs - receivedAtMs;
-                        setClockSkewMs((prev) => (Math.abs(prev - nextSkew) > 1000 ? nextSkew : prev));
-                    }
-                }
                 const questionsRaw = includeQuestions && Array.isArray(roomState.room.questions) ? roomState.room.questions : null;
                 const meta: any = {
                     phase: roomState.room.phase,
