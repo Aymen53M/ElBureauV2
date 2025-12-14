@@ -39,11 +39,11 @@ async function fetchGeminiJsonText(args: {
     userPrompt: string;
     temperature: number;
 }): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode }> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${args.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
     const response = await retryFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
         body: JSON.stringify({
             systemInstruction: { parts: [{ text: args.systemPrompt }] },
             contents: [{ role: 'user', parts: [{ text: args.userPrompt }] }],
@@ -149,9 +149,9 @@ type GeminiErrorCode =
     | 'INVALID_RESPONSE'
     | 'MODEL_UNAVAILABLE';
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 1;
 const RETRY_BASE_DELAY_MS = 1000;
-const MAX_RETRY_DELAY_MS = 15000;
+const MAX_RETRY_DELAY_MS = 60000;
 
 /**
  * Retry fetch with exponential backoff and jitter.
@@ -163,7 +163,26 @@ async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<
 
         // Retry on 429 (rate limit) or 503 (overloaded) or 5xx server errors
         if ((response.status === 429 || response.status === 503 || response.status >= 500) && attempt < MAX_RETRIES) {
-            const delay = calculateBackoffDelay(attempt);
+            if (response.status === 429) {
+                try {
+                    const body = await response.clone().text();
+                    const bodyLower = body.toLowerCase();
+                    const isQuota =
+                        bodyLower.includes('quota') ||
+                        bodyLower.includes('resource_exhausted') ||
+                        bodyLower.includes('exceeded');
+                    // If quota is exhausted, do not retry automatically (each retry consumes more quota).
+                    if (isQuota) {
+                        return response;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            const retryAfter = response.headers.get('retry-after');
+            const retryAfterMs = retryAfter && Number.isFinite(Number(retryAfter)) ? Number(retryAfter) * 1000 : 0;
+            const delay = Math.max(calculateBackoffDelay(attempt), retryAfterMs);
             console.log(`Gemini returned ${response.status}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
             await new Promise((r) => setTimeout(r, delay));
             return retryFetch(url, init, attempt + 1);
@@ -272,102 +291,85 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         const desiredType = settings.questionType;
         const fallbackDifficulty: 'easy' | 'medium' | 'hard' = settings.difficulty === 'easy' || settings.difficulty === 'hard' ? settings.difficulty : 'medium';
 
-        let lastValidationError = '';
-
-        for (let contentAttempt = 0; contentAttempt < 2; contentAttempt++) {
-            const extraRules = contentAttempt === 0
-                ? undefined
-                : `The previous output was invalid. Fix it now.
-For "${desiredType}" you MUST follow the rules exactly and return exactly ${settings.numberOfQuestions} items.
-Do not include explanations, apologies, or extra keys.
-Invalidity summary: ${lastValidationError}`;
-
-            const prompt = buildUserPrompt(extraRules);
-            const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: contentAttempt === 0 ? 0.7 : 0.2 });
-            if (!fetched.ok) {
-                return { error: fetched.error, code: fetched.code };
-            }
-
-            let parsed: any;
-            try {
-                parsed = JSON.parse(fetched.content);
-            } catch (parseErr) {
-                console.error('Gemini parse error', parseErr, fetched.content);
-                lastValidationError = 'Response was not valid JSON.';
-                continue;
-            }
-
-            const rawQuestions = extractQuestionsArray(parsed);
-            if (!rawQuestions) {
-                lastValidationError = 'JSON was not an array of questions.';
-                continue;
-            }
-
-            if (rawQuestions.length < settings.numberOfQuestions) {
-                lastValidationError = `Returned ${rawQuestions.length} questions, expected ${settings.numberOfQuestions}.`;
-                continue;
-            }
-
-            const normalized: Question[] = [];
-            const problems: string[] = [];
-
-            for (let i = 0; i < settings.numberOfQuestions; i++) {
-                const q = rawQuestions[i];
-                const text = typeof q?.text === 'string' ? q.text.trim() : '';
-                const hint = typeof q?.hint === 'string' ? q.hint.trim() : undefined;
-                let correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
-                let options: string[] | undefined;
-
-                if (!text) problems.push(`q[${i}].text missing`);
-
-                if (desiredType === 'multiple-choice') {
-                    const deduped = normalizeOptions(q?.options);
-                    if (correctAnswer) {
-                        options = [correctAnswer, ...deduped].map((s) => s.trim()).filter((s) => s.length > 0);
-                        options = Array.from(new Set(options));
-                    } else {
-                        options = deduped;
-                    }
-
-                    if (!options || options.length !== 4) {
-                        problems.push(`q[${i}].options must have exactly 4 items`);
-                    } else if (!correctAnswer || !options.includes(correctAnswer)) {
-                        problems.push(`q[${i}].correctAnswer must be one of the 4 options`);
-                    }
-                } else if (desiredType === 'true-false') {
-                    const normalizedAnswer = correctAnswer ? normalizeTrueFalseAnswer(correctAnswer) : '';
-                    if (!normalizedAnswer) {
-                        problems.push(`q[${i}].correctAnswer must be "True" or "False"`);
-                    }
-                    correctAnswer = normalizedAnswer;
-                    options = undefined;
-                } else {
-                    options = undefined;
-                    if (!correctAnswer) problems.push(`q[${i}].correctAnswer missing`);
-                }
-
-                const difficulty = sanitizeDifficulty(q?.difficulty, fallbackDifficulty);
-
-                normalized.push({
-                    id: `q-${Date.now()}-${i}`,
-                    text,
-                    type: desiredType,
-                    options,
-                    correctAnswer,
-                    hint,
-                    difficulty: difficulty as any,
-                });
-            }
-
-            if (problems.length > 0) {
-                lastValidationError = problems.slice(0, 6).join('; ');
-                continue;
-            }
-
-            return { questions: normalized };
+        const prompt = buildUserPrompt();
+        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.7 });
+        if (!fetched.ok) {
+            return { error: fetched.error, code: fetched.code };
         }
 
-        return { error: 'AI returned questions that do not match the selected mode. Please try again.', code: 'INVALID_RESPONSE' };
+        let parsed: any;
+        try {
+            parsed = JSON.parse(fetched.content);
+        } catch (parseErr) {
+            console.error('Gemini parse error', parseErr, fetched.content);
+            return { error: 'AI response was not valid JSON. Please try again.', code: 'PARSING_ERROR' };
+        }
+
+        const rawQuestions = extractQuestionsArray(parsed);
+        if (!rawQuestions) {
+            return { error: 'AI response was not an array of questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        if (rawQuestions.length < settings.numberOfQuestions) {
+            return { error: 'AI returned too few questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        const normalized: Question[] = [];
+        const problems: string[] = [];
+
+        for (let i = 0; i < settings.numberOfQuestions; i++) {
+            const q = rawQuestions[i];
+            const text = typeof q?.text === 'string' ? q.text.trim() : '';
+            const hint = typeof q?.hint === 'string' ? q.hint.trim() : undefined;
+            let correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+            let options: string[] | undefined;
+
+            if (!text) problems.push(`q[${i}].text missing`);
+
+            if (desiredType === 'multiple-choice') {
+                const deduped = normalizeOptions(q?.options);
+                if (correctAnswer) {
+                    options = [correctAnswer, ...deduped].map((s) => s.trim()).filter((s) => s.length > 0);
+                    options = Array.from(new Set(options));
+                } else {
+                    options = deduped;
+                }
+
+                if (!options || options.length !== 4) {
+                    problems.push(`q[${i}].options must have exactly 4 items`);
+                } else if (!correctAnswer || !options.includes(correctAnswer)) {
+                    problems.push(`q[${i}].correctAnswer must be one of the 4 options`);
+                }
+            } else if (desiredType === 'true-false') {
+                const normalizedAnswer = correctAnswer ? normalizeTrueFalseAnswer(correctAnswer) : '';
+                if (!normalizedAnswer) {
+                    problems.push(`q[${i}].correctAnswer must be "True" or "False"`);
+                }
+                correctAnswer = normalizedAnswer;
+                options = undefined;
+            } else {
+                options = undefined;
+                if (!correctAnswer) problems.push(`q[${i}].correctAnswer missing`);
+            }
+
+            const difficulty = sanitizeDifficulty(q?.difficulty, fallbackDifficulty);
+
+            normalized.push({
+                id: `q-${Date.now()}-${i}`,
+                text,
+                type: desiredType,
+                options,
+                correctAnswer,
+                hint,
+                difficulty: difficulty as any,
+            });
+        }
+
+        if (problems.length > 0) {
+            return { error: 'AI returned invalid questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        return { questions: normalized };
     } catch (err) {
         console.error('Unexpected error generating questions:', err);
         return {
@@ -424,12 +426,12 @@ Winner: ${data.winner.name} with ${data.winner.score} points!
 
 Write a fun, brief highlight commentary (2-3 sentences) celebrating the game. Make it feel exciting and party-like!`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
     try {
         const response = await retryFetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [

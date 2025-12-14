@@ -10,7 +10,6 @@ import PlayerAvatar from '@/components/PlayerAvatar';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
-import { generateGameHighlights } from '@/services/questionService';
 
 const demoPlayers: Player[] = [
     { id: '1', name: 'Alex', score: 45, isHost: true, isReady: true, usedBets: [], hasApiKey: true },
@@ -124,8 +123,8 @@ export default function Results() {
 
     const [showConfetti, setShowConfetti] = useState(false);
     const [revealedRanks, setRevealedRanks] = useState<number[]>([]);
-    const [highlights, setHighlights] = useState<string | null>(null);
-    const [isLoadingHighlights, setIsLoadingHighlights] = useState(false);
+    const [highlights] = useState<string | null>(null);
+    const [isLoadingHighlights] = useState(false);
     const [view, setView] = useState<'podium' | 'rankings' | 'highlights'>('podium');
     const [rankPage, setRankPage] = useState(0);
 
@@ -160,25 +159,8 @@ export default function Results() {
 
     // Generate AI highlights when confetti starts
     useEffect(() => {
-        if (showConfetti && gameState?.hostApiKey && !highlights && !isLoadingHighlights) {
-            setIsLoadingHighlights(true);
-            generateGameHighlights(
-                {
-                    winner: { name: winner.name, score: winner.score },
-                    players: players.map(p => ({ name: p.name, score: p.score, isHost: p.isHost })),
-                    theme: gameState.settings.customTheme || gameState.settings.theme,
-                    totalQuestions: gameState.settings.numberOfQuestions,
-                    language: gameState.settings.language,
-                },
-                gameState.hostApiKey
-            ).then(result => {
-                if (result.highlights) {
-                    setHighlights(result.highlights);
-                }
-                setIsLoadingHighlights(false);
-            });
-        }
-    }, [showConfetti, gameState, winner, players, highlights, isLoadingHighlights]);
+        if (!showConfetti || highlights || isLoadingHighlights) return;
+    }, [showConfetti, highlights, isLoadingHighlights]);
 
     const handlePlayAgain = () => {
         setGameState(null);

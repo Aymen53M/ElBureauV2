@@ -112,6 +112,7 @@ export default function Game() {
     const autoAdvanceInFlightRef = React.useRef(false);
     const submitInFlightRef = React.useRef(false);
     const roomQuestionsCountRef = React.useRef<number>(0);
+    const questionsGenerationInFlightRef = React.useRef(false);
 
     const answerBoardScopeRef = React.useRef<
         | { kind: 'normal'; questionIndex: number }
@@ -325,7 +326,7 @@ export default function Game() {
                     phase: roomState.room.phase,
                     currentQuestionIndex: roomState.room.current_question_index ?? 0,
                     phaseStartedAt: roomState.room.phase_started_at ?? new Date().toISOString(),
-                    finalMode: (roomState.room.final_mode === 'personalized' ? 'personalized' : 'shared') as 'shared' | 'personalized',
+                    finalMode: 'shared' as const,
                     questions: Array.isArray(questionsRaw) ? questionsRaw : [],
                 };
 
@@ -438,14 +439,20 @@ export default function Game() {
 
                 // Ensure normal questions exist (generated once by host).
                 if ((!meta.questions || meta.questions.length === 0) && (currentPlayer?.id === roomState.room.host_player_id)) {
+                    if (questionsGenerationInFlightRef.current) {
+                        setLoadingMessage(t('generatingQuestions'));
+                        return;
+                    }
                     const hostKey = gameState.hostApiKey || apiKey;
                     if (!hostKey) {
                         setLoadingMessage(t('missingApiKeyHost'));
                         return;
                     }
 
+                    questionsGenerationInFlightRef.current = true;
                     setLoadingMessage(t('generatingQuestions'));
                     const result = await generateQuestions(roomState.room.settings, hostKey);
+                    questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
                     if (result.error) {
                         if (result.code === 'QUOTA_EXCEEDED') {
@@ -579,51 +586,6 @@ export default function Game() {
                     });
 
                     setFinalQuestion(myQuestion);
-
-                    // Personalized final: generate own question if missing.
-                    if (meta.phase === 'final-question' && meta.finalMode === 'personalized' && !myQuestion) {
-                        const choice = nextChoices[currentPlayer.id];
-                        if (!choice || choice.wager === null) {
-                            return;
-                        }
-                        const keyToUse = gameState.playerApiKeys?.[currentPlayer.id] || apiKey;
-                        if (!keyToUse) {
-                            setLoadingMessage(t('missingApiKeyPersonal'));
-                            return;
-                        }
-
-                        setIsLoadingFinal(true);
-                        const finalSettings = {
-                            ...roomState.room.settings,
-                            numberOfQuestions: 1,
-                            difficulty: choice.difficulty,
-                            questionType: 'open-ended' as const,
-                        };
-                        const result = await generateQuestions(finalSettings, keyToUse);
-                        if (cancelled) return;
-                        if (result.error || !result.questions?.length) {
-                            if (result.code === 'QUOTA_EXCEEDED') {
-                                Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
-                                    { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
-                                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                                ]);
-                            } else if (result.code === 'INVALID_API_KEY') {
-                                Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
-                                    { text: t('cancel'), style: 'cancel', onPress: () => router.replace('/lobby') },
-                                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                                ]);
-                            } else {
-                                Alert.alert(t('loading'), result.error || t('generationFailed'));
-                            }
-                            setIsLoadingFinal(false);
-                            return;
-                        }
-
-                        if (result.questions && result.questions.length > 0) {
-                            await upsertFinalQuestion({ roomCode, playerId: currentPlayer.id, question: result.questions[0] });
-                        }
-                        setIsLoadingFinal(false);
-                    }
 
                     const ansMap: Record<string, string> = {};
                     finalAnswers.forEach((a) => {
@@ -1008,59 +970,48 @@ export default function Game() {
             return;
         }
 
-        if (finalMode === 'personalized') {
-            const missingKeys = gameState.players.filter((p) => !p.hasApiKey);
-            if (missingKeys.length > 0) {
-                const list = missingKeys.map((p) => p.name).join(', ');
-                Alert.alert(t('finalWager'), `${t('playersMissingKeys')}\n${list}`);
-                return;
-            }
-        }
-
         const hostChoice = finalChoices[currentPlayer?.id || ''] || { wager: null, difficulty: 'medium' as Difficulty };
-        if (finalMode === 'shared' && hostChoice.wager === null) {
+        if (hostChoice.wager === null) {
             Alert.alert(t('finalWager'), t('finalWagerDesc'));
             return;
         }
 
-        if (finalMode === 'shared') {
-            const hostKey = gameState.hostApiKey || apiKey;
-            if (!hostKey) {
-                Alert.alert(t('apiKey'), t('missingApiKeyHost'));
-                return;
-            }
-
-            setIsLoadingFinal(true);
-            const finalSettings = {
-                ...gameState.settings,
-                numberOfQuestions: 1,
-                difficulty: hostChoice.difficulty,
-                questionType: 'open-ended' as const,
-            };
-            const result = await generateQuestions(finalSettings, hostKey);
-            if (result.error || !result.questions?.length) {
-                if (result.code === 'QUOTA_EXCEEDED') {
-                    Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
-                        { text: t('cancel'), style: 'cancel' },
-                        { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                    ]);
-                } else if (result.code === 'INVALID_API_KEY') {
-                    Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
-                        { text: t('cancel'), style: 'cancel' },
-                        { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                    ]);
-                } else {
-                    Alert.alert(t('loading'), result.error || t('generationFailed'));
-                }
-                setIsLoadingFinal(false);
-                return;
-            }
-
-            await Promise.all(
-                gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: result.questions![0] }))
-            );
-            setIsLoadingFinal(false);
+        const hostKey = gameState.hostApiKey || apiKey;
+        if (!hostKey) {
+            Alert.alert(t('apiKey'), t('missingApiKeyHost'));
+            return;
         }
+
+        setIsLoadingFinal(true);
+        const finalSettings = {
+            ...gameState.settings,
+            numberOfQuestions: 1,
+            difficulty: hostChoice.difficulty,
+            questionType: 'open-ended' as const,
+        };
+        const result = await generateQuestions(finalSettings, hostKey);
+        if (result.error || !result.questions?.length) {
+            if (result.code === 'QUOTA_EXCEEDED') {
+                Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
+                    { text: t('cancel'), style: 'cancel' },
+                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                ]);
+            } else if (result.code === 'INVALID_API_KEY') {
+                Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
+                    { text: t('cancel'), style: 'cancel' },
+                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                ]);
+            } else {
+                Alert.alert(t('loading'), result.error || t('generationFailed'));
+            }
+            setIsLoadingFinal(false);
+            return;
+        }
+
+        await Promise.all(
+            gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: result.questions![0] }))
+        );
+        setIsLoadingFinal(false);
 
         await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-question' });
         setTimerKey((prev) => prev + 1);
@@ -1182,34 +1133,15 @@ export default function Game() {
                                     </Text>
 
                                     {isHost ? (
-                                        <View className="flex-row justify-center gap-2">
-                                            {(['personalized', 'shared'] as const).map((mode) => (
-                                                <TouchableOpacity
-                                                    key={mode}
-                                                    onPress={async () => {
-                                                        if (!gameState?.roomCode) return;
-                                                        setFinalMode(mode);
-                                                        try {
-                                                            await updateRoomMeta({
-                                                                roomCode: gameState.roomCode,
-                                                                patch: { final_mode: mode },
-                                                            });
-                                                        } catch (err) {
-                                                            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update final mode');
-                                                        }
-                                                    }}
-                                                    className={`flex-1 px-3 py-2 rounded-xl border ${finalMode === mode ? 'border-primary bg-primary/20' : 'border-border bg-muted'}`}
-                                                >
-                                                    <Text className="text-center font-display font-semibold text-foreground">
-                                                        {mode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
+                                        <View className="items-center">
+                                            <Text className="text-muted-foreground">
+                                                {t('finalMode')}: {t('sharedFinal')}
+                                            </Text>
                                         </View>
                                     ) : (
                                         <View className="items-center">
                                             <Text className="text-muted-foreground">
-                                                {t('finalMode')}: {finalMode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
+                                                {t('finalMode')}: {t('sharedFinal')}
                                             </Text>
                                         </View>
                                     )}
