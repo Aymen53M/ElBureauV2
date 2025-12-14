@@ -24,7 +24,7 @@ export default function JoinRoom() {
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
     const [isJoining, setIsJoining] = useState(false);
 
-    const canJoin = roomCode.length >= 4 && localPlayerName.trim();
+    const canJoin = roomCode.length === 6 && localPlayerName.trim();
 
     const handleJoin = async () => {
         if (!canJoin) return;
@@ -41,7 +41,7 @@ export default function JoinRoom() {
 
         setIsJoining(true);
 
-        const normalizedRoomCode = roomCode.toUpperCase();
+        const normalizedRoomCode = roomCode;
         const joiningPlayer = {
             id: playerId,
             name: localPlayerName,
@@ -133,10 +133,10 @@ export default function JoinRoom() {
                                     <Text className="text-sm font-medium text-foreground">{t('roomCode')}</Text>
                                     <Input
                                         value={roomCode}
-                                        onChangeText={(text) => setRoomCode(text.toUpperCase())}
+                                        onChangeText={(text) => setRoomCode((text || '').replace(/\D+/g, '').slice(0, 6))}
                                         placeholder={t('enterRoomCode')}
                                         maxLength={6}
-                                        autoCapitalize="characters"
+                                        keyboardType="number-pad"
                                         className={`text-center ${isCompact ? 'text-xl' : 'text-2xl'} font-display tracking-widest`}
                                     />
                                 </View>

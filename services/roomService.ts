@@ -181,10 +181,22 @@ export async function updateRoomQuestions(args: {
     const client = requireSupabase();
     const roomCode = args.roomCode.toUpperCase();
 
-    const { error } = await client
+    const patch: any = {
+        questions: args.questions,
+        phase_started_at: new Date().toISOString(),
+    };
+
+    let { error } = await client
         .from('elbureau_rooms')
-        .update({ questions: args.questions })
+        .update(patch)
         .eq('room_code', roomCode);
+
+    if (error && error.message?.toLowerCase?.().includes('phase_started_at')) {
+        ({ error } = await client
+            .from('elbureau_rooms')
+            .update({ questions: args.questions })
+            .eq('room_code', roomCode));
+    }
 
     if (error) {
         if (error.message?.toLowerCase?.().includes('questions')) {

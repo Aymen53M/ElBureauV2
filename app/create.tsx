@@ -98,7 +98,9 @@ export default function CreateRoom() {
         let roomCode = '';
         let lastError: unknown = null;
         for (let attempt = 0; attempt < 5; attempt++) {
-            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            roomCode = Math.floor(Math.random() * 1_000_000)
+                .toString()
+                .padStart(6, '0');
             try {
                 const { room, players } = await createRoom({
                     roomCode,

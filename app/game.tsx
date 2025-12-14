@@ -760,6 +760,11 @@ export default function Game() {
         }
     };
 
+    const handleRoundTimerComplete = () => {
+        handleSubmit().catch(() => undefined);
+        handleTimerComplete();
+    };
+
     const handleRevealAnswer = async () => {
         if (!isHost || !gameState?.roomCode || !activeQuestion) return;
 
@@ -1065,7 +1070,7 @@ export default function Game() {
                                     <Timer
                                         key={timerKey}
                                         seconds={gameState.settings.timePerQuestion}
-                                        onComplete={handleTimerComplete}
+                                        onComplete={handleRoundTimerComplete}
                                         endsAt={phaseEndsAtMs}
                                         size="xxs"
                                     />
@@ -1249,7 +1254,7 @@ export default function Game() {
                                         <Timer
                                             key={timerKey}
                                             seconds={gameState.settings.timePerQuestion}
-                                            onComplete={handleTimerComplete}
+                                            onComplete={handleRoundTimerComplete}
                                             endsAt={phaseEndsAtMs}
                                             size="xxs"
                                         />
@@ -1318,7 +1323,7 @@ export default function Game() {
                                 </View>
                             )}
 
-                            {phase === 'preview' && !showCorrectAnswer && !isHost && (
+                            {phase === 'preview' && !showCorrectAnswer && !isHost && viewerHasAnswered && (
                                 <View className="items-center">
                                     <Text className="text-muted-foreground">{t('waitingForHost')}</Text>
                                 </View>
