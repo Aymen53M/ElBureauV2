@@ -21,6 +21,22 @@ const Timer: React.FC<TimerProps> = ({
     const shakeAnim = React.useRef(new Animated.Value(0)).current;
     const completedRef = React.useRef(false);
 
+    const endsAtRef = React.useRef<number | undefined>(endsAt);
+    const initialSecondsRef = React.useRef<number>(initialSeconds);
+    const onCompleteRef = React.useRef<typeof onComplete>(onComplete);
+
+    useEffect(() => {
+        endsAtRef.current = endsAt;
+    }, [endsAt]);
+
+    useEffect(() => {
+        initialSecondsRef.current = initialSeconds;
+    }, [initialSeconds]);
+
+    useEffect(() => {
+        onCompleteRef.current = onComplete;
+    }, [onComplete]);
+
     const computeSecondsLeft = React.useCallback(() => {
         if (typeof endsAt === 'number' && Number.isFinite(endsAt)) {
             const diffMs = endsAt - Date.now();
@@ -39,13 +55,15 @@ const Timer: React.FC<TimerProps> = ({
 
         const interval = setInterval(() => {
             setSeconds((prev) => {
-                const next = typeof endsAt === 'number' && Number.isFinite(endsAt)
-                    ? Math.max(0, Math.min(initialSeconds, Math.ceil((endsAt - Date.now()) / 1000)))
+                const nextEndsAt = endsAtRef.current;
+                const nextInitial = initialSecondsRef.current;
+                const next = typeof nextEndsAt === 'number' && Number.isFinite(nextEndsAt)
+                    ? Math.max(0, Math.min(nextInitial, Math.ceil((nextEndsAt - Date.now()) / 1000)))
                     : Math.max(0, prev - 1);
 
                 if (next <= 0 && !completedRef.current) {
                     completedRef.current = true;
-                    onComplete?.();
+                    onCompleteRef.current?.();
                 }
 
                 return next;
@@ -53,7 +71,7 @@ const Timer: React.FC<TimerProps> = ({
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [endsAt, initialSeconds, isPaused, onComplete]);
+    }, [isPaused]);
 
     // Shake animation when critical
     useEffect(() => {
