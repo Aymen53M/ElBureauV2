@@ -9,7 +9,6 @@ import BetSelector from '@/components/BetSelector';
 import Timer from '@/components/Timer';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
-import Slider from '@/components/ui/Slider';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player, GameSettings } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -113,6 +112,7 @@ export default function Game() {
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
     const submitInFlightRef = React.useRef(false);
+    const personalFinalGenerationInFlightRef = React.useRef(false);
     const roomQuestionsCountRef = React.useRef<number>(0);
     const questionsGenerationInFlightRef = React.useRef(false);
     const questionsGenerationCooldownUntilRef = React.useRef<number>(0);
@@ -141,6 +141,7 @@ export default function Game() {
     const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('shared');
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
+    const [isGeneratingPersonalFinal, setIsGeneratingPersonalFinal] = useState(false);
     const [finalWagerDraft, setFinalWagerDraft] = useState(0);
 
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
@@ -240,7 +241,8 @@ export default function Game() {
         if (phase !== 'final-wager') return;
         if (!activePlayer?.id) return;
         const saved = finalChoices[activePlayer.id]?.wager;
-        const next = typeof saved === 'number' && Number.isFinite(saved) ? saved : 0;
+        const allowedWagers = [0, 10, 20];
+        const next = typeof saved === 'number' && Number.isFinite(saved) && allowedWagers.includes(saved) ? saved : 0;
         setFinalWagerDraft((prev) => (prev === next ? prev : next));
     }, [activePlayer?.id, finalChoices, phase]);
 
@@ -356,13 +358,15 @@ export default function Game() {
                 const nextPhase = roomState.room.phase as GamePhase;
                 const phaseChanged = phaseRef.current !== nextPhase;
                 const serverPhaseStartedAt = (roomState.room as any)?.phase_started_at;
+                const serverFinalMode = (roomState.room as any)?.final_mode;
+                const resolvedFinalMode = serverFinalMode === 'personalized' ? 'personalized' : 'shared';
                 const meta: any = {
                     phase: nextPhase,
                     currentQuestionIndex: roomState.room.current_question_index ?? 0,
                     phaseStartedAt: typeof serverPhaseStartedAt === 'string'
                         ? serverPhaseStartedAt
                         : (phaseChanged ? new Date().toISOString() : null),
-                    finalMode: 'shared' as const,
+                    finalMode: resolvedFinalMode,
                     questions: questionsRaw,
                 };
 
@@ -1011,9 +1015,11 @@ export default function Game() {
         const shouldPersist = typeof updates.wager !== 'undefined' || typeof updates.difficulty !== 'undefined';
         if (!shouldPersist) return;
 
-        const wagerToPersist = typeof next.wager === 'number' && Number.isFinite(next.wager)
-            ? next.wager
-            : Math.max(0, Math.min(activePlayer.score, Math.round(finalWagerDraft || 0)));
+        const allowedWagers = [0, 10, 20];
+        const resolvedWager = typeof next.wager === 'number' && Number.isFinite(next.wager) ? next.wager : finalWagerDraft;
+        const wagerToPersist = allowedWagers.includes(resolvedWager) ? resolvedWager : 0;
+
+        let startedPersonalGeneration = false;
         try {
             await upsertFinalChoice({
                 roomCode: gameState.roomCode,
@@ -1022,26 +1028,117 @@ export default function Game() {
                 difficulty: next.difficulty,
                 mode: finalMode,
             });
+
+            // For personalized finals, generate the player's question using their own key.
+            // We only generate on explicit wager submission to avoid re-generating on every difficulty tap.
+            if (finalMode === 'personalized' && typeof updates.wager !== 'undefined') {
+                const myKey = ((gameState.playerApiKeys?.[activePlayer.id] || apiKey) || '').trim();
+                if (!myKey) {
+                    Alert.alert(t('apiKey'), t('missingApiKeyPersonal'), [
+                        { text: t('cancel'), style: 'cancel' },
+                        { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                    ]);
+                    return;
+                }
+
+                if (personalFinalGenerationInFlightRef.current) return;
+                personalFinalGenerationInFlightRef.current = true;
+                startedPersonalGeneration = true;
+                setIsGeneratingPersonalFinal(true);
+
+                const finalSettings = {
+                    ...gameState.settings,
+                    numberOfQuestions: 1,
+                    difficulty: next.difficulty,
+                    questionType: 'open-ended' as const,
+                };
+                const result = await generateQuestions(finalSettings, myKey);
+
+                if (result.error || !result.questions?.length) {
+                    if (result.code === 'QUOTA_EXCEEDED') {
+                        Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
+                            { text: t('cancel'), style: 'cancel' },
+                            { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                        ]);
+                    } else if (result.code === 'INVALID_API_KEY') {
+                        Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
+                            { text: t('cancel'), style: 'cancel' },
+                            { text: t('goToSettings'), onPress: () => router.push('/settings') },
+                        ]);
+                    } else {
+                        Alert.alert(t('loading'), result.error || t('generationFailed'));
+                    }
+                    return;
+                }
+
+                await upsertFinalQuestion({
+                    roomCode: gameState.roomCode,
+                    playerId: activePlayer.id,
+                    question: result.questions[0],
+                });
+                setFinalQuestion(result.questions[0]);
+            }
         } catch (err) {
             Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to save final choice');
+        } finally {
+            if (startedPersonalGeneration) {
+                personalFinalGenerationInFlightRef.current = false;
+                setIsGeneratingPersonalFinal(false);
+            }
         }
     };
 
     const startFinalQuestion = async () => {
         if (!isHost || !gameState?.roomCode) return;
 
+        const [choicesFromDb] = await Promise.all([
+            fetchFinalChoices(gameState.roomCode),
+        ]);
+        const choiceMap: Record<string, { wager: number; difficulty: Difficulty; mode: string }> = {};
+        choicesFromDb.forEach((c) => {
+            choiceMap[c.player_id] = {
+                wager: c.wager,
+                difficulty: (c.difficulty as Difficulty) || 'medium',
+                mode: c.mode,
+            };
+        });
+
         const missingWagers = gameState.players.filter((p) => {
-            const choice = finalChoices[p.id];
-            return choice?.wager === null || typeof choice?.wager !== 'number';
+            const c = choiceMap[p.id];
+            return !c || typeof c.wager !== 'number' || !Number.isFinite(c.wager) || c.mode !== finalMode;
         });
         if (missingWagers.length > 0) {
             Alert.alert(t('finalWager'), t('waitingForWagers'));
             return;
         }
 
+        if (finalMode === 'personalized') {
+            const missingKeys = gameState.players.filter((p) => !p.hasApiKey);
+            if (missingKeys.length > 0) {
+                Alert.alert(
+                    t('finalWager'),
+                    `${t('playersMissingKeys')}\n${missingKeys.map((p) => p.name).join(', ')}`
+                );
+                return;
+            }
+
+            const finalQuestions = await Promise.all(
+                gameState.players.map((p) => fetchFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id }))
+            );
+            const missingQuestions = gameState.players.filter((p, idx) => !finalQuestions[idx]);
+            if (missingQuestions.length > 0) {
+                Alert.alert(t('finalWager'), t('waitingForWagers'));
+                return;
+            }
+
+            await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-question' });
+            setTimerKey((prev) => prev + 1);
+            return;
+        }
+
         const votedDifficulty = difficultyVote.selected;
 
-        const hostKey = gameState.hostApiKey || apiKey;
+        const hostKey = (gameState.hostApiKey || apiKey || '').trim();
         if (!hostKey) {
             Alert.alert(t('apiKey'), t('missingApiKeyHost'));
             return;
@@ -1197,44 +1294,79 @@ export default function Game() {
                                         {t('finalWagerDesc')}
                                     </Text>
 
-                                    {isHost ? (
-                                        <View className="items-center">
-                                            <Text className="text-muted-foreground">
-                                                {t('finalMode')}: {t('sharedFinal')}
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <View className="items-center">
-                                            <Text className="text-muted-foreground">
-                                                {t('finalMode')}: {t('sharedFinal')}
-                                            </Text>
-                                        </View>
-                                    )}
+                                    <View className="space-y-3">
+                                        <Text className="text-center text-muted-foreground">
+                                            {t('finalMode')}: {finalMode === 'personalized' ? t('personalFinal') : t('sharedFinal')}
+                                        </Text>
 
-                                    <View className="space-y-2">
+                                        {isHost && (
+                                            <View className="flex-row justify-center gap-2">
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        if (!gameState?.roomCode) return;
+                                                        updateRoomMeta({
+                                                            roomCode: gameState.roomCode,
+                                                            patch: { final_mode: 'shared' },
+                                                        })
+                                                            .then(() => setFinalMode('shared'))
+                                                            .catch((err) => Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to set mode'));
+                                                    }}
+                                                    className={`px-4 py-2 rounded-xl border ${finalMode === 'shared' ? 'border-primary bg-primary/20' : 'border-border bg-muted'}`}
+                                                >
+                                                    <Text className="font-display font-semibold text-foreground">{t('sharedFinal')}</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        if (!gameState?.roomCode) return;
+                                                        updateRoomMeta({
+                                                            roomCode: gameState.roomCode,
+                                                            patch: { final_mode: 'personalized' },
+                                                        })
+                                                            .then(() => setFinalMode('personalized'))
+                                                            .catch((err) => Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to set mode'));
+                                                    }}
+                                                    className={`px-4 py-2 rounded-xl border ${finalMode === 'personalized' ? 'border-primary bg-primary/20' : 'border-border bg-muted'}`}
+                                                >
+                                                    <Text className="font-display font-semibold text-foreground">{t('personalFinal')}</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View className="space-y-3">
                                         <Text className="text-center font-semibold text-foreground">
                                             {t('yourBet')}: {finalWagerDraft} {t('points')}
                                         </Text>
-                                        <Slider
-                                            value={finalWagerDraft}
-                                            onValueChange={(val: number) => setFinalWagerDraft(Math.max(0, Math.min(activePlayer.score, Math.round(val))))}
-                                            minimumValue={0}
-                                            maximumValue={Math.max(0, activePlayer.score)}
-                                            step={1}
-                                            minimumTrackTintColor="#C97B4C"
-                                            maximumTrackTintColor="#E2CFBC"
-                                            thumbTintColor="#C97B4C"
-                                        />
-                                        <View className="flex-row justify-between">
-                                            <Text className="text-xs text-muted-foreground">0</Text>
-                                            <Text className="text-xs text-muted-foreground">{activePlayer.score}</Text>
+                                        <View className="flex-row justify-center gap-2">
+                                            {[0, 10, 20].map((w) => (
+                                                <TouchableOpacity
+                                                    key={w}
+                                                    onPress={() => setFinalWagerDraft(w)}
+                                                    className={`px-5 py-3 rounded-2xl border ${finalWagerDraft === w ? 'border-accent bg-accent/20' : 'border-border bg-muted'}`}
+                                                >
+                                                    <Text className="font-display font-bold text-foreground">{w}</Text>
+                                                </TouchableOpacity>
+                                            ))}
                                         </View>
+
+                                        {finalMode === 'personalized' && !((apiKey || '').trim()) && (
+                                            <View className="items-center space-y-2">
+                                                <Text className="text-sm text-muted-foreground text-center">{t('missingApiKeyPersonal')}</Text>
+                                                <Button variant="outline" onPress={() => router.push('/settings')}>
+                                                    <Text className="font-display font-bold text-primary">{t('goToSettings')}</Text>
+                                                </Button>
+                                            </View>
+                                        )}
+
                                         <Button
                                             variant="outline"
                                             onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
+                                            disabled={finalMode === 'personalized' && !((apiKey || '').trim())}
                                             className="w-full"
                                         >
-                                            <Text className="font-display font-bold text-primary">{t('submit')}</Text>
+                                            <Text className="font-display font-bold text-primary">
+                                                {isGeneratingPersonalFinal ? t('loading') : t('submit')}
+                                            </Text>
                                         </Button>
                                     </View>
 
@@ -1251,12 +1383,11 @@ export default function Game() {
                                                 </TouchableOpacity>
                                             ))}
                                         </View>
-                                        <Text className="text-center text-xs text-muted-foreground">
-                                            {t('easy')}: {difficultyVote.counts.easy} · {t('medium')}: {difficultyVote.counts.medium} · {t('hard')}: {difficultyVote.counts.hard}
-                                        </Text>
-                                        <Text className="text-center text-sm text-muted-foreground">
-                                            {t('difficulty')}: {t(difficultyVote.selected)}
-                                        </Text>
+                                        {finalMode === 'shared' && (
+                                            <Text className="text-center text-xs text-muted-foreground">
+                                                {t('difficulty')}: {t(difficultyVote.selected)}
+                                            </Text>
+                                        )}
                                     </View>
 
                                     {isHost ? (
@@ -1381,7 +1512,7 @@ export default function Game() {
                                                     </Text>
                                                 </View>
                                             )}
-                                            {(viewerHasAnswered || isHost) && gameState.players.map((player) => {
+                                            {viewerHasAnswered && gameState.players.map((player) => {
                                                 const entry = answerBoard[player.id];
                                                 return (
                                                     <View key={player.id} className="flex-row justify-between items-center py-2 border-b border-border/40">
