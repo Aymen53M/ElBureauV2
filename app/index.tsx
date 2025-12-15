@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { Link } from '@/lib/router';
 import { Ionicons } from '@/components/ui/Ionicons';
@@ -25,12 +25,12 @@ export default function Index() {
                 Animated.timing(floatAnim, {
                     toValue: 1,
                     duration: 1600,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
                 Animated.timing(floatAnim, {
                     toValue: 0,
                     duration: 1600,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
             ])
         );
@@ -56,7 +56,7 @@ export default function Index() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="home" />
 
-            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} max-w-5xl w-full self-center z-10`}>
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} w-full z-10`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
                     <TouchableOpacity className="p-2 w-12 h-12 rounded-lg bg-white items-center justify-center border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
@@ -65,7 +65,7 @@ export default function Index() {
                 </Link>
             </View>
 
-            <View className={`flex-1 items-center justify-center px-6 max-w-5xl w-full self-center ${isCompact ? 'space-y-8' : 'space-y-14'}`}>
+            <View className={`flex-1 items-center justify-center px-6 w-full ${isCompact ? 'space-y-8' : 'space-y-14'}`}>
                 <View className={`items-center w-full ${isCompact ? 'space-y-8' : 'space-y-12'}`}>
                     <View className={isCompact ? 'mb-2' : 'mb-6'}>
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>

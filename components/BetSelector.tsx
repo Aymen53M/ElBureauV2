@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getShadowStyle } from '@/lib/styles';
 
 interface BetSelectorProps {
     totalQuestions: number;
@@ -122,10 +123,7 @@ const BetSelector: React.FC<BetSelectorProps> = ({
                                         : 'bg-muted border-2 border-border'
                                     }`}
                                 style={isSelected ? {
-                                    shadowColor: '#D4AF37', // Gold
-                                    shadowOffset: { width: 0, height: 0 },
-                                    shadowOpacity: 0.5,
-                                    shadowRadius: 15,
+                                    ...getShadowStyle('#D4AF37', { width: 0, height: 0 }, 0.5, 15),
                                     elevation: 8,
                                 } : undefined}
                             >

@@ -112,10 +112,10 @@ const Timer: React.FC<TimerProps> = ({
     useEffect(() => {
         if (seconds <= 5 && seconds > 0) {
             Animated.sequence([
-                Animated.timing(shakeAnim, { toValue: 5, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: -5, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: 5, duration: 50, useNativeDriver: true }),
-                Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: 5, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
+                Animated.timing(shakeAnim, { toValue: -5, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
+                Animated.timing(shakeAnim, { toValue: 5, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
+                Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
             ]).start();
         }
     }, [seconds, shakeAnim]);
@@ -181,10 +181,9 @@ const Timer: React.FC<TimerProps> = ({
 
             {/* Time display */}
             <View
-                pointerEvents="none"
                 style={[
                     styles.timeTextContainer,
-                    { width: config.container, height: config.container },
+                    { width: config.container, height: config.container, pointerEvents: 'none' },
                 ]}
             >
                 <Text

@@ -337,19 +337,11 @@ export default function CreateRoom() {
                                         </View>
                                     </View>
 
-                                    <Button
-                                        variant="hero"
-                                        onPress={handleCreate}
-                                        disabled={nextDisabled}
-                                        className="w-full py-4 shadow-none"
-                                    >
-                                        <View className="flex-row items-center gap-3 justify-center">
-                                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-white`}>
-                                                {t('createRoom')}
-                                            </Text>
-                                            <Text className={isCompact ? 'text-lg' : 'text-xl'}>🎉</Text>
-                                        </View>
-                                    </Button>
+                                    <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
+                                        <Text className="text-center text-muted-foreground font-display text-lg">
+                                            {t('readyToStart')}
+                                        </Text>
+                                    </View>
                                 </CardContent>
                             </Card>
                         )}

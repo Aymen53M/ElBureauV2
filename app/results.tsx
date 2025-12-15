@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, ActivityIndicator, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
 import { Ionicons } from '@/components/ui/Ionicons';
@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import ScreenBackground from '@/components/ui/ScreenBackground';
+import { getShadowStyle } from '@/lib/styles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
 
@@ -59,7 +60,7 @@ const ConfettiAnimation: React.FC<{ show: boolean }> = ({ show }) => {
                         toValue: 1,
                         duration: piece.duration,
                         delay: piece.delay,
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }).start(() => {
                         // Reset and repeat
                         if (show) animate();
@@ -212,7 +213,7 @@ export default function Results() {
             {/* Animated Confetti */}
             <ConfettiAnimation show={showConfetti} />
 
-            <View className={`flex-1 ${isCompact ? 'p-4' : 'p-6'} max-w-5xl w-full self-center`}>
+            <View className={`flex-1 ${isCompact ? 'p-4' : 'p-6'} w-full`}>
                 {/* Header */}
                 <View className={`items-center ${isCompact ? 'pt-2' : 'pt-6'} ${isCompact ? 'mb-3' : 'mb-8'}`}>
                     <Logo size={isCompact ? 'sm' : 'md'} animated={false} />
@@ -409,10 +410,7 @@ export default function Results() {
 
 const styles = StyleSheet.create({
     winnerCard: {
-        shadowColor: '#D4AF37',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
+        ...getShadowStyle('#D4AF37', { width: 0, height: 10 }, 0.25, 20),
         elevation: 10,
     },
     confetti: {

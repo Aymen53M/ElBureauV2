@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-nativ
 import { Card, CardContent } from '@/components/ui/Card';
 import { Question } from '@/contexts/GameContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getShadowStyle } from '@/lib/styles';
 
 interface QuestionCardProps {
     question: Question;
@@ -214,10 +215,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
 const styles = StyleSheet.create({
     cardShadow: {
-        shadowColor: '#2B1F17',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 0,
+        ...getShadowStyle('#2B1F17', { width: 4, height: 4 }, 1, 0),
         elevation: 8,
     },
 });

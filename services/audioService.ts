@@ -5,7 +5,7 @@ type SoundType = 'click' | 'success' | 'error' | 'timer' | 'game-start';
 const SOUND_URLS: Record<SoundType, string> = {
     // Using placeholder sounds or data URIs for now. 
     // In a real app these would be local assets or hosted files.
-    'click': 'https://github.com/maykbrito/libs/blob/master/audios/button-press.wav?raw=true', // Reliable GitHub raw link
+    'click': 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=', // Placeholder silent/short click (to stop error), will need real base64 or valid URL
     'success': 'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/bonus.wav', // Positive ping
     'error': 'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/player_shoot.wav', // Placeholder flat sound
     'timer': 'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/pause.wav', // Short blip (reused for ticking)

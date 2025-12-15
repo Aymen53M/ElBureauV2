@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from '@/components/ui/LinearGradient';
 import { twMerge } from 'tailwind-merge';
+import { getShadowStyle } from '@/lib/styles';
 import { audioService } from '@/services/audioService';
 import { useGame } from '@/contexts/GameContext';
 
@@ -101,10 +102,7 @@ const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
     sketchyShadow: {
-        shadowColor: '#2B1F17',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 0,
+        ...getShadowStyle('#2B1F17', { width: 4, height: 4 }, 1, 0),
         elevation: 0, // Elevation doesn't support hard shadows well on Android without tricks, but web is priority
         // For web, box-shadow is handled by tailwind/CSS usually, but RN styles need this.
         // We can inject a web-specific style or class if needed, but shadow* props map to box-shadow on web.

@@ -13,7 +13,7 @@ import HowToPlay from '../app/how-to-play';
 
 export default function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
                 <Route element={<RootLayout />}>
                     <Route path="/" element={<Index />} />

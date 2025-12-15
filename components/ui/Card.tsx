@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { twMerge } from 'tailwind-merge';
+import { getShadowStyle } from '@/lib/styles';
 
 interface CardProps {
     children: React.ReactNode;
@@ -67,10 +68,7 @@ export const CardFooter: React.FC<CardProps> = ({ children, className = '' }) =>
 
 const styles = StyleSheet.create({
     card: {
-        shadowColor: '#2B1F17',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 1, // Hard shadow
-        shadowRadius: 0,
+        ...getShadowStyle('#2B1F17', { width: 4, height: 4 }, 1, 0),
         elevation: 6,
     },
 });

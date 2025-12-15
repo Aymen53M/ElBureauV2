@@ -325,9 +325,11 @@ export default function RootLayout() {
                 <LanguageProvider>
                     <GameProvider>
                         <ResumeBootstrap />
-                        <GlobalImmersiveToggle />
-                        <View className="flex-1">
-                            <Outlet />
+                        <View className="flex-1 md:bg-neutral-900 md:items-center md:justify-center">
+                            <View className="flex-1 w-full h-full md:max-w-[480px] md:h-[95vh] md:max-h-[850px] md:my-auto md:rounded-[32px] md:overflow-hidden md:shadow-2xl bg-background border-0 md:border-8 md:border-gray-800 relative">
+                                <Outlet />
+                                <GlobalImmersiveToggle />
+                            </View>
                         </View>
                     </GameProvider>
                 </LanguageProvider>

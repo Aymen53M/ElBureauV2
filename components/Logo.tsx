@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Image, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image, Pressable, Alert, Platform } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 import { usePathname, useRouter } from '@/lib/router';
+import { getShadowStyle } from '@/lib/styles';
 
 import logoSource from '../assets/Flowting Logo.png';
 
@@ -25,13 +26,13 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
                         toValue: -10,
                         duration: 1500,
                         easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                     Animated.timing(animatedValue, {
                         toValue: 0,
                         duration: 1500,
                         easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                 ])
             ).start();
@@ -72,7 +73,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
             <View className="absolute inset-0" style={styles.glow}>
                 <Image
                     source={{ uri: logoSource }}
-                    style={[{ width: sizePx.w, height: sizePx.h, opacity: 0.55 }, styles.glowImage]}
+                    style={[{ width: sizePx.w, height: sizePx.h, opacity: 0.55 }, styles.glowImage] as any}
                     resizeMode="contain"
                 />
             </View>
@@ -97,10 +98,7 @@ const styles = StyleSheet.create({
         opacity: 0.4,
     },
     glowImage: {
-        shadowColor: '#C97B4C',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.45,
-        shadowRadius: 20,
+        ...getShadowStyle('#C97B4C', { width: 0, height: 0 }, 0.45, 20),
     },
     hiddenSparkle: {
         position: 'absolute',
