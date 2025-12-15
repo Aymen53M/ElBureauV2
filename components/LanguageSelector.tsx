@@ -22,9 +22,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ compact = false }) 
                     <TouchableOpacity
                         key={lang.code}
                         onPress={() => setLanguage(lang.code)}
-                        className={`px-3 py-2 rounded-lg ${language === lang.code
-                                ? 'bg-primary/20 border border-primary'
-                                : 'bg-muted'
+                        className={`px-3 py-2 rounded-lg border-2 ${language === lang.code
+                            ? 'bg-primary/10 border-primary'
+                            : 'bg-white border-foreground/10'
                             }`}
                     >
                         <Text className="text-base">{lang.flag}</Text>
@@ -40,9 +40,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ compact = false }) 
                 <TouchableOpacity
                     key={lang.code}
                     onPress={() => setLanguage(lang.code)}
-                    className={`flex-row items-center gap-2 px-4 py-3 rounded-xl ${language === lang.code
-                            ? 'bg-primary/20 border-2 border-primary'
-                            : 'bg-muted border-2 border-transparent'
+                    className={`flex-row items-center gap-2 px-4 py-3 rounded-lg ${language === lang.code
+                        ? 'bg-primary/10 border-2 border-primary shadow-[2px_2px_0px_#C17F59]'
+                        : 'bg-white border-2 border-foreground/10'
                         }`}
                 >
                     <Text className="text-xl">{lang.flag}</Text>

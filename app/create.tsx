@@ -43,7 +43,7 @@ export default function CreateRoom() {
     const getDifficultyColor = (d: Difficulty, isSelected: boolean) => {
         if (!isSelected) return 'bg-muted border-transparent';
         switch (d) {
-            case 'easy': return 'bg-neon-green/20 border-neon-green';
+            case 'easy': return 'bg-success/20 border-success';
             case 'medium': return 'bg-accent/20 border-accent';
             case 'hard': return 'bg-destructive/20 border-destructive';
             case 'mixed': return 'bg-secondary/20 border-secondary';
@@ -94,6 +94,8 @@ export default function CreateRoom() {
             questionType,
             language,
             hintsEnabled: true,
+            soundEnabled: true,
+            animationsEnabled: true,
         };
 
         let roomCode = '';
@@ -181,7 +183,7 @@ export default function CreateRoom() {
                             {Array.from({ length: maxStep + 1 }, (_, i) => (
                                 <View
                                     key={i}
-                                    className={`${i === step ? 'bg-primary' : 'bg-muted'} ${isCompact ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full`}
+                                    className={`${i === step ? 'bg-primary' : 'bg-muted'} ${isCompact ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full border border-foreground/50`}
                                 />
                             ))}
                         </View>
@@ -189,19 +191,19 @@ export default function CreateRoom() {
 
                     {/* API Key Warning */}
                     {!canCreate && (
-                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                        <Card className="border-destructive bg-destructive/10 rounded-lg border-2">
                             <CardContent className={`${isCompact ? 'p-4' : 'p-5'} flex-row items-center gap-3`}>
                                 <Text className={isCompact ? 'text-xl' : 'text-2xl'}>⚠️</Text>
                                 <View className="flex-1">
-                                    <Text className="font-semibold text-foreground">{t('setupRequiredLabel')}</Text>
+                                    <Text className="font-semibold text-foreground font-sans">{t('setupRequiredLabel')}</Text>
                                     {!isCompact && (
-                                        <Text className="text-sm text-muted-foreground">
+                                        <Text className="text-sm text-foreground/80 font-sans">
                                             {t('setupRequiredMessage')}
                                         </Text>
                                     )}
                                 </View>
-                                <Button size="sm" variant="outline" onPress={() => router.push('/settings')}>
-                                    <Text className="text-primary font-display">{t('settingsButton')}</Text>
+                                <Button size="sm" variant="outline" onPress={() => router.push('/settings')} className="border-2 border-destructive text-destructive">
+                                    <Text className="text-destructive font-display">{t('settingsButton')}</Text>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -210,7 +212,7 @@ export default function CreateRoom() {
                     {/* Step content */}
                     <View className="flex-1 justify-center">
                         {step === 0 && (
-                            <Card className="rounded-3xl">
+                            <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
                                 <CardContent className={isCompact ? 'p-5 space-y-3' : 'p-7 space-y-4'}>
                                     <ThemeSelector
                                         selectedTheme={theme}
@@ -225,7 +227,7 @@ export default function CreateRoom() {
 
                         {step === 1 && (
                             <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
-                                <Card className="rounded-3xl">
+                                <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
                                     <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
                                         <View className="flex-row items-center gap-2">
                                             <Ionicons name="flash" size={20} color="#D4A72C" />
@@ -238,7 +240,7 @@ export default function CreateRoom() {
                                                 <TouchableOpacity
                                                     key={d}
                                                     onPress={() => setDifficulty(d)}
-                                                    className={`flex-1 ${isCompact ? 'py-2' : 'py-3'} rounded-xl items-center border-2 ${getDifficultyColor(d, difficulty === d)}`}
+                                                    className={`flex-1 ${isCompact ? 'py-2' : 'py-3'} rounded-lg items-center border-2 ${getDifficultyColor(d, difficulty === d)}`}
                                                 >
                                                     <Text className={`font-display font-semibold ${difficulty === d ? 'text-foreground' : 'text-muted-foreground'
                                                         }`}>
@@ -250,7 +252,7 @@ export default function CreateRoom() {
                                     </CardContent>
                                 </Card>
 
-                                <Card>
+                                <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
                                     <CardHeader className={isCompact ? 'pb-2' : 'pb-3'}>
                                         <CardTitle className="text-lg">{t('questionType')}</CardTitle>
                                     </CardHeader>
@@ -260,13 +262,13 @@ export default function CreateRoom() {
                                                 <TouchableOpacity
                                                     key={type}
                                                     onPress={() => setQuestionType(type)}
-                                                    className={`flex-1 ${isCompact ? 'py-3' : 'py-4'} rounded-xl items-center border-2 ${questionType === type
-                                                        ? 'bg-primary/20 border-primary'
-                                                        : 'bg-muted border-transparent'
+                                                    className={`flex-1 ${isCompact ? 'py-3' : 'py-4'} rounded-lg items-center border-2 ${questionType === type
+                                                        ? 'bg-primary/20 border-foreground'
+                                                        : 'bg-transparent border-foreground/20'
                                                         }`}
                                                 >
                                                     <Text className={isCompact ? 'text-lg mb-0.5' : 'text-xl mb-1'}>{icon}</Text>
-                                                    <Text className={`text-xs font-display ${questionType === type ? 'text-primary' : 'text-muted-foreground'
+                                                    <Text className={`text-xs font-display ${questionType === type ? 'text-foreground' : 'text-muted-foreground'
                                                         }`}>
                                                         {t(type === 'multiple-choice' ? 'multipleChoice' : type === 'open-ended' ? 'openEnded' : 'trueFalse')}
                                                     </Text>
@@ -279,7 +281,7 @@ export default function CreateRoom() {
                         )}
 
                         {step === 2 && (
-                            <Card className="rounded-3xl">
+                            <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
                                 <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
                                     <View className="flex-row items-center gap-2">
                                         <Ionicons name="help-circle" size={20} color="#6B3F23" />
@@ -295,25 +297,25 @@ export default function CreateRoom() {
                                         minimumValue={5}
                                         maximumValue={20}
                                         step={1}
-                                        minimumTrackTintColor="#C97B4C"
+                                        minimumTrackTintColor="#2B1F17"
                                         maximumTrackTintColor="#E2CFBC"
-                                        thumbTintColor="#C97B4C"
+                                        thumbTintColor="#2B1F17"
                                     />
                                     <View className="flex-row justify-between mt-1">
-                                        <Text className="text-xs text-muted-foreground">5</Text>
-                                        <Text className="text-xs text-muted-foreground">20</Text>
+                                        <Text className="text-xs text-muted-foreground font-sans">5</Text>
+                                        <Text className="text-xs text-muted-foreground font-sans">20</Text>
                                     </View>
                                 </CardContent>
                             </Card>
                         )}
 
                         {step === 3 && (
-                            <Card className="rounded-3xl">
+                            <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
                                 <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
                                     <View className="flex-row items-center gap-2">
                                         <Ionicons name="timer" size={20} color="#C97B4C" />
                                         <CardTitle className="text-lg">
-                                            {t('timeLeft')}: <Text className="text-secondary">{timePerQuestion}s</Text>
+                                            {t('timeLeft')}: <Text className="text-secondary-foreground">{timePerQuestion}s</Text>
                                         </CardTitle>
                                     </View>
                                 </CardHeader>
@@ -325,13 +327,13 @@ export default function CreateRoom() {
                                             minimumValue={10}
                                             maximumValue={60}
                                             step={5}
-                                            minimumTrackTintColor="#C97B4C"
+                                            minimumTrackTintColor="#2B1F17"
                                             maximumTrackTintColor="#E2CFBC"
-                                            thumbTintColor="#C97B4C"
+                                            thumbTintColor="#2B1F17"
                                         />
                                         <View className="flex-row justify-between mt-1">
-                                            <Text className="text-xs text-muted-foreground">10s</Text>
-                                            <Text className="text-xs text-muted-foreground">60s</Text>
+                                            <Text className="text-xs text-muted-foreground font-sans">10s</Text>
+                                            <Text className="text-xs text-muted-foreground font-sans">60s</Text>
                                         </View>
                                     </View>
 
@@ -339,10 +341,10 @@ export default function CreateRoom() {
                                         variant="hero"
                                         onPress={handleCreate}
                                         disabled={nextDisabled}
-                                        className="w-full py-4 shadow-lg shadow-primary/30"
+                                        className="w-full py-4 shadow-none"
                                     >
                                         <View className="flex-row items-center gap-3 justify-center">
-                                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
+                                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-white`}>
                                                 {t('createRoom')}
                                             </Text>
                                             <Text className={isCompact ? 'text-lg' : 'text-xl'}>🎉</Text>
@@ -358,17 +360,17 @@ export default function CreateRoom() {
                         <Button
                             variant="outline"
                             onPress={handleBack}
-                            className="flex-1"
+                            className="flex-1 border-2 border-foreground bg-white"
                         >
-                            <Text className="font-display font-bold text-primary">{t('back')}</Text>
+                            <Text className="font-display font-bold text-foreground">{t('back')}</Text>
                         </Button>
                         <Button
                             variant="hero"
                             onPress={step === maxStep ? handleCreate : handleNext}
                             disabled={nextDisabled}
-                            className="flex-1"
+                            className="flex-1 border-2 border-foreground"
                         >
-                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
+                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-white`}>
                                 {nextLabel}
                             </Text>
                         </Button>

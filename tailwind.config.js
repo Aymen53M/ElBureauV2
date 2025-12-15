@@ -12,53 +12,54 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                display: ['Fredoka'],
-                sans: ['Rubik'],
+                display: ['Patrick Hand', 'cursive'],
+                sans: ['Patrick Hand', 'cursive'],
             },
             colors: {
-                background: '#F7F1E6',
-                foreground: '#2B1F17',
+                background: '#FDFBF7', // Paper White
+                foreground: '#2B1F17', // Ink Black/Brown
                 card: {
-                    DEFAULT: '#FFF8EF',
+                    DEFAULT: '#FFFFFF',
+                    foreground: '#2B1F17',
+                },
+                popover: {
+                    DEFAULT: '#FFFFFF',
                     foreground: '#2B1F17',
                 },
                 primary: {
-                    DEFAULT: '#6B3F23',
-                    foreground: '#FFF8EF',
+                    DEFAULT: '#2B1F17', // Ink
+                    foreground: '#FFFFFF',
                 },
                 secondary: {
-                    DEFAULT: '#C83A32',
-                    foreground: '#FFF8EF',
-                },
-                accent: {
-                    DEFAULT: '#D4A72C',
+                    DEFAULT: '#E3C8A8', // Parchment
                     foreground: '#2B1F17',
                 },
-                destructive: {
-                    DEFAULT: '#B3261E',
-                    foreground: '#FFF8EF',
+                accent: {
+                    DEFAULT: '#FF6B6B', // Red Pen
+                    foreground: '#FFFFFF',
                 },
                 muted: {
-                    DEFAULT: '#EFE1D1',
-                    foreground: '#7B6657',
+                    DEFAULT: '#F3EFE7',
+                    foreground: '#8C7B70',
                 },
-                border: '#E2CFBC',
-                input: '#FFF4E6',
-                ring: '#C97B4C',
-                neon: {
-                    cyan: '#2D9C93',
-                    pink: '#D1497B',
-                    yellow: '#D4A72C',
-                    green: '#3C8C6E',
-                    orange: '#D9822B',
+                destructive: {
+                    DEFAULT: '#D32F2F',
+                    foreground: '#FFFFFF',
                 },
+                success: {
+                    DEFAULT: '#4CAF50', // Green Marker
+                    foreground: '#FFFFFF',
+                },
+                border: '#2B1F17', // Ink
+                input: 'transparent',
+                ring: '#2B1F17',
             },
             borderRadius: {
-                lg: 16,
-                md: 12,
-                sm: 8,
-                xl: 20,
-                '2xl': 24,
+                lg: '255px 15px 225px 15px / 15px 225px 15px 255px',
+                md: '255px 15px 225px 15px / 15px 225px 15px 255px',
+                sm: '255px 15px 225px 15px / 15px 225px 15px 255px',
+                xl: '255px 15px 225px 15px / 15px 225px 15px 255px',
+                '2xl': '255px 15px 225px 15px / 15px 225px 15px 255px',
             },
         },
     },

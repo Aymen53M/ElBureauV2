@@ -23,6 +23,14 @@ import {
     IoSettingsOutline,
     IoTimer,
     IoTrophy,
+    IoWarning,
+    IoCheckmark,
+    IoClose,
+    IoCheckmarkCircle,
+    IoCloseCircle,
+    IoAlertCircle,
+    IoArrowForward,
+    IoFlashOff,
 } from 'react-icons/io5';
 
 const ICONS: Record<string, IconType> = {
@@ -48,6 +56,14 @@ const ICONS: Record<string, IconType> = {
     'settings-outline': IoSettingsOutline,
     timer: IoTimer,
     trophy: IoTrophy,
+    warning: IoWarning,
+    checkmark: IoCheckmark,
+    close: IoClose,
+    'checkmark-circle': IoCheckmarkCircle,
+    'close-circle': IoCloseCircle,
+    'alert-circle': IoAlertCircle,
+    'arrow-forward': IoArrowForward,
+    'flash-off': IoFlashOff,
 };
 
 type IoniconsProps = {

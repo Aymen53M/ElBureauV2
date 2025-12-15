@@ -17,7 +17,7 @@ import { updatePlayerState } from '@/services/roomService';
 export default function Settings() {
     const router = useRouter();
     const { t, isRTL, language } = useLanguage();
-    const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer } = useGame();
+    const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer, soundEnabled, setSoundEnabled, animationsEnabled, setAnimationsEnabled } = useGame();
 
     const initialLanguageRef = React.useRef(language);
 
@@ -79,7 +79,7 @@ export default function Settings() {
             >
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
-                    <TouchableOpacity onPress={() => router.back()} className="p-2">
+                    <TouchableOpacity onPress={() => router.back()} className="p-2 bg-white rounded-lg border-2 border-foreground">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
@@ -150,7 +150,7 @@ export default function Settings() {
                     </Card>
 
                     {/* Hosting rule */}
-                    <Card className="border-accent/40 bg-accent/10">
+                    <Card className="border-2 border-accent bg-accent/10">
                         <CardContent className="p-4 space-y-2">
                             <View className="flex-row items-center gap-2">
                                 <Text className="text-xl">🎙️</Text>
@@ -159,6 +159,43 @@ export default function Settings() {
                             <Text className="text-sm text-foreground">
                                 {t('hostingRuleDesc')}
                             </Text>
+                        </CardContent>
+                    </Card>
+
+                    {/* Audio & Visuals */}
+                    <Card>
+                        <CardHeader>
+                            <View className="flex-row items-center gap-2">
+                                <Ionicons name="options-outline" size={20} color="#4A7A68" />
+                                <CardTitle>{t('settings')}</CardTitle>
+                            </View>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <View className="flex-row items-center justify-between">
+                                <View className="flex-row items-center gap-2">
+                                    <Text className="text-xl">🔊</Text>
+                                    <Text className="font-display font-semibold text-foreground">{t('soundEffects')}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => setSoundEnabled(!soundEnabled)}
+                                    className={`w-12 h-7 rounded-full items-center flex-row px-1 border-2 border-foreground ${soundEnabled ? 'bg-success justify-end' : 'bg-muted justify-start'}`}
+                                >
+                                    <View className="w-4 h-4 rounded-full bg-white border border-foreground" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View className="flex-row items-center justify-between">
+                                <View className="flex-row items-center gap-2">
+                                    <Text className="text-xl">✨</Text>
+                                    <Text className="font-display font-semibold text-foreground">{t('animations')}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => setAnimationsEnabled(!animationsEnabled)}
+                                    className={`w-12 h-7 rounded-full items-center flex-row px-1 border-2 border-foreground ${animationsEnabled ? 'bg-success justify-end' : 'bg-muted justify-start'}`}
+                                >
+                                    <View className="w-4 h-4 rounded-full bg-white border border-foreground" />
+                                </TouchableOpacity>
+                            </View>
                         </CardContent>
                     </Card>
 

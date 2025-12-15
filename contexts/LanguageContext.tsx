@@ -32,6 +32,8 @@ export const translations: Translations = {
     poweredBy: { en: 'Powered by AI ✨ Play with friends anywhere!', fr: 'Propulsé par l\'IA ✨ Jouez entre amis partout!', ar: 'مدعوم بالذكاء الاصطناعي ✨ العب مع أصدقائك في أي مكان!' },
 
     // Settings
+    soundEffects: { en: 'Sound Effects', fr: 'Effets Sonores', ar: 'المؤثرات الصوتية' },
+    animations: { en: 'Animations', fr: 'Animations', ar: 'الرسوم المتحركة' },
     apiKey: { en: 'Gemini API Key', fr: 'Clé API Gemini', ar: 'مفتاح API جيميني' },
     apiKeyPlaceholder: { en: 'Enter your Gemini API key...', fr: 'Entrez votre clé API Gemini...', ar: 'أدخل مفتاح API جيميني...' },
     apiKeyDesc: { en: 'Required to host games. Get your key from Google AI Studio.', fr: 'Requis pour héberger des jeux. Obtenez votre clé depuis Google AI Studio.', ar: 'مطلوب لاستضافة الألعاب. احصل على مفتاحك من Google AI Studio.' },
@@ -108,6 +110,7 @@ export const translations: Translations = {
     generationFailed: { en: 'Could not generate a final question. Returning to results.', fr: 'Impossible de générer la question finale. Retour aux résultats.', ar: 'تعذر إنشاء السؤال النهائي. سيتم العودة للنتائج.' },
     chooseDifficulty: { en: 'Choose your difficulty', fr: 'Choisissez la difficulté', ar: 'اختر مستوى الصعوبة' },
     startFinal: { en: 'Start final question', fr: 'Lancer la question finale', ar: 'ابدأ السؤال النهائي' },
+    optional: { en: 'Optional', fr: 'Optionnel', ar: 'اختياري' },
     finalQuestion: { en: 'Final Question', fr: 'Question Finale', ar: 'السؤال النهائي' },
     loading: { en: 'Loading...', fr: 'Chargement...', ar: 'جار التحميل...' },
 

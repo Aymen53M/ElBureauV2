@@ -4,7 +4,7 @@ import { twMerge } from 'tailwind-merge';
 
 interface PlayerAvatarProps {
     name: string;
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'xl';
     isHost?: boolean;
     isReady?: boolean;
     showName?: boolean;
@@ -12,8 +12,14 @@ interface PlayerAvatarProps {
 }
 
 const avatarColors = [
-    '#6B3F23', '#C97B4C', '#C83A32', '#2D9C93',
-    '#D4A72C', '#3C8C6E', '#D1497B', '#D9822B'
+    '#C17F59', // Terracotta
+    '#D4AF37', // Gold
+    '#8C7B70', // Warm Grey
+    '#4A7A68', // Sage
+    '#E3C8A8', // Sand
+    '#A0522D', // Sienna
+    '#4A3B32', // Deep Brown
+    '#B3261E'  // Deep Red
 ];
 
 const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
@@ -37,6 +43,7 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
             case 'sm': return { container: 'w-10 h-10', text: 'text-sm', badge: 'text-xs' };
             case 'md': return { container: 'w-14 h-14', text: 'text-lg', badge: 'text-sm' };
             case 'lg': return { container: 'w-20 h-20', text: 'text-2xl', badge: 'text-base' };
+            case 'xl': return { container: 'w-28 h-28', text: 'text-4xl', badge: 'text-xl' };
         }
     };
 
@@ -45,30 +52,28 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
     return (
         <View className={twMerge("items-center", className)}>
             <View className="relative">
-                {/* Avatar circle */}
                 <View
-                    className={`rounded-full items-center justify-center ${sizes.container}`}
+                    className={`rounded-full items-center justify-center ${sizes.container} border-2 ${isReady ? 'border-success' : 'border-foreground'} ${isReady ? 'bg-success/20' : ''}`}
                     style={[
                         { backgroundColor },
-                        isReady && styles.readyShadow,
                     ]}
                 >
-                    <Text className={`font-display font-bold text-background ${sizes.text}`}>
+                    <Text className={`font-display font-bold text-white ${sizes.text}`}>
                         {getInitials()}
                     </Text>
                 </View>
 
                 {/* Host badge */}
                 {isHost && (
-                    <View className="absolute -top-1 -right-1 bg-accent rounded-full w-6 h-6 items-center justify-center">
+                    <View className="absolute -top-1 -right-1 bg-accent rounded-full w-6 h-6 items-center justify-center border border-white">
                         <Text className="text-xs">👑</Text>
                     </View>
                 )}
 
                 {/* Ready indicator */}
                 {isReady && (
-                    <View className="absolute -bottom-1 -right-1 bg-neon-green rounded-full w-5 h-5 items-center justify-center border-2 border-background">
-                        <Text className="text-xs">✓</Text>
+                    <View className="absolute -bottom-1 -right-1 bg-success rounded-full w-5 h-5 items-center justify-center border-2 border-background">
+                        <Text className="text-xs text-white">✓</Text>
                     </View>
                 )}
             </View>
@@ -83,14 +88,7 @@ const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
     );
 };
 
-const styles = StyleSheet.create({
-    readyShadow: {
-        shadowColor: '#3C8C6E',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-});
+// styles removed
+const styles = StyleSheet.create({});
 
 export default PlayerAvatar;

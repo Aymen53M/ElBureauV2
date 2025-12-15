@@ -217,6 +217,8 @@ function ResumeBootstrap() {
                             questionType: 'multiple-choice',
                             language: 'en',
                             hintsEnabled: true,
+                            soundEnabled: true,
+                            animationsEnabled: true,
                         },
                         hostId: '',
                         hostApiKey: undefined,

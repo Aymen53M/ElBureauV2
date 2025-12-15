@@ -1,3 +1,5 @@
+
+
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
@@ -228,13 +230,13 @@ export default function Lobby() {
             <View className={`${isCompact ? 'p-4' : 'p-7'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}>
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'mb-4 pt-2' : 'mb-8 pt-8'}`}>
-                    <TouchableOpacity onPress={exitLobby} className="p-2">
+                    <TouchableOpacity onPress={exitLobby} className="p-2 bg-white rounded-lg border-2 border-foreground">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
                     <View className="flex-1" />
                     {isHost && (
-                        <TouchableOpacity onPress={() => router.push('/create')} className="p-2">
+                        <TouchableOpacity onPress={() => router.push('/create')} className="p-2 bg-white rounded-lg border-2 border-foreground">
                             <Ionicons name="settings-outline" size={20} color="#2B1F17" />
                         </TouchableOpacity>
                     )}
@@ -242,10 +244,10 @@ export default function Lobby() {
 
                 <View className={`max-w-2xl mx-auto w-full flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}>
                     {!isSupabaseConfigured && (
-                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                        <Card className="border-destructive bg-destructive/10 rounded-lg border-2">
                             <CardContent className="p-5 space-y-2">
                                 <Text className="font-display font-bold text-foreground">Realtime not configured</Text>
-                                <Text className="text-sm text-muted-foreground">
+                                <Text className="text-sm text-foreground/70 font-sans">
                                     This deployment is missing Supabase environment variables. Set VITE_SUPABASE_URL and
                                     VITE_SUPABASE_ANON_KEY in Vercel,
                                     then redeploy.
@@ -255,10 +257,10 @@ export default function Lobby() {
                     )}
 
                     {isSupabaseConfigured && realtimeStatus === 'error' && (
-                        <Card className="border-destructive/50 bg-destructive/10 rounded-3xl">
+                        <Card className="border-destructive bg-destructive/10 rounded-lg border-2">
                             <CardContent className="p-5 space-y-2">
                                 <Text className="font-display font-bold text-foreground">Realtime connection error</Text>
-                                <Text className="text-sm text-muted-foreground">
+                                <Text className="text-sm text-foreground/70 font-sans">
                                     {realtimeError || 'Unknown error'}
                                 </Text>
                             </CardContent>
@@ -266,56 +268,51 @@ export default function Lobby() {
                     )}
 
                     {/* Room Code */}
-                    <Card className="border-primary/30 rounded-3xl" style={{
-                        shadowColor: '#C97B4C',
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 20,
-                        elevation: 10,
-                    }}>
+                    <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
                         <CardContent className={`${isCompact ? 'p-5' : 'p-7'} items-center space-y-2`}>
-                            <Text className="text-sm text-muted-foreground mb-2">{t('roomCode')}</Text>
-                            <View className="flex-row items-center gap-4">
-                                <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold tracking-widest text-primary`} style={{
-                                    textShadowColor: '#C97B4C',
-                                    textShadowOffset: { width: 0, height: 0 },
-                                    textShadowRadius: 15,
-                                }}>
+                            <Text className="text-sm text-muted-foreground mb-2 font-bold uppercase tracking-wider font-sans">{t('roomCode')}</Text>
+                            <View className="flex-row items-center gap-4 bg-muted/20 p-3 px-6 rounded-lg border-2 border-dashed border-foreground/30">
+                                <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold tracking-widest text-primary`}>
                                     {gameState.roomCode}
                                 </Text>
-                                <TouchableOpacity onPress={copyRoomCode} className="p-2">
-                                    <Ionicons name="copy-outline" size={20} color="#2B1F17" />
+                                <View className="h-8 w-[2px] bg-foreground/20" />
+                                <TouchableOpacity onPress={copyRoomCode} className="p-2 bg-primary/10 rounded-lg active:bg-primary/20">
+                                    <Ionicons name="copy-outline" size={24} color="#C17F59" />
                                 </TouchableOpacity>
                             </View>
-                            <Text className={`${isCompact ? 'text-xs mt-2' : 'text-sm mt-4'} text-muted-foreground text-center`}>
+                            <Text className={`${isCompact ? 'text-xs mt-2' : 'text-sm mt-4'} text-muted-foreground text-center font-sans`}>
                                 {t('shareCodeMessage')}
                             </Text>
                         </CardContent>
                     </Card>
 
                     {/* Game Settings Preview */}
-                    <Card className="rounded-3xl">
-                        <CardContent className="p-6">
-                            <View className="flex-row flex-wrap gap-3 justify-center">
-                                <View className="px-3 py-1.5 rounded-full bg-muted">
-                                    <Text className="text-sm font-medium text-foreground">
-                                        🎯 {t(gameState.settings.theme)}
+                    <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
+                        <CardContent className="p-4">
+                            <View className="flex-row flex-wrap gap-2 justify-center">
+                                <View className="px-3 py-1.5 rounded-lg bg-secondary/10 border-2 border-secondary/30 flex-row items-center gap-1.5">
+                                    <Text className="text-sm">🎯</Text>
+                                    <Text className="text-sm font-bold text-foreground font-sans">
+                                        {t(gameState.settings.theme)}
                                         {gameState.settings.customTheme && `: ${gameState.settings.customTheme}`}
                                     </Text>
                                 </View>
-                                <View className="px-3 py-1.5 rounded-full bg-muted">
-                                    <Text className="text-sm font-medium text-foreground">
-                                        ⚡ {t(gameState.settings.difficulty)}
+                                <View className="px-3 py-1.5 rounded-lg bg-accent/10 border-2 border-accent/30 flex-row items-center gap-1.5">
+                                    <Text className="text-sm">⚡</Text>
+                                    <Text className="text-sm font-bold text-foreground font-sans">
+                                        {t(gameState.settings.difficulty)}
                                     </Text>
                                 </View>
-                                <View className="px-3 py-1.5 rounded-full bg-muted">
-                                    <Text className="text-sm font-medium text-foreground">
-                                        ❓ {gameState.settings.numberOfQuestions} {t('question')}s
+                                <View className="px-3 py-1.5 rounded-lg bg-primary/10 border-2 border-primary/30 flex-row items-center gap-1.5">
+                                    <Text className="text-sm">❓</Text>
+                                    <Text className="text-sm font-bold text-foreground font-sans">
+                                        {gameState.settings.numberOfQuestions} {t('question')}s
                                     </Text>
                                 </View>
-                                <View className="px-3 py-1.5 rounded-full bg-muted">
-                                    <Text className="text-sm font-medium text-foreground">
-                                        ⏱️ {gameState.settings.timePerQuestion}s
+                                <View className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border-2 border-emerald-500/30 flex-row items-center gap-1.5">
+                                    <Text className="text-sm">⏱️</Text>
+                                    <Text className="text-sm font-bold text-foreground font-sans">
+                                        {gameState.settings.timePerQuestion}s
                                     </Text>
                                 </View>
                             </View>
@@ -324,9 +321,14 @@ export default function Lobby() {
 
                     {/* Players */}
                     <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
-                        <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-center mb-4 text-foreground`}>
-                            {t('players')} ({gameState.players.length})
-                        </Text>
+                        <View className="flex-row items-center justify-center gap-2 mb-2">
+                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-center text-foreground`}>
+                                {t('players')}
+                            </Text>
+                            <View className="bg-primary/20 px-2 py-0.5 rounded-full border border-primary/30">
+                                <Text className="text-primary font-bold text-xs font-sans">{gameState.players.length}</Text>
+                            </View>
+                        </View>
 
                         <View className={`flex-row flex-wrap justify-center ${isCompact ? 'gap-4 pt-1' : 'gap-7 pt-2'}`}>
                             {gameState.players.map((player) => (
@@ -341,30 +343,34 @@ export default function Lobby() {
 
                             {/* Waiting for more players */}
                             {gameState.players.length < 8 && (
-                                <View className={`${isCompact ? 'w-14 h-14' : 'w-20 h-20'} rounded-full border-2 border-dashed border-border items-center justify-center opacity-50`}>
-                                    <Text className={`${isCompact ? 'text-2xl' : 'text-3xl'} text-muted-foreground`}>+</Text>
+                                <View className={`${isCompact ? 'w-14 h-14' : 'w-20 h-20'} rounded-full border-2 border-dashed border-foreground/30 bg-white items-center justify-center transform rotate-3`}>
+                                    <Text className={`${isCompact ? 'text-2xl' : 'text-3xl'} text-foreground/40 pl-0.5 pt-0.5 font-display`}>+</Text>
                                 </View>
                             )}
                         </View>
                     </View>
 
                     {/* Waiting Status */}
-                    <Text className="text-center text-muted-foreground">
-                        {t('waiting')}
-                    </Text>
+                    <View className="items-center py-2">
+                        <Text className="text-center text-muted-foreground font-medium font-sans">
+                            {t('waiting')}
+                        </Text>
+                    </View>
 
                     {/* Actions */}
-                    <View className="space-y-3">
+                    <View className="space-y-3 pb-4">
                         {!isHost && currentPlayer?.id && (
                             <Button
                                 variant={gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'default' : 'outline'}
                                 size="lg"
                                 onPress={toggleReady}
-                                className="w-full"
+                                className={`w-full ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady
+                                    ? 'bg-success hover:bg-success/90 border-2 border-foreground shadow-none'
+                                    : 'bg-white border-2 border-foreground text-foreground'}`}
                             >
-                                <Text className={`font-display font-bold ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'text-primary-foreground' : 'text-primary'
+                                <Text className={`font-display font-bold text-lg ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'text-white' : 'text-foreground'
                                     }`}>
-                                    {gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? t('ready') + ' ✅' : t('notReady')}
+                                    {gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? t('ready') + '!' : t('notReady')}
                                 </Text>
                             </Button>
                         )}
@@ -374,7 +380,7 @@ export default function Lobby() {
                                 variant="hero"
                                 onPress={startGame}
                                 disabled={!allReady || gameState.players.length < 1}
-                                className="w-full"
+                                className="w-full shadow-none transform -rotate-1"
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="play" size={24} color="#FFF8EF" />

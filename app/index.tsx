@@ -56,10 +56,10 @@ export default function Index() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="home" />
 
-            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} max-w-5xl w-full self-center`}>
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} max-w-5xl w-full self-center z-10`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
-                    <TouchableOpacity className="p-2">
+                    <TouchableOpacity className="p-2 w-12 h-12 rounded-lg bg-white items-center justify-center border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
                         <Ionicons name="settings-outline" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                 </Link>
@@ -81,15 +81,20 @@ export default function Index() {
                             )}
                         </Animated.View>
                     </View>
-                    <Text className={`${isCompact ? 'text-base' : 'text-xl'} text-muted-foreground font-display text-center`}>
-                        {t('tagline')}
-                    </Text>
+
+                    {/* Glass Panel for Tagline */}
+                    <View className="px-6 py-3 rounded-lg bg-white border-2 border-foreground shadow-sm transform rotate-1">
+                        <Text className={`${isCompact ? 'text-base' : 'text-xl'} text-foreground font-display text-center font-medium`}>
+                            {t('tagline')}
+                        </Text>
+                    </View>
+
                     <View className={`w-full ${isCompact ? 'space-y-3 pt-2' : 'space-y-6 pt-8'}`}>
                         <Link href="/create" asChild>
-                            <Button variant="hero" className={`w-full rounded-full ${isCompact ? 'py-4' : 'py-5'}`}>
+                            <Button variant="hero" className={`w-full ${isCompact ? 'py-4' : 'py-5'} transform -rotate-1`}>
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="add-circle-outline" size={isCompact ? 20 : 24} color="#FFF8EF" />
-                                    <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
+                                    <Ionicons name="add-circle-outline" size={isCompact ? 22 : 26} color="#FFFFFF" />
+                                    <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-display font-bold text-white`}>
                                         {t('createRoom')}
                                     </Text>
                                 </View>
@@ -97,10 +102,10 @@ export default function Index() {
                         </Link>
 
                         <Link href="/join" asChild>
-                            <Button variant="secondary" size="lg" className="w-full">
+                            <Button variant="secondary" size="lg" className="w-full bg-secondary text-secondary-foreground border-2 border-foreground transform rotate-1">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="people-outline" size={isCompact ? 18 : 20} color="#FFF8EF" />
-                                    <Text className="font-display font-semibold text-secondary-foreground">
+                                    <Ionicons name="people-outline" size={isCompact ? 20 : 22} color="#2B1F17" />
+                                    <Text className="font-display font-bold text-lg text-foreground">
                                         {t('joinRoom')}
                                     </Text>
                                 </View>
@@ -108,10 +113,10 @@ export default function Index() {
                         </Link>
 
                         <Link href="/how-to-play" asChild>
-                            <Button variant="outline" size="lg" className="w-full">
+                            <Button variant="outline" size="lg" className="w-full border-2 border-foreground bg-white transform -rotate-1">
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="help-circle-outline" size={isCompact ? 18 : 20} color="#6B3F23" />
-                                    <Text className="font-display font-semibold text-primary">
+                                    <Ionicons name="help-circle-outline" size={isCompact ? 20 : 22} color="#C17F59" />
+                                    <Text className="font-display font-bold text-lg text-foreground">
                                         {t('howToPlay')}
                                     </Text>
                                 </View>
@@ -122,7 +127,7 @@ export default function Index() {
             </View>
 
             <View className={isCompact ? 'p-3 items-center' : 'p-4 items-center'}>
-                <Text className="text-muted-foreground text-sm text-center">
+                <Text className="text-muted-foreground/70 text-sm text-center font-medium">
                     {t('poweredBy')}
                 </Text>
             </View>

@@ -53,6 +53,8 @@ export interface GameSettings {
     questionType: QuestionType;
     language: Language;
     hintsEnabled: boolean;
+    soundEnabled: boolean;
+    animationsEnabled: boolean;
 }
 
 export interface GameState {
@@ -66,6 +68,7 @@ export interface GameState {
     hostApiKey?: string;
     playerApiKeys?: Record<string, string>;
     answers: Record<string, { playerId: string; answer: string; isCorrect?: boolean }>;
+    difficultyVotes?: Record<string, Difficulty>;
 }
 
 interface GameContextType {
@@ -79,6 +82,11 @@ interface GameContextType {
     setPlayerName: (name: string) => Promise<void>;
     deviceId: string;
     playerId: string;
+    // Settings actions
+    setSoundEnabled: (enabled: boolean) => Promise<void>;
+    setAnimationsEnabled: (enabled: boolean) => Promise<void>;
+    soundEnabled: boolean;
+    animationsEnabled: boolean;
 }
 
 const API_KEY_STORAGE_KEY = 'elbureau-api-key';
@@ -93,6 +101,8 @@ const defaultSettings: GameSettings = {
     questionType: 'multiple-choice',
     language: 'en',
     hintsEnabled: true,
+    soundEnabled: true,
+    animationsEnabled: true,
 };
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -103,6 +113,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [apiKey, setApiKeyState] = useState('');
     const [playerName, setPlayerNameState] = useState('');
     const [deviceId, setDeviceId] = useState('');
+    const [soundEnabled, setSoundEnabledState] = useState(defaultSettings.soundEnabled);
+    const [animationsEnabled, setAnimationsEnabledState] = useState(defaultSettings.animationsEnabled);
 
     // Load saved data on mount
     useEffect(() => {
@@ -127,6 +139,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const nextId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
                     await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
                     setDeviceId(nextId);
+                }
+
+                // Load settings
+                const savedSound = await AsyncStorage.getItem('elbureau-sound-enabled');
+                if (savedSound !== null) {
+                    setSoundEnabledState(savedSound === 'true');
+                }
+                const savedAnimations = await AsyncStorage.getItem('elbureau-animations-enabled');
+                if (savedAnimations !== null) {
+                    setAnimationsEnabledState(savedAnimations === 'true');
                 }
             } catch (error) {
                 console.error('Failed to load saved data:', error);
@@ -192,6 +214,26 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const setSoundEnabled = async (enabled: boolean) => {
+        try {
+            await AsyncStorage.setItem('elbureau-sound-enabled', String(enabled));
+            setSoundEnabledState(enabled);
+            // We'll update the global audio service listener in a useEffect if needed, 
+            // or just let components read from context.
+        } catch (error) {
+            console.error('Failed to save sound setting:', error);
+        }
+    };
+
+    const setAnimationsEnabled = async (enabled: boolean) => {
+        try {
+            await AsyncStorage.setItem('elbureau-animations-enabled', String(enabled));
+            setAnimationsEnabledState(enabled);
+        } catch (error) {
+            console.error('Failed to save animations setting:', error);
+        }
+    };
+
     return (
         <GameContext.Provider value={{
             gameState,
@@ -204,6 +246,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setPlayerName,
             deviceId,
             playerId,
+            // Expose settings via game state or directly? 
+            // For now, let's patch them into gameState if it exists, or expose directly.
+            // Actually, let's expose setters directly, and ensure gameState reflects them if we want to sync.
+            // But for local prefs, direct access is better.
+            // wait, the interface defined them on ContextType.
+            setSoundEnabled,
+            setAnimationsEnabled,
+            soundEnabled,
+            animationsEnabled,
         }}>
             {children}
         </GameContext.Provider>

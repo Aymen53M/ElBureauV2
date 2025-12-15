@@ -11,7 +11,7 @@ interface CardProps {
 export const Card: React.FC<CardProps> = ({ children, className = '', style }) => {
     return (
         <View
-            className={twMerge("rounded-2xl bg-card border border-border", className)}
+            className={twMerge("rounded-lg bg-card border-2 border-foreground animate-slide-in", className)}
             style={[styles.card, style]}
         >
             {children}
@@ -51,7 +51,7 @@ export const CardDescription: React.FC<{ children: React.ReactNode; className?: 
     className = ''
 }) => {
     return (
-        <Text className={twMerge("text-sm text-muted-foreground mt-1", className)}>
+        <Text className={twMerge("text-sm text-muted-foreground mt-1 font-sans", className)}>
             {children}
         </Text>
     );
@@ -67,11 +67,11 @@ export const CardFooter: React.FC<CardProps> = ({ children, className = '' }) =>
 
 const styles = StyleSheet.create({
     card: {
-        shadowColor: '#BFA58A',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
+        shadowColor: '#2B1F17',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 1, // Hard shadow
+        shadowRadius: 0,
+        elevation: 6,
     },
 });
 

@@ -31,7 +31,7 @@ export default function Slider({
                     const next = Number((e.target as HTMLInputElement).value);
                     onValueChange(next);
                 }}
-                style={{ width: '100%' }}
+                className="w-full h-4 bg-muted/20 rounded-lg appearance-none cursor-pointer border-2 border-foreground/20 accent-primary"
             />
         </View>
     );

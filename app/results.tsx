@@ -18,7 +18,7 @@ const demoPlayers: Player[] = [
     { id: '4', name: 'Taylor', score: 28, isHost: false, isReady: true, usedBets: [], hasApiKey: false },
 ];
 
-const CONFETTI_COLORS = ['#C97B4C', '#D1497B', '#D4A72C', '#D9822B', '#2D9C93', '#6B3F23', '#C83A32'];
+const CONFETTI_COLORS = ['#C17F59', '#D4AF37', '#98684D', '#4A7A68', '#D9822B', '#E6C9A8', '#B3261E'];
 const CONFETTI_COUNT = 50;
 
 interface ConfettiPiece {
@@ -190,12 +190,15 @@ export default function Results() {
     }) => (
         <TouchableOpacity
             onPress={() => setView(id)}
-            className={`flex-1 ${isCompact ? 'py-2' : 'py-3'} rounded-2xl border ${view === id ? 'bg-primary/15 border-primary' : 'bg-muted/50 border-transparent'}`}
+            className={`flex-1 ${isCompact ? 'py-1.5' : 'py-2.5'} rounded-xl transition-all ${view === id
+                ? 'bg-primary shadow-lg shadow-primary/20'
+                : 'bg-transparent'
+                }`}
         >
             <View className="flex-row items-center justify-center gap-2">
                 <Text className={isCompact ? 'text-base' : 'text-lg'}>{icon}</Text>
                 {!isCompact && (
-                    <Text className={`font-display font-bold ${view === id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <Text className={`font-display font-bold ${view === id ? 'text-primary-foreground' : 'text-foreground/60'}`}>
                         {label}
                     </Text>
                 )}
@@ -204,29 +207,33 @@ export default function Results() {
     );
 
     return (
-        <SafeAreaView className="flex-1 bg-background">
+        <SafeAreaView className="flex-1 bg-background relative">
             <ScreenBackground variant="game" />
             {/* Animated Confetti */}
             <ConfettiAnimation show={showConfetti} />
 
             <View className={`flex-1 ${isCompact ? 'p-4' : 'p-6'} max-w-5xl w-full self-center`}>
                 {/* Header */}
-                <View className={`items-center ${isCompact ? 'pt-2' : 'pt-6'} ${isCompact ? 'mb-3' : 'mb-5'}`}>
+                <View className={`items-center ${isCompact ? 'pt-2' : 'pt-6'} ${isCompact ? 'mb-3' : 'mb-8'}`}>
                     <Logo size={isCompact ? 'sm' : 'md'} animated={false} />
                 </View>
 
                 {/* Title + Tabs */}
-                <View className={isCompact ? 'space-y-3' : 'space-y-4'}>
+                <View className={isCompact ? 'space-y-3' : 'space-y-6'}>
                     <View className="items-center">
-                        <Text className={`${isCompact ? 'text-3xl' : 'text-4xl'} font-display font-bold text-foreground ${isCompact ? 'mb-0.5' : 'mb-2'}`}>
+                        <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold text-primary ${isCompact ? 'mb-1' : 'mb-2'}`} style={{
+                            textShadowColor: 'rgba(193, 127, 89, 0.2)',
+                            textShadowOffset: { width: 0, height: 2 },
+                            textShadowRadius: 4,
+                        }}>
                             {t('gameOver')}
                         </Text>
                         {!isCompact && (
-                            <Text className="text-muted-foreground">{t('finalStandings')}</Text>
+                            <Text className="text-foreground/70 text-lg font-medium">{t('finalStandings')}</Text>
                         )}
                     </View>
 
-                    <View className="flex-row gap-2">
+                    <View className="flex-row gap-3 bg-white/30 p-1.5 rounded-2xl border border-white/40 self-center">
                         <TabButton id="podium" label={t('winner')} icon="🏆" />
                         <TabButton id="rankings" label={t('finalStandings')} icon="📋" />
                         <TabButton id="highlights" label={t('gameHighlights')} icon="✨" />
@@ -234,45 +241,46 @@ export default function Results() {
                 </View>
 
                 {/* Content */}
-                <View className="flex-1 justify-center">
+                <View className="flex-1 justify-center mt-4">
                     {view === 'podium' && (
-                        <Card className="border-accent/50" style={styles.winnerCard}>
-                            <CardContent className={`${isCompact ? 'p-5' : 'p-8'} items-center`}>
-                                <Ionicons name="trophy" size={isCompact ? 44 : 64} color="#D4A72C" style={{ marginBottom: isCompact ? 10 : 16 }} />
-                                <Text className="text-sm text-muted-foreground mb-2">{t('winner')}</Text>
-                                <View className={isCompact ? 'items-center mb-3' : 'items-center mb-4'}>
-                                    <PlayerAvatar name={winner.name} size={isCompact ? 'md' : 'lg'} showName={false} />
+                        <Card className="border-2 border-foreground bg-white rounded-lg transform rotate-1" style={styles.winnerCard}>
+                            <CardContent className={`${isCompact ? 'p-6' : 'p-10'} items-center`}>
+                                <View className="mb-6 p-6 rounded-full bg-accent/10 border-2 border-accent/20">
+                                    <Ionicons name="trophy" size={isCompact ? 56 : 80} color="#D4AF37" />
                                 </View>
-                                <Text className={`${isCompact ? 'text-2xl' : 'text-3xl'} font-display font-bold text-accent mb-2`} style={{
-                                    textShadowColor: '#D4A72C',
-                                    textShadowOffset: { width: 0, height: 0 },
-                                    textShadowRadius: 15,
-                                }}>
+                                <Text className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-3 font-sans">{t('winner')}</Text>
+                                <View className={isCompact ? 'items-center mb-4' : 'items-center mb-6'}>
+                                    <PlayerAvatar name={winner.name} size={isCompact ? 'lg' : 'xl'} showName={false} />
+                                </View>
+                                <Text className={`${isCompact ? 'text-3xl' : 'text-4xl'} font-display font-bold text-foreground mb-2`}>
                                     {winner.name}
                                 </Text>
-                                <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold text-primary`}>
-                                    {winner.score} <Text className="text-lg">{t('points')}</Text>
-                                </Text>
+                                <View className="flex-row items-baseline gap-2">
+                                    <Text className={`${isCompact ? 'text-5xl' : 'text-6xl'} font-display font-bold text-primary`}>
+                                        {winner.score}
+                                    </Text>
+                                    <Text className="text-xl font-bold text-primary/60 font-sans">{t('points')}</Text>
+                                </View>
                             </CardContent>
                         </Card>
                     )}
 
                     {view === 'rankings' && (
-                        <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
+                        <View className={isCompact ? 'space-y-3' : 'space-y-4'}>
                             {visiblePlayers.map((player, offset) => {
                                 const index = rankStart + offset;
+                                const isWinner = index === 0;
                                 return (
                                     <View
                                         key={player.id}
                                         style={[{ opacity: revealedRanks.includes(index) ? 1 : 0 }]}
                                     >
-                                        <Card className={
-                                            index === 0 ? 'border-accent/50 bg-accent/5' :
-                                                index === 1 ? 'border-muted-foreground/30' :
-                                                    index === 2 ? 'border-secondary/30' : ''
-                                        }>
-                                            <CardContent className={`${isCompact ? 'p-3' : 'p-4'} flex-row items-center gap-3`}>
-                                                <Text className={`${isCompact ? 'text-2xl w-10' : 'text-3xl w-12'} text-center`}>
+                                        <Card className={`rounded-lg border-2 ${isWinner
+                                            ? 'bg-accent/10 border-accent/30'
+                                            : 'bg-white border-foreground/20'
+                                            }`}>
+                                            <CardContent className={`${isCompact ? 'p-3' : 'p-4'} flex-row items-center gap-4`}>
+                                                <Text className={`${isCompact ? 'text-3xl w-12' : 'text-4xl w-14'} text-center font-display`}>
                                                     {getRankEmoji(index)}
                                                 </Text>
                                                 <PlayerAvatar
@@ -282,19 +290,19 @@ export default function Results() {
                                                     showName={false}
                                                 />
                                                 <View className="flex-1">
-                                                    <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-semibold ${index === 0 ? 'text-accent' : 'text-foreground'}`}>
+                                                    <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-bold ${isWinner ? 'text-foreground' : 'text-muted-foreground'}`}>
                                                         {player.name}
                                                     </Text>
                                                     {player.isHost && (
-                                                        <Text className="text-xs text-muted-foreground">({t('host')})</Text>
+                                                        <Text className="text-xs font-semibold text-primary/70 uppercase tracking-wide font-sans">({t('host')})</Text>
                                                     )}
                                                 </View>
-                                                <View className="items-end">
-                                                    <Text className={`${isCompact ? 'text-xl' : 'text-2xl'} font-display font-bold ${index === 0 ? 'text-accent' : 'text-primary'}`}>
+                                                <View className="items-end bg-white/50 px-3 py-1.5 rounded-lg border-2 border-foreground/10">
+                                                    <Text className={`${isCompact ? 'text-xl' : 'text-2xl'} font-display font-bold ${isWinner ? 'text-accent' : 'text-primary'}`}>
                                                         {player.score}
                                                     </Text>
                                                     {!isCompact && (
-                                                        <Text className="text-sm text-muted-foreground">{t('points')}</Text>
+                                                        <Text className="text-xs font-bold text-muted-foreground font-sans">{t('points')}</Text>
                                                     )}
                                                 </View>
                                             </CardContent>
@@ -304,23 +312,27 @@ export default function Results() {
                             })}
 
                             {totalRankPages > 1 && (
-                                <View className="flex-row items-center justify-between">
+                                <View className="flex-row items-center justify-center gap-6 mt-2">
                                     <Button
                                         variant="outline"
+                                        size="sm"
                                         onPress={() => setRankPage((p) => Math.max(0, p - 1))}
                                         disabled={clampedRankPage === 0}
+                                        className="rounded-lg border-2 border-foreground/20 text-foreground"
                                     >
-                                        <Text className="font-display font-bold text-primary">{t('back')}</Text>
+                                        <Ionicons name="arrow-back" size={20} color="#2B1F17" />
                                     </Button>
-                                    <Text className="text-sm text-muted-foreground">
-                                        {clampedRankPage + 1}/{totalRankPages}
+                                    <Text className="text-sm font-bold text-muted-foreground font-sans">
+                                        {t('page')} {clampedRankPage + 1} / {totalRankPages}
                                     </Text>
                                     <Button
                                         variant="outline"
+                                        size="sm"
                                         onPress={() => setRankPage((p) => Math.min(totalRankPages - 1, p + 1))}
                                         disabled={clampedRankPage >= totalRankPages - 1}
+                                        className="rounded-lg border-2 border-foreground/20 text-foreground"
                                     >
-                                        <Text className="font-display font-bold text-primary">{t('next')}</Text>
+                                        <Ionicons name="arrow-forward" size={20} color="#2B1F17" />
                                     </Button>
                                 </View>
                             )}
@@ -328,29 +340,34 @@ export default function Results() {
                     )}
 
                     {view === 'highlights' && (
-                        <Card className="border-primary/30 bg-primary/5 rounded-3xl">
-                            <CardContent className={isCompact ? 'p-4' : 'p-5'}>
-                                <View className="flex-row items-center gap-2 mb-3">
-                                    <Text className="text-xl">✨</Text>
-                                    <Text className="font-display font-bold text-foreground">
+                        <Card className="border-2 border-foreground bg-white rounded-lg h-full transform -rotate-1">
+                            <CardContent className={isCompact ? 'p-6' : 'p-8'}>
+                                <View className="flex-row items-center gap-3 mb-6 border-b-2 border-foreground/10 pb-4">
+                                    <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center border border-primary/20">
+                                        <Text className="text-xl">✨</Text>
+                                    </View>
+                                    <Text className="font-display font-bold text-2xl text-foreground">
                                         {t('gameHighlights')}
                                     </Text>
                                 </View>
                                 {isLoadingHighlights ? (
-                                    <View className="flex-row items-center gap-3 py-2">
-                                        <ActivityIndicator size="small" color="#C97B4C" />
-                                        <Text className="text-muted-foreground text-sm">
+                                    <View className="flex-row items-center gap-3 py-8 justify-center">
+                                        <ActivityIndicator size="small" color="#C17F59" />
+                                        <Text className="text-muted-foreground font-medium text-lg font-sans">
                                             {t('generatingHighlights')}
                                         </Text>
                                     </View>
                                 ) : highlights ? (
-                                    <Text className="text-foreground leading-relaxed">
+                                    <Text className="text-foreground/80 leading-relaxed text-lg font-medium font-sans">
                                         {highlights}
                                     </Text>
                                 ) : (
-                                    <Text className="text-muted-foreground text-sm italic">
-                                        {t('highlightsError')}
-                                    </Text>
+                                    <View className="items-center py-10 opacity-60">
+                                        <Ionicons name="flash-off" size={48} color="#999" />
+                                        <Text className="text-muted-foreground text-center mt-4 italic font-medium font-sans">
+                                            {t('highlightsError')}
+                                        </Text>
+                                    </View>
                                 )}
                             </CardContent>
                         </Card>
@@ -358,28 +375,28 @@ export default function Results() {
                 </View>
 
                 {/* Actions */}
-                <View className={`flex-row gap-4 ${isCompact ? 'pt-3' : 'pt-4'}`}>
+                <View className={`flex-row gap-4 ${isCompact ? 'pt-4' : 'pt-8'}`}>
                     <Button
                         variant="hero"
                         onPress={handlePlayAgain}
-                        className="flex-1"
+                        className="flex-1 shadow-none"
                     >
                         <View className="flex-row items-center gap-2">
-                            <Ionicons name="refresh" size={20} color="#FFF8EF" />
-                            <Text className="font-display font-bold text-primary-foreground">
+                            <Ionicons name="refresh" size={24} color="#FFF8EF" />
+                            <Text className="font-display font-bold text-primary-foreground text-lg">
                                 {t('playAgain')}
                             </Text>
                         </View>
                     </Button>
 
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onPress={() => router.replace('/')}
-                        className="flex-1"
+                        className="flex-1 shadow-none border-2 border-foreground"
                     >
                         <View className="flex-row items-center gap-2">
-                            <Ionicons name="home" size={20} color="#6B3F23" />
-                            <Text className="font-display font-bold text-primary">
+                            <Ionicons name="home" size={24} color="#2B1F17" />
+                            <Text className="font-display font-bold text-foreground text-lg">
                                 {t('home')}
                             </Text>
                         </View>
@@ -392,9 +409,9 @@ export default function Results() {
 
 const styles = StyleSheet.create({
     winnerCard: {
-        shadowColor: '#D4A72C',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
+        shadowColor: '#D4AF37',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
         shadowRadius: 20,
         elevation: 10,
     },

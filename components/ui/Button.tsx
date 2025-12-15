@@ -2,6 +2,9 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from '@/components/ui/LinearGradient';
 import { twMerge } from 'tailwind-merge';
+import { audioService } from '@/services/audioService';
+import { useGame } from '@/contexts/GameContext';
+
 
 interface ButtonProps {
     variant?: 'default' | 'hero' | 'secondary' | 'outline' | 'ghost' | 'accent' | 'game' | 'bet' | 'betActive' | 'betUsed' | 'destructive';
@@ -20,69 +23,74 @@ const Button: React.FC<ButtonProps> = ({
     disabled = false,
     className = '',
 }) => {
+    const { soundEnabled } = useGame();
+
+    const handlePress = (e: any) => {
+        if (!disabled && soundEnabled) {
+            audioService.setEnabled(soundEnabled);
+            audioService.play('click');
+        }
+        onPress?.();
+    };
+
     const getSizeClasses = () => {
         switch (size) {
-            case 'sm': return 'h-10 px-4 rounded-lg';
-            case 'lg': return 'h-14 px-8 rounded-2xl';
-            case 'xl': return 'h-16 px-10 rounded-2xl';
-            case 'icon': return 'h-12 w-12 rounded-xl';
-            case 'bet': return 'h-14 w-14 rounded-xl';
-            default: return 'h-12 px-6 rounded-xl';
+            case 'sm': return 'h-10 px-4 rounded-none';
+            case 'lg': return 'h-14 px-8 rounded-none';
+            case 'xl': return 'h-16 px-10 rounded-none';
+            case 'icon': return 'h-12 w-12 rounded-none';
+            case 'bet': return 'h-14 w-14 rounded-none';
+            default: return 'h-12 px-6 rounded-none';
         }
     };
 
     const getVariantClasses = () => {
         switch (variant) {
-            case 'default': return 'bg-primary';
-            case 'secondary': return 'bg-secondary';
-            case 'outline': return 'bg-transparent border-2 border-primary';
-            case 'ghost': return 'bg-transparent';
-            case 'accent': return 'bg-accent';
-            case 'destructive': return 'bg-destructive';
-            case 'game': return 'bg-card border-2 border-primary/30';
-            case 'bet': return 'bg-muted border-2 border-border';
-            case 'betActive': return 'bg-accent border-2 border-accent';
-            case 'betUsed': return 'bg-muted/50 border-2 border-border/50';
-            case 'hero': return ''; // Uses gradient
-            default: return 'bg-primary';
+            case 'default': return 'bg-primary border-2 border-foreground text-primary-foreground';
+            case 'secondary': return 'bg-secondary border-2 border-foreground text-secondary-foreground';
+            case 'outline': return 'bg-transparent border-2 border-foreground text-foreground';
+            case 'ghost': return 'bg-transparent border-0';
+            case 'accent': return 'bg-accent border-2 border-foreground text-accent-foreground';
+            case 'destructive': return 'bg-destructive border-2 border-foreground text-destructive-foreground';
+            case 'game': return 'bg-card border-2 border-foreground text-card-foreground';
+            case 'bet': return 'bg-muted border-2 border-foreground text-muted-foreground';
+            case 'betActive': return 'bg-accent border-2 border-foreground text-accent-foreground';
+            case 'betUsed': return 'bg-muted/50 border-2 border-foreground/50 text-muted-foreground';
+            case 'hero': return 'bg-[#C17F59] border-2 border-foreground text-white';
+            default: return 'bg-primary border-2 border-foreground text-primary-foreground';
         }
     };
 
-    const baseClasses = `items-center justify-center ${getSizeClasses()} ${getVariantClasses()}`;
+    const baseClasses = `items-center justify-center font-display ${getSizeClasses()} ${getVariantClasses()} rounded-lg`;
+
+    // Custom style for the sketchy border radius since Tailwind class might be too long/complex to repeat
+    // Actually we defined rounded-lg in tailwind config, so 'rounded-lg' should work!
+
     const mergedClasses = twMerge(baseClasses, className);
 
+    // Hero variant no longer needs LinearGradient, just standard button with hero styling
     if (variant === 'hero') {
         return (
             <TouchableOpacity
-                onPress={onPress}
+                onPress={handlePress}
                 disabled={disabled}
                 activeOpacity={0.8}
-                style={[disabled && styles.disabled]}
+                className={twMerge(mergedClasses, "active:scale-95 transition-transform duration-100")}
+                style={[styles.sketchyShadow, disabled && styles.disabled]}
             >
-                <LinearGradient
-                    colors={['#6B3F23', '#C97B4C']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    className={twMerge(`h-16 px-10 rounded-2xl items-center justify-center`, className)}
-                    style={styles.heroShadow}
-                >
-                    {children}
-                </LinearGradient>
+                {children}
             </TouchableOpacity>
         );
     }
 
     return (
         <TouchableOpacity
-            onPress={onPress}
+            onPress={handlePress}
             disabled={disabled}
             activeOpacity={0.7}
-            className={mergedClasses}
+            className={twMerge(mergedClasses, "active:scale-95 transition-transform duration-100")}
             style={[
-                variant === 'default' && styles.primaryShadow,
-                variant === 'secondary' && styles.secondaryShadow,
-                variant === 'accent' && styles.accentShadow,
-                variant === 'betActive' && styles.accentShadow,
+                variant !== 'ghost' && styles.sketchyShadow,
                 disabled && styles.disabled,
             ]}
         >
@@ -92,36 +100,19 @@ const Button: React.FC<ButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
-    heroShadow: {
-        shadowColor: '#C97B4C',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    primaryShadow: {
-        shadowColor: '#6B3F23',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 8,
-    },
-    secondaryShadow: {
-        shadowColor: '#C83A32',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 8,
-    },
-    accentShadow: {
-        shadowColor: '#D4A72C',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 8,
+    sketchyShadow: {
+        shadowColor: '#2B1F17',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 0, // Elevation doesn't support hard shadows well on Android without tricks, but web is priority
+        // For web, box-shadow is handled by tailwind/CSS usually, but RN styles need this.
+        // We can inject a web-specific style or class if needed, but shadow* props map to box-shadow on web.
     },
     disabled: {
         opacity: 0.5,
+        shadowOffset: { width: 1, height: 1 },
+        transform: [{ translateY: 2 }, { translateX: 2 }], // "Pressed" look
     },
 });
 

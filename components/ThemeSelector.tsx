@@ -32,7 +32,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
     const { t } = useLanguage();
 
     const isCompact = density === 'compact';
-    const tileClass = isCompact ? 'w-16 h-16 rounded-2xl' : 'w-20 h-20 rounded-2xl';
+    const tileClass = isCompact ? 'w-16 h-16 rounded-lg' : 'w-20 h-20 rounded-lg';
     const iconClass = isCompact ? 'text-2xl mb-0.5' : 'text-3xl mb-1';
     const gridClass = isCompact ? 'gap-2' : 'gap-3';
 
@@ -49,8 +49,8 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                         key={theme.id}
                         onPress={() => onSelectTheme(theme.id)}
                         className={`${tileClass} items-center justify-center ${selectedTheme === theme.id
-                                ? 'bg-primary/20 border-2 border-primary'
-                                : 'bg-muted border-2 border-transparent'
+                            ? 'bg-primary/10 border-2 border-primary shadow-[2px_2px_0px_#C17F59]'
+                            : 'bg-white border-2 border-foreground/10'
                             }`}
                     >
                         <Text className={iconClass}>{theme.icon}</Text>
@@ -69,7 +69,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                     onChangeText={onCustomThemeChange}
                     placeholder={t('customTheme')}
                     placeholderTextColor="#7B6657"
-                    className="h-12 px-4 rounded-xl border border-primary bg-input text-foreground font-sans"
+                    className="h-12 px-4 rounded-lg border-2 border-primary bg-white text-foreground font-sans indent-2"
                 />
             )}
         </View>

@@ -29,7 +29,7 @@ export default function HowToPlay() {
             >
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 mb-8 pt-8`}>
-                    <TouchableOpacity onPress={() => router.back()} className="p-2">
+                    <TouchableOpacity onPress={() => router.back()} className="p-2 bg-white rounded-lg border-2 border-foreground">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                     <Logo size="sm" animated={false} />
@@ -42,7 +42,7 @@ export default function HowToPlay() {
                     {steps.map((step, index) => (
                         <Card key={index}>
                             <CardContent className="p-4 flex-row items-start gap-4">
-                                <View className="w-12 h-12 rounded-full bg-primary/20 items-center justify-center">
+                                <View className="w-12 h-12 rounded-lg bg-primary/10 border-2 border-primary items-center justify-center">
                                     <Text className="text-2xl">{step.icon}</Text>
                                 </View>
                                 <View className="flex-1">
@@ -58,7 +58,7 @@ export default function HowToPlay() {
                     ))}
 
                     {/* Tips */}
-                    <Card className="border-accent/30 bg-accent/5 mt-6">
+                    <Card className="border-2 border-accent bg-accent/10 mt-6 transform rotate-1">
                         <CardContent className="p-4">
                             <Text className="text-lg font-display font-bold text-accent mb-2">
                                 💡 {t('proTips')}

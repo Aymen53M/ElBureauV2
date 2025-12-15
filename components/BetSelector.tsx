@@ -122,7 +122,7 @@ const BetSelector: React.FC<BetSelectorProps> = ({
                                         : 'bg-muted border-2 border-border'
                                     }`}
                                 style={isSelected ? {
-                                    shadowColor: '#D4A72C',
+                                    shadowColor: '#D4AF37', // Gold
                                     shadowOffset: { width: 0, height: 0 },
                                     shadowOpacity: 0.5,
                                     shadowRadius: 15,
