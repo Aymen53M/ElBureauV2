@@ -1510,7 +1510,7 @@ export default function Game() {
                                             onSelectBet={setSelectedBet}
                                             showHeader={false}
                                             density={isCompact ? 'compact' : 'default'}
-                                            variant={isCompact ? 'stepper' : 'grid'}
+                                            variant="grid"
                                         />
 
                                         <View className="items-center">
