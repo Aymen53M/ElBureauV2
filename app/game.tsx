@@ -1498,7 +1498,7 @@ export default function Game() {
                                     </CardContent>
                                 </Card>
 
-                                <Button
+                                {/* <Button
                                     variant="hero"
                                     onPress={handleSubmit}
                                     disabled={!selectedAnswer?.trim() || !!answerBoard[activePlayer.id]?.hasAnswered}
@@ -1507,7 +1507,7 @@ export default function Game() {
                                     <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
                                         {t('submit')}
                                     </Text>
-                                </Button>
+                                </Button> */}
                             </View>
                         )}
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchRoomState } from '../services/roomService';
 import { Language } from './LanguageContext';
 
 export type GamePhase =
@@ -141,6 +142,36 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setDeviceId(nextId);
                 }
 
+                // Attempt to restore session
+                const savedRoomCode = await AsyncStorage.getItem('elbureau-room-code');
+                const savedPlayerId = await AsyncStorage.getItem('elbureau-player-id');
+
+                if (savedRoomCode && savedPlayerId) {
+                    console.log('Restoring session for room:', savedRoomCode);
+                    try {
+                        const roomState = await fetchRoomState(savedRoomCode);
+                        const player = roomState.players.find((p) => p.id === savedPlayerId);
+
+                        if (player) {
+                            setGameState({
+                                roomCode: roomState.room.room_code,
+                                phase: roomState.room.phase as any,
+                                players: roomState.players,
+                                currentQuestion: roomState.room.current_question_index ?? 0,
+                                questions: (roomState.room.questions as any) || [],
+                                settings: roomState.room.settings,
+                                hostId: roomState.room.host_player_id,
+                                hostApiKey: undefined,
+                                playerApiKeys: {}, // Will be populated by next useEffect if apiKey exists
+                                answers: {}, // Answers/validations will be fetched by game components
+                            });
+                            setCurrentPlayer(player);
+                        }
+                    } catch (e) {
+                        console.log("Failed to restore session", e);
+                    }
+                }
+
                 // Load settings
                 const savedSound = await AsyncStorage.getItem('elbureau-sound-enabled');
                 if (savedSound !== null) {
@@ -156,6 +187,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         loadSavedData();
     }, []);
+
+    // Persist Room Code & Player ID
+    useEffect(() => {
+        if (gameState?.roomCode) {
+            AsyncStorage.setItem('elbureau-room-code', gameState.roomCode).catch(e => console.error(e));
+        }
+        if (currentPlayer?.id) {
+            AsyncStorage.setItem('elbureau-player-id', currentPlayer.id).catch(e => console.error(e));
+        }
+    }, [gameState?.roomCode, currentPlayer?.id]);
 
     useEffect(() => {
         if (!apiKey || !currentPlayer?.id) return;
@@ -246,11 +287,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setPlayerName,
             deviceId,
             playerId,
-            // Expose settings via game state or directly? 
-            // For now, let's patch them into gameState if it exists, or expose directly.
-            // Actually, let's expose setters directly, and ensure gameState reflects them if we want to sync.
-            // But for local prefs, direct access is better.
-            // wait, the interface defined them on ContextType.
             setSoundEnabled,
             setAnimationsEnabled,
             soundEnabled,
