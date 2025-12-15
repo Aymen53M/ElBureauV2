@@ -177,7 +177,7 @@ export const translations: Translations = {
     highlightsError: { en: 'Could not generate highlights', fr: 'Impossible de générer les moments forts', ar: 'تعذر إنشاء الملخص' },
 
     // Betting Phase
-    placeBetFirst: { en: 'Optional: pick a bet now (we’ll auto-pick the smallest unused bet if you don’t)', fr: 'Optionnel : choisissez un pari (sinon on choisit automatiquement le plus petit pari disponible)', ar: 'اختياري: اختر رهانًا الآن (وإلا سنختار أصغر رهان غير مستخدم تلقائيًا)' },
+    placeBetFirst: { en: 'Pick a bet now (otherwise we’ll pick the smallest unused one)', fr: 'Choisissez un pari (sinon le plus petit disponible sera choisi)', ar: 'اختر رهانًا الآن (وإلا سنختار لك أصغر رهان متاح)' },
     bet: { en: 'Bet', fr: 'Pari', ar: 'رهان' },
 };
 

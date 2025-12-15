@@ -1409,9 +1409,11 @@ export default function Game() {
                     {/* Header */}
                     <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-4 pt-4' : 'mb-9 pt-12'}`}>
                         <Logo size="sm" animated={false} />
-                        <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
-                            <Text className="text-primary font-display font-bold text-lg">{activePlayer.score} pts</Text>
-                        </View>
+                        {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
+                            <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
+                                <Text className="text-primary font-display font-bold text-lg">{activePlayer.score} pts</Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Opponent Status (Visible when not in lobby/results) */}
