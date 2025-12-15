@@ -234,7 +234,7 @@ function calculateBackoffDelay(attempt: number): number {
 export async function generateQuestions(
     settings: GameSettings,
     apiKey?: string,
-    opts?: { tone?: string }
+    opts?: { tone?: string; extraRules?: string }
 ): Promise<GenerateQuestionsResponse> {
     if (!apiKey) {
         return { error: 'Missing Gemini API key', code: 'MISSING_API_KEY' };
@@ -314,8 +314,8 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         const desiredType = settings.questionType;
         const fallbackDifficulty: 'easy' | 'medium' | 'hard' = settings.difficulty === 'easy' || settings.difficulty === 'hard' ? settings.difficulty : 'medium';
 
-        const prompt = buildUserPrompt();
-        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.7 });
+        const prompt = buildUserPrompt(opts?.extraRules);
+        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.2 });
         if (!fetched.ok) {
             return { error: fetched.error, code: fetched.code };
         }

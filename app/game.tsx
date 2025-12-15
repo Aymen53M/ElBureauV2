@@ -1234,6 +1234,63 @@ export default function Game() {
         await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-wager' });
     };
 
+    const collectPriorCorrectAnswers = (preferredLanguage?: Language) => {
+        const keys = new Set<string>();
+        const rawAnswers: string[] = [];
+
+        const addQuestions = (qs: Question[] | undefined) => {
+            (qs || []).forEach((q) => {
+                const raw = (q?.correctAnswer || '').trim();
+                if (raw) rawAnswers.push(raw);
+                const k = normalizeAnswerText(raw);
+                if (k) keys.add(k);
+            });
+        };
+
+        if (preferredLanguage && questionsByLanguageRef.current?.[preferredLanguage]) {
+            addQuestions(questionsByLanguageRef.current[preferredLanguage]);
+        }
+        addQuestions(questions);
+        Object.values(questionsByLanguageRef.current || {}).forEach((qs) => addQuestions(qs));
+
+        const dedupRaw = Array.from(new Set(rawAnswers.map((a) => a.trim()).filter(Boolean)));
+        return { keys, raw: dedupRaw };
+    };
+
+    const generateUniqueFinalQuestion = async (args: {
+        finalSettings: GameSettings;
+        apiKey: string;
+        priorAnswerKeys: Set<string>;
+        priorRawAnswers: string[];
+        maxAttempts?: number;
+    }): Promise<Question> => {
+        const maxAttempts = typeof args.maxAttempts === 'number' && args.maxAttempts > 0 ? args.maxAttempts : 3;
+        const forbidden = (args.priorRawAnswers || []).slice(0, 20);
+        const extraRules = forbidden.length
+            ? `Do NOT reuse the same correctAnswer as any earlier question in the game. Avoid these exact answers (case-insensitive): ${forbidden
+                .map((a) => `"${a.replace(/\"/g, '"')}"`)
+                .join(', ')}.`
+            : 'Do NOT reuse the same correctAnswer as any earlier question in the game.';
+
+        let last: Question | null = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const result = await generateQuestions(args.finalSettings, args.apiKey, { extraRules });
+            if (result.error || !result.questions?.length) {
+                throw new Error(result.error || t('generationFailed'));
+            }
+
+            const q = result.questions[0];
+            last = q;
+            const ansKey = normalizeAnswerText((q?.correctAnswer || '').trim());
+            if (!ansKey) continue;
+            if (!args.priorAnswerKeys.has(ansKey)) {
+                return q;
+            }
+        }
+
+        throw new Error(t('generationFailed'));
+    };
+
     const updateFinalChoice = async (updates: Partial<{ wager: number | null; difficulty: Difficulty }>) => {
         if (!gameState?.roomCode || !activePlayer?.id) return;
         const next = {
@@ -1282,31 +1339,27 @@ export default function Game() {
                     difficulty: next.difficulty,
                     questionType: 'open-ended' as const,
                 };
-                const result = await generateQuestions(finalSettings, myKey);
 
-                if (result.error || !result.questions?.length) {
-                    if (result.code === 'QUOTA_EXCEEDED') {
-                        Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
-                            { text: t('cancel'), style: 'cancel' },
-                            { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                        ]);
-                    } else if (result.code === 'INVALID_API_KEY') {
-                        Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
-                            { text: t('cancel'), style: 'cancel' },
-                            { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                        ]);
-                    } else {
-                        Alert.alert(t('loading'), result.error || t('generationFailed'));
-                    }
+                const prior = collectPriorCorrectAnswers((gameState.settings.language as any) || language);
+                try {
+                    const q = await generateUniqueFinalQuestion({
+                        finalSettings,
+                        apiKey: myKey,
+                        priorAnswerKeys: prior.keys,
+                        priorRawAnswers: prior.raw,
+                        maxAttempts: 3,
+                    });
+                    await upsertFinalQuestion({
+                        roomCode: gameState.roomCode,
+                        playerId: activePlayer.id,
+                        question: q,
+                    });
+                    setFinalQuestion(q);
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : t('generationFailed');
+                    Alert.alert(t('loading'), msg);
                     return;
                 }
-
-                await upsertFinalQuestion({
-                    roomCode: gameState.roomCode,
-                    playerId: activePlayer.id,
-                    question: result.questions[0],
-                });
-                setFinalQuestion(result.questions[0]);
             }
         } catch (err) {
             Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to save final choice');
@@ -1388,27 +1441,26 @@ export default function Game() {
             difficulty: votedDifficulty,
             questionType: 'open-ended' as const,
         };
-        const result = await generateQuestions(finalSettings, hostKey);
-        if (result.error || !result.questions?.length) {
-            if (result.code === 'QUOTA_EXCEEDED') {
-                Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
-                    { text: t('cancel'), style: 'cancel' },
-                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                ]);
-            } else if (result.code === 'INVALID_API_KEY') {
-                Alert.alert(t('aiInvalidApiKeyTitle'), t('aiInvalidApiKeyDesc'), [
-                    { text: t('cancel'), style: 'cancel' },
-                    { text: t('goToSettings'), onPress: () => router.push('/settings') },
-                ]);
-            } else {
-                Alert.alert(t('loading'), result.error || t('generationFailed'));
-            }
+
+        const prior = collectPriorCorrectAnswers((gameState.settings.language as any) || language);
+        let q: Question;
+        try {
+            q = await generateUniqueFinalQuestion({
+                finalSettings,
+                apiKey: hostKey,
+                priorAnswerKeys: prior.keys,
+                priorRawAnswers: prior.raw,
+                maxAttempts: 3,
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : t('generationFailed');
+            Alert.alert(t('loading'), msg);
             setIsLoadingFinal(false);
             return;
         }
 
         await Promise.all(
-            gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: result.questions![0] }))
+            gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: q }))
         );
         setIsLoadingFinal(false);
 
