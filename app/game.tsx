@@ -117,6 +117,7 @@ export default function Game() {
     const submitInFlightRef = React.useRef(false);
     const personalFinalGenerationInFlightRef = React.useRef(false);
     const roomQuestionsCountRef = React.useRef<number>(0);
+    const questionsCountRef = React.useRef<number>(0);
     const questionsGenerationInFlightRef = React.useRef(false);
     const questionsGenerationCooldownUntilRef = React.useRef<number>(0);
     const questionsByLanguageRef = React.useRef<Record<string, Question[]>>({});
@@ -144,6 +145,10 @@ export default function Game() {
     const [phaseStartedAt, setPhaseStartedAt] = useState<string | null>(null);
     const [timerKey, setTimerKey] = useState(0);
     const [questions, setQuestions] = useState<Question[]>([]);
+
+    useEffect(() => {
+        questionsCountRef.current = questions.length;
+    }, [questions.length]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState('');
     const [answerBoard, setAnswerBoard] = useState<AnswerBoard>({});
@@ -421,8 +426,22 @@ export default function Game() {
             try {
                 const roomCode = gameState.roomCode;
 
-                const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
-                const roomState = await fetchRoomState(roomCode, { includeQuestions });
+                let includeQuestions =
+                    lastQuestionsSignatureRef.current === '' ||
+                    roomQuestionsCountRef.current === 0 ||
+                    questionsCountRef.current === 0 ||
+                    currentQuestionIndexRef.current >= questionsCountRef.current;
+
+                let roomState = await fetchRoomState(roomCode, { includeQuestions });
+
+                const rawIndexFirst: any = (roomState.room as any).current_question_index;
+                const parsedIndexFirst = typeof rawIndexFirst === 'number' ? rawIndexFirst : Number(rawIndexFirst);
+                const nextIndexFirst = Number.isFinite(parsedIndexFirst) ? parsedIndexFirst : 0;
+                const shouldRefetchQuestions = !includeQuestions && (questionsCountRef.current === 0 || nextIndexFirst >= questionsCountRef.current);
+                if (shouldRefetchQuestions) {
+                    includeQuestions = true;
+                    roomState = await fetchRoomState(roomCode, { includeQuestions: true });
+                }
 
                 const decodeRoomQuestions = (field: any, settings: GameSettings) => {
                     const baseLanguage: Language = (settings.language as any) || 'en';
@@ -463,7 +482,11 @@ export default function Game() {
                     : null;
                 const nextPhase = roomState.room.phase as GamePhase;
                 const phaseChanged = phaseRef.current !== nextPhase;
-                const nextQuestionIndex = roomState.room.current_question_index ?? 0;
+                const rawQuestionIndex: any = (roomState.room as any).current_question_index;
+                const parsedQuestionIndex = typeof rawQuestionIndex === 'number'
+                    ? rawQuestionIndex
+                    : Number(rawQuestionIndex);
+                const nextQuestionIndex = Number.isFinite(parsedQuestionIndex) ? parsedQuestionIndex : 0;
                 const questionIndexChanged = currentQuestionIndexRef.current !== nextQuestionIndex;
 
                 const serverPhaseStartedAt = (roomState.room as any)?.phase_started_at;
@@ -1404,10 +1427,10 @@ export default function Game() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View
-                    className={`${isCompact ? 'p-4' : 'p-7'} w-full flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}
+                    className={`${isCompact ? 'p-3' : 'p-7'} w-full flex-1 ${isCompact ? 'space-y-4' : 'space-y-10'}`}
                 >
                     {/* Header */}
-                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-4 pt-4' : 'mb-9 pt-12'}`}>
+                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
                         <Logo size="sm" animated={false} />
                         {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
                             <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
@@ -1418,7 +1441,7 @@ export default function Game() {
 
                     {/* Opponent Status (Visible when not in lobby/results) */}
                     {phase !== 'lobby' && phase !== 'results' && (
-                        <View className="mb-4">
+                        <View className={isCompact ? 'mb-2' : 'mb-4'}>
                             <OpponentStatusList
                                 players={gameState.players}
                                 currentPlayerId={activePlayer.id}
@@ -1435,10 +1458,10 @@ export default function Game() {
                         </View>
                     )}
 
-                    <View className={`max-w-3xl mx-auto w-full ${isCompact ? 'space-y-6' : 'space-y-10'} flex-1`}>
+                    <View className={`max-w-3xl mx-auto w-full ${isCompact ? 'space-y-4' : 'space-y-10'} flex-1`}>
                         {/* Unified Round Screen (Bet + Answer) */}
                         {!isFinalRound && phase === 'question' && activeQuestion && (
-                            <View className={isCompact ? 'space-y-5' : 'space-y-8'}>
+                            <View className={isCompact ? 'space-y-4' : 'space-y-8'}>
                                 {/* Question + answers (always visible) */}
                                 <QuestionCard
                                     question={activeQuestion}
@@ -1471,7 +1494,7 @@ export default function Game() {
 
                                 {/* Bet selection (no confirm; submitting answer commits the bet) */}
                                 <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
-                                    <CardContent className={`${isCompact ? 'p-6 space-y-4' : 'p-9 space-y-6'}`}>
+                                    <CardContent className={`${isCompact ? 'p-4 space-y-3' : 'p-9 space-y-6'}`}>
                                         <View className="items-center">
                                             <View className="px-5 py-2.5 rounded-lg bg-accent/10 border-2 border-accent">
                                                 <Text className="text-accent font-display font-bold text-lg">
@@ -1487,7 +1510,7 @@ export default function Game() {
                                             onSelectBet={setSelectedBet}
                                             showHeader={false}
                                             density={isCompact ? 'compact' : 'default'}
-                                            variant="grid"
+                                            variant={isCompact ? 'stepper' : 'grid'}
                                         />
 
                                         <View className="items-center">
@@ -1514,7 +1537,7 @@ export default function Game() {
                         {/* Final Wager Phase */}
                         {isFinalRound && phase === 'final-wager' && (
                             <View className={`${isCompact ? 'space-y-4' : 'space-y-6'}`}>
-                                <Card className="border-2 border-foreground bg-white rounded-lg p-5">
+                                <Card className={`border-2 border-foreground bg-white rounded-lg ${isCompact ? 'p-4' : 'p-5'}`}>
                                     <View className="mb-4">
                                         <Text className="text-xl font-display font-bold text-center mb-2">{t('finalMode')}</Text>
                                         <View className="flex-row gap-2 justify-center">
@@ -1580,31 +1603,29 @@ export default function Game() {
                                         <Text className="text-center italic mt-4">{t('waitingForHost')}</Text>
                                     )}
                                 </Card>
-                            </View>
-                        )}
 
+                                {finalMode === 'personalized' && !((apiKey || '').trim()) && (
+                                    <View className="items-center space-y-2 bg-destructive/10 p-4 rounded-2xl border border-destructive/20 mt-2">
+                                        <Ionicons name="warning" size={24} color="#B3261E" />
+                                        <Text className="text-sm text-foreground/80 text-center font-medium">{t('missingApiKeyPersonal')}</Text>
+                                        <Button variant="outline" size="sm" onPress={() => router.push('/settings')} className="border-destructive/30 text-destructive">
+                                            <Text className="font-display font-bold text-destructive">{t('goToSettings')}</Text>
+                                        </Button>
+                                    </View>
+                                )}
 
-
-                        {finalMode === 'personalized' && !((apiKey || '').trim()) && (
-                            <View className="items-center space-y-2 bg-destructive/10 p-4 rounded-2xl border border-destructive/20 mt-2">
-                                <Ionicons name="warning" size={24} color="#B3261E" />
-                                <Text className="text-sm text-foreground/80 text-center font-medium">{t('missingApiKeyPersonal')}</Text>
-                                <Button variant="outline" size="sm" onPress={() => router.push('/settings')} className="border-destructive/30 text-destructive">
-                                    <Text className="font-display font-bold text-destructive">{t('goToSettings')}</Text>
+                                <Button
+                                    variant="hero"
+                                    onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
+                                    disabled={finalMode === 'personalized' && !((apiKey || '').trim())}
+                                    className="w-full mt-2"
+                                >
+                                    <Text className="font-display font-bold text-primary-foreground text-lg">
+                                        {isGeneratingPersonalFinal ? t('loading') : t('submit')}
+                                    </Text>
                                 </Button>
                             </View>
                         )}
-
-                        <Button
-                            variant="hero"
-                            onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
-                            disabled={finalMode === 'personalized' && !((apiKey || '').trim())}
-                            className="w-full mt-2"
-                        >
-                            <Text className="font-display font-bold text-primary-foreground text-lg">
-                                {isGeneratingPersonalFinal ? t('loading') : t('submit')}
-                            </Text>
-                        </Button>
                     </View>
 
 
@@ -1613,7 +1634,7 @@ export default function Game() {
                     {/* Question Phase */}
                     {
                         (phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
-                            <View className={isCompact ? 'space-y-5' : 'space-y-8'}>
+                            <View className={isCompact ? 'space-y-4' : 'space-y-8'}>
                                 {/* Your Bet Display */}
                                 <View className="items-center">
                                     <View className="px-5 py-2 rounded-lg bg-accent/10 border-2 border-accent transform -rotate-1">
@@ -1664,9 +1685,9 @@ export default function Game() {
 
                                 {/* Answer Preview Phase */}
                                 {phase === 'preview' && !showCorrectAnswer && (
-                                    <View className="space-y-5">
+                                    <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
                                         <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                            <CardContent className="p-5 space-y-3">
+                                            <CardContent className={isCompact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
                                                 <Text className="text-lg font-display font-semibold text-foreground">
                                                     {t('answerPreview')}
                                                 </Text>
@@ -1680,7 +1701,7 @@ export default function Game() {
                                                 {viewerHasAnswered && gameState.players.map((player) => {
                                                     const entry = answerBoard[player.id];
                                                     return (
-                                                        <View key={player.id} className="flex-row justify-between items-center py-3 border-b border-black/5 last:border-0">
+                                                        <View key={player.id} className={`flex-row justify-between items-center ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
                                                             <Text className="font-semibold text-foreground">{player.name}</Text>
                                                             <Text className="text-sm text-muted-foreground bg-white/50 px-2 py-1 rounded-md overflow-hidden max-w-[50%]" numberOfLines={1}>
                                                                 {entry?.hasAnswered ? entry.answer : t('waitingForAnswer')}
@@ -1709,7 +1730,7 @@ export default function Game() {
                                 )}
 
                                 {phase === 'preview' && !showCorrectAnswer && !isHost && viewerHasAnswered && (
-                                    <View className="items-center bg-white p-4 rounded-lg border-2 border-foreground mx-auto transform -rotate-1">
+                                    <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
                                         <ActivityIndicator size="small" color="#4A3B32" />
                                         <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waitingForHost')}</Text>
                                     </View>
@@ -1718,14 +1739,14 @@ export default function Game() {
                                 {/* Validation Phase */}
                                 {(phase === 'validation' || phase === 'final-validation') && (
                                     <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                        <CardContent className="p-5 space-y-4">
+                                        <CardContent className={isCompact ? 'p-3 space-y-3' : 'p-5 space-y-4'}>
                                             <Text className="text-lg font-display font-semibold text-foreground">
                                                 {t('hostValidation')}
                                             </Text>
                                             {gameState.players.map((player) => {
                                                 const entry = answerBoard[player.id];
                                                 return (
-                                                    <View key={player.id} className="flex-row items-center justify-between py-3 border-b border-black/5 last:border-0">
+                                                    <View key={player.id} className={`flex-row items-center justify-between ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
                                                         <View className="flex-1 mr-4">
                                                             <Text className="font-semibold text-foreground">{player.name}</Text>
                                                             <Text className="text-sm text-foreground/80 font-medium mt-0.5">
@@ -1772,14 +1793,14 @@ export default function Game() {
 
                                 {/* Scoring / progression */}
                                 {(phase === 'scoring' || phase === 'final-scoring') && (
-                                    <View className="items-center space-y-6">
-                                        <View className={`p-6 rounded-lg border-2 ${isCorrectAnswer ? 'bg-success/10 border-success' : 'bg-destructive/10 border-destructive'} items-center w-full transform -rotate-1`}>
+                                    <View className={isCompact ? 'items-center space-y-4' : 'items-center space-y-6'}>
+                                        <View className={`${isCompact ? 'p-4' : 'p-6'} rounded-lg border-2 ${isCorrectAnswer ? 'bg-success/10 border-success' : 'bg-destructive/10 border-destructive'} items-center w-full transform -rotate-1`}>
                                             {isCorrectAnswer ? (
-                                                <Ionicons name="trophy" size={48} color="#4A7A68" />
+                                                <Ionicons name="trophy" size={isCompact ? 36 : 48} color="#4A7A68" />
                                             ) : (
-                                                <Ionicons name="alert-circle" size={48} color="#B3261E" />
+                                                <Ionicons name="alert-circle" size={isCompact ? 36 : 48} color="#B3261E" />
                                             )}
-                                            <Text className={`text-3xl font-display font-bold mt-4 ${isCorrectAnswer ? 'text-success' : 'text-destructive'}`}>
+                                            <Text className={`${isCompact ? 'text-2xl mt-2' : 'text-3xl mt-4'} font-display font-bold ${isCorrectAnswer ? 'text-success' : 'text-destructive'}`}>
                                                 {isCorrectAnswer
                                                     ? `${t('correct')} ${isFinalRound ? '' : `+${currentBetDisplay ?? 0}`}`
                                                     : isFinalRound

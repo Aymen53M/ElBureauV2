@@ -56,7 +56,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
     return (
         <Card className="rounded-lg border-2 border-foreground bg-white" style={styles.cardShadow}>
-            <CardContent className={`${isCompact ? 'p-5 space-y-5' : 'p-7 space-y-7'}`}>
+            <CardContent className={`${isCompact ? 'p-4 space-y-4' : 'p-7 space-y-7'}`}>
                 {/* Question header */}
                 <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center gap-2">
@@ -73,7 +73,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 </View>
 
                 {/* Question text */}
-                <Text className={`${isCompact ? 'text-xl' : 'text-2xl'} font-display font-medium text-center text-foreground leading-tight`}>
+                <Text className={`${isCompact ? 'text-lg' : 'text-2xl'} font-display font-medium text-center text-foreground leading-tight`}>
                     {question.text}
                 </Text>
 
@@ -100,7 +100,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
                 {/* Answer options */}
                 {isAnswerPhase && (
-                    <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
+                    <View className={isCompact ? 'space-y-1.5' : 'space-y-3'}>
                         {disabled && !!disabledMessage && (
                             <View className="items-center">
                                 <Text className="text-muted-foreground text-sm italic text-center font-sans">
@@ -109,7 +109,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                             </View>
                         )}
                         {question.type === 'multiple-choice' && question.options && (
-                            <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
+                            <View className={isCompact ? 'space-y-1.5' : 'space-y-3'}>
                                 {question.options.map((option, index) => {
                                     const isSelected = selectedAnswer === option;
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
@@ -122,7 +122,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                             key={index}
                                             onPress={() => !isDisabled && onSelectAnswer(option)}
                                             disabled={isDisabled}
-                                            className={`flex-row items-center ${isCompact ? 'p-3 rounded-lg' : 'p-4 rounded-lg'} border-2 ${isCorrect
+                                            className={`flex-row items-center ${isCompact ? 'p-2.5 rounded-lg' : 'p-4 rounded-lg'} border-2 ${isCorrect
                                                 ? 'border-success bg-success/20'
                                                 : isWrong
                                                     ? 'border-destructive bg-destructive/20'
@@ -162,7 +162,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                             key={option}
                                             onPress={() => !isDisabled && onSelectAnswer(option)}
                                             disabled={isDisabled}
-                                            className={`${isCompact ? 'w-28 py-3 rounded-lg' : 'w-32 py-4 rounded-lg'} items-center border-2 ${isCorrect
+                                            className={`${isCompact ? 'w-24 py-2.5 rounded-lg' : 'w-32 py-4 rounded-lg'} items-center border-2 ${isCorrect
                                                 ? 'border-success bg-success/20'
                                                 : isWrong
                                                     ? 'border-destructive bg-destructive/20'
@@ -192,7 +192,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                     editable={!disabled}
                                     placeholder={t('answer') + '...'}
                                     placeholderTextColor="#8C7B70"
-                                    className={`flex-1 ${isCompact ? 'h-11 text-sm' : 'h-12'} px-4 rounded-lg border-2 border-foreground bg-white text-foreground font-display`}
+                                    className={`flex-1 ${isCompact ? 'h-10 text-sm' : 'h-12'} px-4 rounded-lg border-2 border-foreground bg-white text-foreground font-display`}
                                 />
                             </View>
                         )}
