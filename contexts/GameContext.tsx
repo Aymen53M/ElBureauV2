@@ -30,6 +30,7 @@ export interface Player {
     currentAnswer?: string;
     usedBets: number[];
     hasApiKey: boolean;
+    language?: Language;
     avatar?: string;
 }
 

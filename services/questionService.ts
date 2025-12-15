@@ -33,6 +33,27 @@ function normalizeOptions(rawOptions: any): string[] {
     return Array.from(new Set(cleaned));
 }
 
+function normalizeLeakText(raw: string): string {
+    let s = (raw || '').trim().toLowerCase();
+    try {
+        s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch {
+        // noop
+    }
+    s = s.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '');
+    s = s.replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+}
+
+function answerLeaksIntoText(answer: string, body: string): boolean {
+    const a = normalizeLeakText(answer);
+    const b = normalizeLeakText(body);
+    if (!a || !b) return false;
+    if (a.length < 3) return false;
+    return b.includes(a);
+}
+
 async function fetchGeminiJsonText(args: {
     apiKey: string;
     systemPrompt: string;
@@ -269,6 +290,8 @@ Requirements:
 - Language: ${languageLabel}
 - Do not mix question types. Every item must have "type": "${settings.questionType}".
 - Do not include extra keys besides: text, type, options (only for multiple-choice), correctAnswer, hint (optional), difficulty.
+- The question text and hint MUST NOT reveal the correctAnswer. Do not include the answer, spelling, translation, or obvious synonyms in the question text or hint.
+- If you include a hint, it must be subtle and must NOT contain the answer or parts of it.
 ${toneLine}
 - Keep answers unambiguous, factually correct, and culturally safe.
 - Add light fun where appropriate, but keep answers concise.
@@ -352,6 +375,15 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
                 if (!correctAnswer) problems.push(`q[${i}].correctAnswer missing`);
             }
 
+            if (desiredType !== 'true-false' && correctAnswer) {
+                if (answerLeaksIntoText(correctAnswer, text)) {
+                    problems.push(`q[${i}].text leaks answer`);
+                }
+                if (hint && answerLeaksIntoText(correctAnswer, hint)) {
+                    problems.push(`q[${i}].hint leaks answer`);
+                }
+            }
+
             const difficulty = sanitizeDifficulty(q?.difficulty, fallbackDifficulty);
 
             normalized.push({
@@ -372,6 +404,169 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         return { questions: normalized };
     } catch (err) {
         console.error('Unexpected error generating questions:', err);
+        return {
+            error: err instanceof Error ? err.message : 'An unexpected error occurred',
+            code: 'UNEXPECTED_ERROR'
+        };
+    }
+}
+
+export async function translateQuestions(args: {
+    sourceQuestions: Question[];
+    sourceLanguage: GameSettings['language'];
+    targetLanguage: GameSettings['language'];
+    apiKey?: string;
+}): Promise<GenerateQuestionsResponse> {
+    if (!args.apiKey) {
+        return { error: 'Missing Gemini API key', code: 'MISSING_API_KEY' };
+    }
+    if (!Array.isArray(args.sourceQuestions) || args.sourceQuestions.length === 0) {
+        return { error: 'No source questions to translate', code: 'INVALID_RESPONSE' };
+    }
+    if (args.sourceLanguage === args.targetLanguage) {
+        return { questions: args.sourceQuestions };
+    }
+
+    const fromLabel = languageNames[args.sourceLanguage] || 'English';
+    const toLabel = languageNames[args.targetLanguage] || 'English';
+
+    const systemPrompt = `You are a professional translator for the multiplayer quiz "ElBureau".
+Translate content accurately for a party game on mobile.
+Always respond with strict JSON only — no markdown, code fences, or prose.
+All output MUST be in ${toLabel}.
+Do NOT reveal answers in the question text or hint.`;
+
+    const source = args.sourceQuestions.map((q) => ({
+        text: q.text,
+        type: q.type,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        hint: q.hint,
+        difficulty: q.difficulty,
+    }));
+
+    const userPrompt = `Translate the following quiz questions from ${fromLabel} to ${toLabel}.
+
+Rules:
+- Return ONLY a JSON array of the same length.
+- Keep the same "type" and "difficulty" values.
+- For multiple-choice: translate all 4 "options" and set "correctAnswer" to EXACTLY match one of the translated options.
+- For true-false: keep "correctAnswer" EXACTLY "True" or "False" (do not translate it). Do NOT add "options".
+- The question text and hint MUST NOT reveal the correctAnswer.
+
+Return ONLY a valid JSON array with this exact shape (no extra text):
+[
+  {
+    "text": "Question text",
+    "type": "multiple-choice" | "open-ended" | "true-false",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": "Correct answer text",
+    "hint": "Optional short hint",
+    "difficulty": "easy" | "medium" | "hard"
+  }
+]
+
+Source questions JSON:
+${JSON.stringify(source)}
+`;
+
+    try {
+        const fetched = await fetchGeminiJsonText({
+            apiKey: args.apiKey,
+            systemPrompt,
+            userPrompt,
+            temperature: 0.2,
+        });
+        if (!fetched.ok) {
+            return { error: fetched.error, code: fetched.code };
+        }
+
+        let parsed: any;
+        try {
+            parsed = JSON.parse(fetched.content);
+        } catch (parseErr) {
+            console.error('Gemini parse error', parseErr, fetched.content);
+            return { error: 'AI response was not valid JSON. Please try again.', code: 'PARSING_ERROR' };
+        }
+
+        const rawQuestions = extractQuestionsArray(parsed);
+        if (!rawQuestions) {
+            return { error: 'AI response was not an array of questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        if (rawQuestions.length < args.sourceQuestions.length) {
+            return { error: 'AI returned too few questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        const normalized: Question[] = [];
+        const problems: string[] = [];
+
+        for (let i = 0; i < args.sourceQuestions.length; i++) {
+            const q = rawQuestions[i];
+            const sourceQ = args.sourceQuestions[i];
+
+            const text = typeof q?.text === 'string' ? q.text.trim() : '';
+            const hint = typeof q?.hint === 'string' ? q.hint.trim() : undefined;
+            let correctAnswer = typeof q?.correctAnswer === 'string' ? q.correctAnswer.trim() : '';
+            let options: string[] | undefined;
+
+            if (!text) problems.push(`q[${i}].text missing`);
+
+            if (sourceQ.type === 'multiple-choice') {
+                const deduped = normalizeOptions(q?.options);
+                if (correctAnswer) {
+                    options = [correctAnswer, ...deduped].map((s) => s.trim()).filter((s) => s.length > 0);
+                    options = Array.from(new Set(options));
+                } else {
+                    options = deduped;
+                }
+
+                if (!options || options.length !== 4) {
+                    problems.push(`q[${i}].options must have exactly 4 items`);
+                } else if (!correctAnswer || !options.includes(correctAnswer)) {
+                    problems.push(`q[${i}].correctAnswer must be one of the 4 options`);
+                }
+            } else if (sourceQ.type === 'true-false') {
+                const normalizedAnswer = correctAnswer ? normalizeTrueFalseAnswer(correctAnswer) : '';
+                if (!normalizedAnswer) {
+                    problems.push(`q[${i}].correctAnswer must be "True" or "False"`);
+                }
+                correctAnswer = normalizedAnswer;
+                options = undefined;
+            } else {
+                options = undefined;
+                if (!correctAnswer) problems.push(`q[${i}].correctAnswer missing`);
+            }
+
+            const difficulty = sanitizeDifficulty(q?.difficulty, sourceQ.difficulty as any);
+
+            if (sourceQ.type !== 'true-false' && correctAnswer) {
+                if (answerLeaksIntoText(correctAnswer, text)) {
+                    problems.push(`q[${i}].text leaks answer`);
+                }
+                if (hint && answerLeaksIntoText(correctAnswer, hint)) {
+                    problems.push(`q[${i}].hint leaks answer`);
+                }
+            }
+
+            normalized.push({
+                id: sourceQ.id,
+                text,
+                type: sourceQ.type,
+                options,
+                correctAnswer,
+                hint,
+                difficulty: difficulty as any,
+            });
+        }
+
+        if (problems.length > 0) {
+            return { error: 'AI returned invalid questions. Please try again.', code: 'INVALID_RESPONSE' };
+        }
+
+        return { questions: normalized };
+    } catch (err) {
+        console.error('Unexpected error translating questions:', err);
         return {
             error: err instanceof Error ? err.message : 'An unexpected error occurred',
             code: 'UNEXPECTED_ERROR'

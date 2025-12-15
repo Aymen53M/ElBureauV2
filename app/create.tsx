@@ -82,6 +82,7 @@ export default function CreateRoom() {
             isReady: true,
             usedBets: [],
             hasApiKey: true,
+            language,
         };
 
         const settings = {

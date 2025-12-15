@@ -15,7 +15,7 @@ import { joinRoom } from '@/services/roomService';
 
 export default function JoinRoom() {
     const router = useRouter();
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, language } = useLanguage();
     const { playerName, apiKey, playerId, setGameState, setCurrentPlayer } = useGame();
     const { height: windowHeight } = useWindowDimensions();
     const isCompact = windowHeight < 760;
@@ -50,6 +50,7 @@ export default function JoinRoom() {
             isReady: false,
             usedBets: [],
             hasApiKey: !!apiKey,
+            language,
         };
 
         try {

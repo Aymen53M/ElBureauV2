@@ -16,8 +16,10 @@ import { updatePlayerState } from '@/services/roomService';
 
 export default function Settings() {
     const router = useRouter();
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, language } = useLanguage();
     const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer } = useGame();
+
+    const initialLanguageRef = React.useRef(language);
 
     const [localApiKey, setLocalApiKey] = useState(apiKey);
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
@@ -38,16 +40,17 @@ export default function Settings() {
                     patch: {
                         has_api_key: hasKey,
                         name: localPlayerName,
+                        language,
                     },
                 });
 
-                setCurrentPlayer((prev) => (prev ? { ...prev, hasApiKey: hasKey, name: localPlayerName } : prev));
+                setCurrentPlayer((prev) => (prev ? { ...prev, hasApiKey: hasKey, name: localPlayerName, language } : prev));
                 setGameState((prev) => {
                     if (!prev) return prev;
                     return {
                         ...prev,
                         players: prev.players.map((p) =>
-                            p.id === currentPlayer.id ? { ...p, hasApiKey: hasKey, name: localPlayerName } : p
+                            p.id === currentPlayer.id ? { ...p, hasApiKey: hasKey, name: localPlayerName, language } : p
                         ),
                     };
                 });
@@ -60,7 +63,7 @@ export default function Settings() {
         router.back();
     };
 
-    const hasChanges = localApiKey !== apiKey || localPlayerName !== playerName;
+    const hasChanges = localApiKey !== apiKey || localPlayerName !== playerName || language !== initialLanguageRef.current;
 
     const openAIStudio = () => {
         Linking.openURL('https://aistudio.google.com/app/apikey');

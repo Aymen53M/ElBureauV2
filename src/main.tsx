@@ -8,11 +8,22 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const w = window as any;
     if (!w.__elbureauAppHeightListener) {
         w.__elbureauAppHeightListener = true;
+        let rafId: number | null = null;
         const setAppHeight = () => {
-            document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                const vv = window.visualViewport;
+                const height = vv?.height || window.innerHeight;
+                document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+            });
         };
         setAppHeight();
         window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', setAppHeight);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', setAppHeight);
+            window.visualViewport.addEventListener('scroll', setAppHeight);
+        }
     }
 }
 

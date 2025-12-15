@@ -9,10 +9,10 @@ import BetSelector from '@/components/BetSelector';
 import Timer from '@/components/Timer';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player, GameSettings } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
-import { generateQuestions } from '@/services/questionService';
+import { generateQuestions, translateQuestions } from '@/services/questionService';
 import { fetchRoomState, updateRoomQuestions, updatePlayerState } from '@/services/roomService';
 import {
     subscribeToGame,
@@ -98,7 +98,7 @@ function isAnswerCorrect(answer: string, question: Question): boolean {
 
 export default function Game() {
     const router = useRouter();
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, language } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey } = useGame();
     const { height: windowHeight } = useWindowDimensions();
     const isCompact = windowHeight < 760;
@@ -117,6 +117,7 @@ export default function Game() {
     const roomQuestionsCountRef = React.useRef<number>(0);
     const questionsGenerationInFlightRef = React.useRef(false);
     const questionsGenerationCooldownUntilRef = React.useRef<number>(0);
+    const questionsByLanguageRef = React.useRef<Record<string, Question[]>>({});
 
     const answerBoardScopeRef = React.useRef<
         | { kind: 'normal'; questionIndex: number }
@@ -412,8 +413,42 @@ export default function Game() {
                 const includeQuestions = lastQuestionsSignatureRef.current === '' || roomQuestionsCountRef.current === 0;
                 const roomState = await fetchRoomState(roomCode, { includeQuestions });
 
+                const decodeRoomQuestions = (field: any, settings: GameSettings) => {
+                    const baseLanguage: Language = (settings.language as any) || 'en';
+                    let resolvedBase: Language = baseLanguage;
+                    let byLanguageRaw: Record<string, any[]> = {};
+
+                    if (Array.isArray(field)) {
+                        byLanguageRaw[resolvedBase] = field;
+                    } else if (field && typeof field === 'object') {
+                        const maybeBase = (field as any)?.baseLanguage;
+                        if (typeof maybeBase === 'string' && (maybeBase === 'en' || maybeBase === 'fr' || maybeBase === 'ar')) {
+                            resolvedBase = maybeBase as Language;
+                        }
+                        const by = (field as any)?.byLanguage;
+                        if (by && typeof by === 'object' && !Array.isArray(by)) {
+                            Object.keys(by).forEach((k) => {
+                                const v = (by as any)[k];
+                                if (Array.isArray(v)) {
+                                    byLanguageRaw[k] = v;
+                                }
+                            });
+                        }
+                    }
+
+                    return { baseLanguage: resolvedBase, byLanguageRaw };
+                };
+
+                const questionsField = includeQuestions ? (roomState.room as any).questions : null;
+                const decoded = includeQuestions ? decodeRoomQuestions(questionsField, roomState.room.settings) : null;
                 const questionsRaw = includeQuestions
-                    ? (Array.isArray(roomState.room.questions) ? roomState.room.questions : [])
+                    ? (decoded?.byLanguageRaw?.[language] ||
+                        decoded?.byLanguageRaw?.[roomState.room.settings.language] ||
+                        decoded?.byLanguageRaw?.[decoded?.baseLanguage || roomState.room.settings.language] ||
+                        decoded?.byLanguageRaw?.en ||
+                        decoded?.byLanguageRaw?.fr ||
+                        decoded?.byLanguageRaw?.ar ||
+                        [])
                     : null;
                 const nextPhase = roomState.room.phase as GamePhase;
                 const phaseChanged = phaseRef.current !== nextPhase;
@@ -428,9 +463,16 @@ export default function Game() {
                         : (phaseChanged ? new Date().toISOString() : null),
                     finalMode: resolvedFinalMode,
                     questions: questionsRaw,
+                    questionsByLanguageRaw: decoded?.byLanguageRaw || null,
+                    questionsBaseLanguage: decoded?.baseLanguage || roomState.room.settings.language,
                 };
 
-                const loadedCount = Array.isArray(meta.questions) ? meta.questions.length : 0;
+                const baseRaw = meta.questionsByLanguageRaw && typeof meta.questionsBaseLanguage === 'string'
+                    ? meta.questionsByLanguageRaw[meta.questionsBaseLanguage]
+                    : null;
+                const loadedCount = Array.isArray(baseRaw)
+                    ? baseRaw.length
+                    : (Array.isArray(meta.questions) ? meta.questions.length : 0);
                 if (loadedCount > 0 && roomQuestionsCountRef.current !== loadedCount) {
                     roomQuestionsCountRef.current = loadedCount;
                 }
@@ -511,14 +553,37 @@ export default function Game() {
                 setFinalMode((prev) => (prev === meta.finalMode ? prev : meta.finalMode));
 
                 if (includeQuestions) {
-                    if (Array.isArray(meta.questions) && meta.questions.length > 0) {
-                        const normalized = normalizeQuestions(meta.questions, roomState.room.settings);
-                        const typeSig = normalized.map((q) => `${q.type}:${q.options?.length || 0}`).join('|');
-                        const signature = `${roomState.room.settings.questionType}:${normalized.length}:${typeSig}`;
-                        if (signature !== lastQuestionsSignatureRef.current) {
-                            lastQuestionsSignatureRef.current = signature;
-                            setQuestions(normalized);
-                        }
+                    const rawByLang = meta.questionsByLanguageRaw && typeof meta.questionsByLanguageRaw === 'object'
+                        ? meta.questionsByLanguageRaw
+                        : null;
+                    const normalizedByLang: Record<string, Question[]> = {};
+                    if (rawByLang) {
+                        Object.keys(rawByLang).forEach((k) => {
+                            normalizedByLang[k] = normalizeQuestions(rawByLang[k], roomState.room.settings);
+                        });
+                    }
+
+                    const selected = Array.isArray(meta.questions) ? meta.questions : [];
+                    const normalizedSelected = normalizeQuestions(selected, roomState.room.settings);
+
+                    const display =
+                        normalizedByLang[language] ||
+                        normalizedByLang[roomState.room.settings.language] ||
+                        normalizedByLang[meta.questionsBaseLanguage] ||
+                        normalizedSelected;
+
+                    const typeSig = display.map((q) => `${q.type}:${q.options?.length || 0}`).join('|');
+                    const signature = `${roomState.room.settings.questionType}:${display.length}:${typeSig}:${language}`;
+                    if (signature !== lastQuestionsSignatureRef.current) {
+                        lastQuestionsSignatureRef.current = signature;
+                        setQuestions(display);
+                    }
+
+                    if (Object.keys(normalizedByLang).length > 0) {
+                        questionsByLanguageRef.current = normalizedByLang;
+                    }
+
+                    if (display.length > 0) {
                         setIsLoading(false);
                     } else {
                         setIsLoading(true);
@@ -563,6 +628,7 @@ export default function Game() {
 
                     questionsGenerationInFlightRef.current = true;
                     setLoadingMessage(t('generatingQuestions'));
+                    const baseLang = (roomState.room.settings.language as Language) || 'en';
                     const result = await generateQuestions(roomState.room.settings, hostKey);
                     questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
@@ -588,7 +654,44 @@ export default function Game() {
                         return;
                     }
                     if (result.questions && result.questions.length > 0) {
-                        await updateRoomQuestions({ roomCode, questions: result.questions });
+                        const baseQuestions = result.questions;
+                        const languagesInRoom = Array.from(
+                            new Set(
+                                (roomState.players || [])
+                                    .map((p) => p.language)
+                                    .filter((l): l is Language => l === 'en' || l === 'fr' || l === 'ar')
+                            )
+                        );
+                        const targets = languagesInRoom.filter((l) => l !== baseLang);
+
+                        const translations = await Promise.all(
+                            targets.map((targetLanguage) =>
+                                translateQuestions({
+                                    sourceQuestions: baseQuestions,
+                                    sourceLanguage: baseLang,
+                                    targetLanguage,
+                                    apiKey: hostKey,
+                                })
+                            )
+                        );
+
+                        const byLanguage: Record<string, Question[]> = {
+                            [baseLang]: baseQuestions,
+                        };
+                        targets.forEach((targetLanguage, idx) => {
+                            const tr = translations[idx];
+                            if (!tr?.error && tr?.questions?.length) {
+                                byLanguage[targetLanguage] = tr.questions;
+                            }
+                        });
+
+                        await updateRoomQuestions({
+                            roomCode,
+                            questions: {
+                                baseLanguage: baseLang,
+                                byLanguage,
+                            },
+                        });
                         // Force the next refresh to re-fetch questions from the DB.
                         lastQuestionsSignatureRef.current = '';
                         roomQuestionsCountRef.current = 0;
@@ -787,7 +890,7 @@ export default function Game() {
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
         };
-    }, [apiKey, currentPlayer?.id, gameState?.roomCode, gameState?.hostApiKey, gameState?.playerApiKeys, router, setGameState, t]);
+    }, [apiKey, currentPlayer?.id, gameState?.roomCode, gameState?.hostApiKey, gameState?.playerApiKeys, language, router, setGameState, t]);
 
     useEffect(() => {
         if (!gameState?.roomCode) return;
@@ -906,7 +1009,12 @@ export default function Game() {
                 await Promise.all(
                     gameState.players.map((p) => {
                         const a = (answerMap[p.id] || '').trim();
-                        const isCorrect = a ? isAnswerCorrect(a, activeQuestion) : false;
+                        const langKey = (p.language || gameState.settings.language || 'en') as any;
+                        const qForPlayer =
+                            questionsByLanguageRef.current?.[langKey]?.[currentQuestionIndex] ||
+                            questionsByLanguageRef.current?.[gameState.settings.language]?.[currentQuestionIndex] ||
+                            activeQuestion;
+                        const isCorrect = a ? isAnswerCorrect(a, qForPlayer) : false;
                         return upsertValidation({
                             roomCode: gameState.roomCode,
                             questionIndex: currentQuestionIndex,
@@ -923,10 +1031,20 @@ export default function Game() {
                 answers.forEach((a) => {
                     answerMap[a.player_id] = a.answer;
                 });
+
+                const questionsForPlayers = await Promise.all(
+                    gameState.players.map((p) => fetchFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id }))
+                );
+                const questionByPlayerId: Record<string, Question | null> = {};
+                gameState.players.forEach((p, idx) => {
+                    questionByPlayerId[p.id] = questionsForPlayers[idx] || null;
+                });
+
                 await Promise.all(
                     gameState.players.map((p) => {
                         const a = (answerMap[p.id] || '').trim();
-                        const isCorrect = a ? isAnswerCorrect(a, activeQuestion) : false;
+                        const qForPlayer = questionByPlayerId[p.id] || activeQuestion;
+                        const isCorrect = a ? isAnswerCorrect(a, qForPlayer) : false;
                         return upsertFinalValidation({
                             roomCode: gameState.roomCode,
                             playerId: p.id,

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider, useSafeAreaInsets } from '@/components/ui/SafeArea';
 import { Alert, Platform, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@/components/ui/Ionicons';
-import { LanguageProvider } from '@/contexts/LanguageContext';
+import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { GameProvider, useGame } from '@/contexts/GameContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -162,6 +162,7 @@ async function clearLastRoomCode() {
 function ResumeBootstrap() {
     const router = useRouter();
     const pathname = usePathname();
+    const { language } = useLanguage();
     const { gameState, setGameState, currentPlayer, setCurrentPlayer, playerId, playerName, apiKey } = useGame();
     const hydratedRef = React.useRef(false);
     const hadRoomRef = React.useRef(false);
@@ -230,6 +231,7 @@ function ResumeBootstrap() {
                         isReady: false,
                         usedBets: [],
                         hasApiKey: !!apiKey,
+                        language,
                     });
                     router.replace('/lobby');
                     return;
@@ -249,6 +251,7 @@ function ResumeBootstrap() {
                                 isReady: false,
                                 usedBets: [],
                                 hasApiKey: !!apiKey,
+                                language,
                             },
                         });
                         room = joined.room;

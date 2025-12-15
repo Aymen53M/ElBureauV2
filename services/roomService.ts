@@ -23,6 +23,7 @@ type RoomPlayerRow = {
     has_api_key: boolean;
     used_bets: number[];
     avatar: string | null;
+    language?: string | null;
 };
 
 export type RoomState = {
@@ -55,8 +56,35 @@ function toPlayer(row: RoomPlayerRow): Player {
         isReady: row.is_ready,
         usedBets: row.used_bets || [],
         hasApiKey: row.has_api_key,
+        language: typeof row.language === 'string' ? (row.language as any) : undefined,
         avatar: row.avatar || undefined,
     };
+}
+
+async function fetchPlayers(client: ReturnType<typeof requireSupabase>, roomCode: string): Promise<Player[]> {
+    const selectWithLang = 'room_code, player_id, name, score, is_host, is_ready, has_api_key, used_bets, avatar, language';
+    const selectWithoutLang = 'room_code, player_id, name, score, is_host, is_ready, has_api_key, used_bets, avatar';
+
+    const tryFetch = async (select: string) => {
+        const { data, error } = await client
+            .from('elbureau_room_players')
+            .select(select)
+            .eq('room_code', roomCode);
+        return { data, error };
+    };
+
+    let res = await tryFetch(selectWithLang);
+    if (res.error && (res.error.message || '').toLowerCase().includes('language')) {
+        res = await tryFetch(selectWithoutLang);
+    }
+    if (res.error) {
+        throw new Error(res.error.message);
+    }
+
+    const rows = (res.data || []) as unknown as RoomPlayerRow[];
+    return rows
+        .map((r) => toPlayer(r))
+        .sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
 }
 
 export async function fetchRoomState(
@@ -93,18 +121,7 @@ export async function fetchRoomState(
             throw new Error(fallbackError?.message || 'ROOM_NOT_FOUND');
         }
 
-        const { data: playerRows, error: playersError } = await client
-            .from('elbureau_room_players')
-            .select('room_code, player_id, name, score, is_host, is_ready, has_api_key, used_bets, avatar')
-            .eq('room_code', normalized);
-
-        if (playersError) {
-            throw new Error(playersError.message);
-        }
-
-        const players = (playerRows || [])
-            .map((r) => toPlayer(r as RoomPlayerRow))
-            .sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
+        const players = await fetchPlayers(client, normalized);
 
         return { room: fallbackRoom as RoomRow, players };
     }
@@ -113,18 +130,7 @@ export async function fetchRoomState(
         throw new Error(roomError?.message || 'ROOM_NOT_FOUND');
     }
 
-    const { data: playerRows, error: playersError } = await client
-        .from('elbureau_room_players')
-        .select('room_code, player_id, name, score, is_host, is_ready, has_api_key, used_bets, avatar')
-        .eq('room_code', normalized);
-
-    if (playersError) {
-        throw new Error(playersError.message);
-    }
-
-    const players = (playerRows || [])
-        .map((r) => toPlayer(r as RoomPlayerRow))
-        .sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
+    const players = await fetchPlayers(client, normalized);
 
     return { room: room as unknown as RoomRow, players };
 }
@@ -148,7 +154,7 @@ export async function createRoom(args: {
         throw new Error(formatDbError(insertRoomError));
     }
 
-    const { error: insertHostError } = await client.from('elbureau_room_players').upsert({
+    let { error: insertHostError } = await client.from('elbureau_room_players').upsert({
         room_code: roomCode,
         player_id: args.hostPlayer.id,
         name: args.hostPlayer.name,
@@ -158,7 +164,22 @@ export async function createRoom(args: {
         has_api_key: args.hostPlayer.hasApiKey,
         used_bets: args.hostPlayer.usedBets || [],
         avatar: args.hostPlayer.avatar ?? null,
+        language: (args.hostPlayer as any)?.language ?? null,
     }, { onConflict: 'room_code,player_id' });
+
+    if (insertHostError && (insertHostError.message || '').toLowerCase().includes('language')) {
+        ({ error: insertHostError } = await client.from('elbureau_room_players').upsert({
+            room_code: roomCode,
+            player_id: args.hostPlayer.id,
+            name: args.hostPlayer.name,
+            score: args.hostPlayer.score,
+            is_host: true,
+            is_ready: args.hostPlayer.isReady,
+            has_api_key: args.hostPlayer.hasApiKey,
+            used_bets: args.hostPlayer.usedBets || [],
+            avatar: args.hostPlayer.avatar ?? null,
+        }, { onConflict: 'room_code,player_id' }));
+    }
 
     if (insertHostError) {
         throw new Error(formatDbError(insertHostError));
@@ -253,7 +274,7 @@ export async function joinRoom(args: {
 
     const isHost = (room as any)?.host_player_id === args.player.id;
 
-    const { error: insertPlayerError } = await client.from('elbureau_room_players').upsert({
+    let { error: insertPlayerError } = await client.from('elbureau_room_players').upsert({
         room_code: roomCode,
         player_id: args.player.id,
         name: args.player.name,
@@ -263,7 +284,22 @@ export async function joinRoom(args: {
         has_api_key: args.player.hasApiKey,
         used_bets: args.player.usedBets || [],
         avatar: args.player.avatar ?? null,
+        language: (args.player as any)?.language ?? null,
     }, { onConflict: 'room_code,player_id' });
+
+    if (insertPlayerError && (insertPlayerError.message || '').toLowerCase().includes('language')) {
+        ({ error: insertPlayerError } = await client.from('elbureau_room_players').upsert({
+            room_code: roomCode,
+            player_id: args.player.id,
+            name: args.player.name,
+            score: args.player.score,
+            is_host: isHost,
+            is_ready: args.player.isReady,
+            has_api_key: args.player.hasApiKey,
+            used_bets: args.player.usedBets || [],
+            avatar: args.player.avatar ?? null,
+        }, { onConflict: 'room_code,player_id' }));
+    }
 
     if (insertPlayerError) {
         throw new Error(insertPlayerError.message);
@@ -275,16 +311,25 @@ export async function joinRoom(args: {
 export async function updatePlayerState(args: {
     roomCode: string;
     playerId: string;
-    patch: Partial<Pick<RoomPlayerRow, 'is_ready' | 'score' | 'used_bets' | 'name' | 'has_api_key' | 'avatar'>>;
+    patch: Partial<Pick<RoomPlayerRow, 'is_ready' | 'score' | 'used_bets' | 'name' | 'has_api_key' | 'avatar' | 'language'>>;
 }): Promise<void> {
     const client = requireSupabase();
     const roomCode = args.roomCode.toUpperCase();
 
-    const { error } = await client
+    let { error } = await client
         .from('elbureau_room_players')
         .update(args.patch)
         .eq('room_code', roomCode)
         .eq('player_id', args.playerId);
+
+    if (error && (error.message || '').toLowerCase().includes('language')) {
+        const { language: _ignored, ...rest } = (args.patch as any) || {};
+        ({ error } = await client
+            .from('elbureau_room_players')
+            .update(rest)
+            .eq('room_code', roomCode)
+            .eq('player_id', args.playerId));
+    }
 
     if (error) {
         throw new Error(error.message);
