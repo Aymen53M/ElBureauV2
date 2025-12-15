@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ViewProps } from 'react-native';
+import { StyleSheet, View, ViewProps } from 'react-native';
 
 type Point = { x: number; y: number };
 
@@ -24,14 +24,15 @@ function toDeg(start?: Point, end?: Point) {
 export function LinearGradient({ colors, start, end, style, children, ...rest }: LinearGradientProps) {
     const deg = toDeg(start, end);
     const backgroundImage = `linear-gradient(${deg}deg, ${colors.join(', ')})`;
+    const flatStyle = StyleSheet.flatten(style as any);
 
     return (
         <View
             {...rest}
             style={[
-                style,
+                flatStyle,
                 {
-                    ...(style as any),
+                    backgroundColor: colors[0],
                     backgroundImage,
                 } as any,
             ]}

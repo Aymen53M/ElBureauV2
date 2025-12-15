@@ -20,6 +20,7 @@ const Timer: React.FC<TimerProps> = ({
     const [seconds, setSeconds] = useState(initialSeconds);
     const shakeAnim = React.useRef(new Animated.Value(0)).current;
     const completedRef = React.useRef(false);
+    const rafRef = React.useRef<number | null>(null);
 
     const endsAtRef = React.useRef<number | undefined>(endsAt);
     const initialSecondsRef = React.useRef<number>(initialSeconds);
@@ -37,28 +38,62 @@ const Timer: React.FC<TimerProps> = ({
         onCompleteRef.current = onComplete;
     }, [onComplete]);
 
-    const computeSecondsLeft = React.useCallback(() => {
-        if (typeof endsAt === 'number' && Number.isFinite(endsAt)) {
-            const diffMs = endsAt - Date.now();
-            return Math.max(0, Math.min(initialSeconds, Math.ceil(diffMs / 1000)));
+    const computeSecondsLeft = React.useCallback((nowMs?: number) => {
+        const nextEndsAt = endsAtRef.current;
+        const nextInitial = initialSecondsRef.current;
+        const now = typeof nowMs === 'number' ? nowMs : Date.now();
+        if (typeof nextEndsAt === 'number' && Number.isFinite(nextEndsAt)) {
+            const diffMs = nextEndsAt - now;
+            return Math.max(0, Math.min(nextInitial, Math.ceil(diffMs / 1000)));
         }
-        return initialSeconds;
-    }, [endsAt, initialSeconds]);
+        return Math.max(0, nextInitial);
+    }, []);
 
     useEffect(() => {
         completedRef.current = false;
         setSeconds(computeSecondsLeft());
-    }, [computeSecondsLeft]);
+    }, [computeSecondsLeft, endsAt, initialSeconds]);
 
     useEffect(() => {
         if (isPaused) return;
 
+        const nextEndsAt = endsAtRef.current;
+        const canUseRaf =
+            Platform.OS === 'web' &&
+            typeof nextEndsAt === 'number' &&
+            Number.isFinite(nextEndsAt) &&
+            typeof requestAnimationFrame === 'function' &&
+            typeof cancelAnimationFrame === 'function';
+
+        if (canUseRaf) {
+            let lastValue = -1;
+            const tick = () => {
+                const next = computeSecondsLeft();
+                if (next !== lastValue) {
+                    lastValue = next;
+                    setSeconds(next);
+                    if (next <= 0 && !completedRef.current) {
+                        completedRef.current = true;
+                        onCompleteRef.current?.();
+                    }
+                }
+                rafRef.current = requestAnimationFrame(tick);
+            };
+
+            tick();
+
+            return () => {
+                if (rafRef.current != null) {
+                    cancelAnimationFrame(rafRef.current);
+                }
+                rafRef.current = null;
+            };
+        }
+
         const interval = setInterval(() => {
             setSeconds((prev) => {
-                const nextEndsAt = endsAtRef.current;
-                const nextInitial = initialSecondsRef.current;
                 const next = typeof nextEndsAt === 'number' && Number.isFinite(nextEndsAt)
-                    ? Math.max(0, Math.min(nextInitial, Math.ceil((nextEndsAt - Date.now()) / 1000)))
+                    ? computeSecondsLeft()
                     : Math.max(0, prev - 1);
 
                 if (next <= 0 && !completedRef.current) {
@@ -68,7 +103,7 @@ const Timer: React.FC<TimerProps> = ({
 
                 return next;
             });
-        }, 1000);
+        }, 500);
 
         return () => clearInterval(interval);
     }, [isPaused]);

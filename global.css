@@ -12,6 +12,10 @@ body,
   overflow-x: hidden;
 }
 
+html {
+  background: #FFF8EF;
+}
+
 body {
   margin: 0;
   padding: 0;

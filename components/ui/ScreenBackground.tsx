@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { LinearGradient } from '@/components/ui/LinearGradient';
 import Svg, { Circle } from '@/components/ui/Svg';
 import { twMerge } from 'tailwind-merge';
@@ -22,7 +22,11 @@ export default function ScreenBackground({ className = '', variant = 'default' }
     const stickerOpacity = variant === 'home' ? 0.85 : 0.55;
 
     return (
-        <View pointerEvents="none" className={twMerge('absolute inset-0 overflow-hidden', className)}>
+        <View
+            pointerEvents="none"
+            className={twMerge('absolute inset-0 overflow-hidden', className)}
+            style={[StyleSheet.absoluteFillObject as any, { backgroundColor: paperStops[0] } as any]}
+        >
             <LinearGradient
                 colors={paperStops}
                 start={{ x: 0, y: 0 }}
