@@ -1,20 +1,21 @@
 import React from 'react';
-import { Stack, usePathname, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from '@/components/ui/SafeArea';
 import { Alert, Platform, View, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@/components/ui/Ionicons';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { GameProvider, useGame } from '@/contexts/GameContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { fetchRoomState, joinRoom } from '@/services/roomService';
+import { usePathname, useRouter } from '@/lib/router';
 import '../global.css';
 
 const queryClient = new QueryClient();
 
 const LAST_ROOM_CODE_STORAGE_KEY = 'elbureau-last-room-code';
+const LAST_ROOM_CODE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 3;
 
 function isMobileWeb() {
     if (Platform.OS !== 'web') return false;
@@ -76,7 +77,6 @@ function GlobalImmersiveToggle() {
 
     return (
         <>
-            <StatusBar style="dark" hidden={isImmersive} />
             <View
                 pointerEvents="box-none"
                 style={{
@@ -111,7 +111,8 @@ function GlobalImmersiveToggle() {
 async function setLastRoomCode(value: string) {
     if (Platform.OS === 'web') {
         try {
-            (globalThis as any)?.sessionStorage?.setItem?.(LAST_ROOM_CODE_STORAGE_KEY, value);
+            const payload = JSON.stringify({ roomCode: value, savedAt: Date.now() });
+            (globalThis as any)?.localStorage?.setItem?.(LAST_ROOM_CODE_STORAGE_KEY, payload);
             return;
         } catch {
             // fallback
@@ -123,8 +124,22 @@ async function setLastRoomCode(value: string) {
 async function getLastRoomCode() {
     if (Platform.OS === 'web') {
         try {
-            const v = (globalThis as any)?.sessionStorage?.getItem?.(LAST_ROOM_CODE_STORAGE_KEY);
-            if (v) return v;
+            const raw = (globalThis as any)?.localStorage?.getItem?.(LAST_ROOM_CODE_STORAGE_KEY);
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                const roomCode = (parsed?.roomCode || '').toString();
+                const savedAt = Number(parsed?.savedAt);
+                if (!roomCode) return null;
+                if (Number.isFinite(savedAt) && Date.now() - savedAt > LAST_ROOM_CODE_MAX_AGE_MS) {
+                    (globalThis as any)?.localStorage?.removeItem?.(LAST_ROOM_CODE_STORAGE_KEY);
+                    return null;
+                }
+                return roomCode;
+            } catch {
+                // Backwards-compatible: older builds stored the raw code.
+                return raw;
+            }
         } catch {
             // fallback
         }
@@ -135,7 +150,7 @@ async function getLastRoomCode() {
 async function clearLastRoomCode() {
     if (Platform.OS === 'web') {
         try {
-            (globalThis as any)?.sessionStorage?.removeItem?.(LAST_ROOM_CODE_STORAGE_KEY);
+            (globalThis as any)?.localStorage?.removeItem?.(LAST_ROOM_CODE_STORAGE_KEY);
             return;
         } catch {
             // fallback
@@ -165,11 +180,19 @@ function ResumeBootstrap() {
         hadRoomRef.current = false;
     }, [gameState]);
 
+    const canAutoResume = React.useMemo(() => {
+        if (pathname === '/') return true;
+        if (pathname === '/lobby') return true;
+        if (pathname === '/game') return true;
+        if (pathname === '/results') return true;
+        return false;
+    }, [pathname]);
+
     React.useEffect(() => {
         if (hydratedRef.current) return;
         if (gameState || currentPlayer) return;
         if (!playerId) return;
-        if (pathname !== '/') return;
+        if (!canAutoResume) return;
 
         hydratedRef.current = true;
 
@@ -285,7 +308,7 @@ function ResumeBootstrap() {
         };
 
         run().catch(() => undefined);
-    }, [apiKey, currentPlayer, gameState, pathname, playerId, playerName, router, setCurrentPlayer, setGameState]);
+    }, [apiKey, canAutoResume, currentPlayer, gameState, playerId, playerName, router, setCurrentPlayer, setGameState]);
 
     return null;
 }
@@ -298,12 +321,9 @@ export default function RootLayout() {
                     <GameProvider>
                         <ResumeBootstrap />
                         <GlobalImmersiveToggle />
-                        <Stack
-                            screenOptions={{
-                                headerShown: false,
-                                contentStyle: { backgroundColor: '#F7F1E6' },
-                            }}
-                        />
+                        <View className="flex-1">
+                            <Outlet />
+                        </View>
                     </GameProvider>
                 </LanguageProvider>
             </QueryClientProvider>

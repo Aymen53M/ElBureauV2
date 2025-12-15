@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Text, StyleSheet, Animated, View, Platform } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle } from '@/components/ui/Svg';
 
 interface TimerProps {
     seconds: number;
@@ -101,7 +101,7 @@ const Timer: React.FC<TimerProps> = ({
             <Svg
                 width={config.container}
                 height={config.container}
-                style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
+                style={{ position: 'absolute', transform: 'rotate(-90deg)' }}
             >
                 {/* Background circle */}
                 <Circle

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
+import { SafeAreaView } from '@/components/ui/SafeArea';
+import { useRouter } from '@/lib/router';
+import { Ionicons } from '@/components/ui/Ionicons';
+import Slider from '@/components/ui/Slider';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
@@ -64,7 +64,7 @@ export default function CreateRoom() {
         }
 
         if (!isSupabaseConfigured) {
-            Alert.alert('Supabase', 'Realtime is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+            Alert.alert('Supabase', 'Realtime is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
             return;
         }
 
@@ -126,6 +126,7 @@ export default function CreateRoom() {
                 return;
             } catch (err) {
                 lastError = err;
+                console.error('Create room failed', { roomCode, err });
                 const msg = err instanceof Error ? err.message.toLowerCase() : '';
                 if (!msg.includes('duplicate') && !msg.includes('unique')) {
                     break;
@@ -133,7 +134,12 @@ export default function CreateRoom() {
             }
         }
 
-        Alert.alert(t('createRoom'), lastError instanceof Error ? lastError.message : 'Failed to create room');
+        const fallbackMsg = typeof lastError === 'string'
+            ? lastError
+            : lastError instanceof Error
+                ? lastError.message
+                : 'Failed to create room';
+        Alert.alert(t('createRoom'), `${fallbackMsg}\nRoom code: ${roomCode}`);
     };
 
     const canProceedStep0 = theme !== 'custom' || !!customTheme.trim();
@@ -284,7 +290,7 @@ export default function CreateRoom() {
                                 <CardContent className={isCompact ? 'space-y-2' : 'space-y-4'}>
                                     <Slider
                                         value={questionCount}
-                                        onValueChange={(val) => setQuestionCount(Math.round(val))}
+                                        onValueChange={(val: number) => setQuestionCount(Math.round(val))}
                                         minimumValue={5}
                                         maximumValue={20}
                                         step={1}
@@ -314,7 +320,7 @@ export default function CreateRoom() {
                                     <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
                                         <Slider
                                             value={timePerQuestion}
-                                            onValueChange={(val) => setTimePerQuestion(Math.round(val))}
+                                            onValueChange={(val: number) => setTimePerQuestion(Math.round(val))}
                                             minimumValue={10}
                                             maximumValue={60}
                                             step={5}

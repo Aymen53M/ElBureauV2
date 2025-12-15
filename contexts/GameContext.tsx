@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 import { Language } from './LanguageContext';
 
 export type GamePhase =
@@ -104,16 +102,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [apiKey, setApiKeyState] = useState('');
     const [playerName, setPlayerNameState] = useState('');
     const [deviceId, setDeviceId] = useState('');
-    const [sessionId, setSessionId] = useState('');
 
     // Load saved data on mount
     useEffect(() => {
         const loadSavedData = async () => {
             try {
                 // Load API key from secure storage
-                const savedApiKey = Platform.OS === 'web'
-                    ? await AsyncStorage.getItem(API_KEY_STORAGE_KEY)
-                    : await SecureStore.getItemAsync(API_KEY_STORAGE_KEY);
+                const savedApiKey = await AsyncStorage.getItem(API_KEY_STORAGE_KEY);
                 if (savedApiKey) {
                     setApiKeyState(savedApiKey);
                 }
@@ -131,25 +126,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const nextId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
                     await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
                     setDeviceId(nextId);
-                }
-
-                if (Platform.OS === 'web') {
-                    try {
-                        const key = 'elbureau-session-id';
-                        const sessionStorageRef = (globalThis as any)?.sessionStorage as
-                            | { getItem?: (k: string) => string | null; setItem?: (k: string, v: string) => void }
-                            | undefined;
-                        const existing = sessionStorageRef?.getItem?.(key);
-                        if (existing) {
-                            setSessionId(existing);
-                        } else {
-                            const next = `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-                            sessionStorageRef?.setItem?.(key, next);
-                            setSessionId(next);
-                        }
-                    } catch {
-                        setSessionId(`session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
-                    }
                 }
             } catch (error) {
                 console.error('Failed to load saved data:', error);
@@ -181,17 +157,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
     }, [apiKey, currentPlayer?.id]);
 
-    const playerId = Platform.OS === 'web'
-        ? (deviceId && sessionId ? `${deviceId}:${sessionId}` : deviceId)
-        : deviceId;
+    const playerId = deviceId;
 
     const setApiKey = async (key: string) => {
         try {
-            if (Platform.OS === 'web') {
-                await AsyncStorage.setItem(API_KEY_STORAGE_KEY, key);
-            } else {
-                await SecureStore.setItemAsync(API_KEY_STORAGE_KEY, key);
-            }
+            await AsyncStorage.setItem(API_KEY_STORAGE_KEY, key);
             setApiKeyState(key);
 
             // Keep the game state's player key ledger in sync so hosts/personal rounds

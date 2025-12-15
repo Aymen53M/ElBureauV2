@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Image, Pressable, Alert } from 'react-native';
 import { twMerge } from 'tailwind-merge';
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname, useRouter } from '@/lib/router';
+
+import logoSource from '../assets/Flowting Logo.png';
 
 interface LogoProps {
     size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -60,8 +62,6 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
         ]);
     };
 
-    const logoSource = require('../assets/Flowting Logo.png');
-
     return (
         <Pressable
             onPress={handlePress}
@@ -71,7 +71,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
             {/* Glow effect behind */}
             <View className="absolute inset-0" style={styles.glow}>
                 <Image
-                    source={logoSource}
+                    source={{ uri: logoSource }}
                     style={[{ width: sizePx.w, height: sizePx.h, opacity: 0.55 }, styles.glowImage]}
                     resizeMode="contain"
                 />
@@ -80,7 +80,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
             {/* Main logo */}
             <Animated.View style={animated ? { transform: [{ translateY: animatedValue }] } : undefined}>
                 <Image
-                    source={logoSource}
+                    source={{ uri: logoSource }}
                     style={{ width: sizePx.w, height: sizePx.h }}
                     resizeMode="contain"
                 />

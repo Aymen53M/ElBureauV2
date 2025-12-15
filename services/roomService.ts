@@ -30,6 +30,15 @@ export type RoomState = {
     players: Player[];
 };
 
+function formatDbError(err: any): string {
+    if (!err) return 'UNKNOWN_ERROR';
+    const msg = typeof err?.message === 'string' ? err.message : String(err);
+    const code = err?.code ? ` (code ${String(err.code)})` : '';
+    const details = err?.details ? `\n${String(err.details)}` : '';
+    const hint = err?.hint ? `\n${String(err.hint)}` : '';
+    return `${msg}${code}${details}${hint}`;
+}
+
 function requireSupabase() {
     if (!isSupabaseConfigured || !supabase) {
         throw new Error('SUPABASE_NOT_CONFIGURED');
@@ -136,7 +145,7 @@ export async function createRoom(args: {
     });
 
     if (insertRoomError) {
-        throw new Error(insertRoomError.message);
+        throw new Error(formatDbError(insertRoomError));
     }
 
     const { error: insertHostError } = await client.from('elbureau_room_players').upsert({
@@ -152,7 +161,7 @@ export async function createRoom(args: {
     }, { onConflict: 'room_code,player_id' });
 
     if (insertHostError) {
-        throw new Error(insertHostError.message);
+        throw new Error(formatDbError(insertHostError));
     }
 
     return fetchRoomState(roomCode);

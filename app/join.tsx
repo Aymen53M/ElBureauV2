@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from '@/components/ui/SafeArea';
+import { useRouter } from '@/lib/router';
+import { Ionicons } from '@/components/ui/Ionicons';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -30,7 +30,7 @@ export default function JoinRoom() {
         if (!canJoin) return;
 
         if (!isSupabaseConfigured) {
-            Alert.alert('Supabase', 'Realtime is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+            Alert.alert('Supabase', 'Realtime is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
             return;
         }
 

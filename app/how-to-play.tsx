@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from '@/components/ui/SafeArea';
+import { useRouter } from '@/lib/router';
+import { Ionicons } from '@/components/ui/Ionicons';
 import { Card, CardContent } from '@/components/ui/Card';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';

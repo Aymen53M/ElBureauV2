@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
+import { LinearGradient } from '@/components/ui/LinearGradient';
+import Svg, { Circle } from '@/components/ui/Svg';
 import { twMerge } from 'tailwind-merge';
 import { useLanguage } from '@/contexts/LanguageContext';
 

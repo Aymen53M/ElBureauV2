@@ -1,15 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Asset } from 'expo-asset';
+import { SafeAreaView } from '@/components/ui/SafeArea';
+import { Link } from '@/lib/router';
+import { Ionicons } from '@/components/ui/Ionicons';
 import Button from '@/components/ui/Button';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const floatingLogo = require('../assets/Flowting Logo.png');
+import floatingLogo from '../assets/Flowting Logo.png';
 
 export default function Index() {
     const { t, isRTL } = useLanguage();
@@ -19,22 +18,6 @@ export default function Index() {
     const [logoError, setLogoError] = useState(false);
 
     const floatAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        let mounted = true;
-        Asset.fromModule(floatingLogo)
-            .downloadAsync()
-            .then(() => {
-                if (mounted) setLogoError(false);
-            })
-            .catch(() => {
-                if (mounted) setLogoError(true);
-            });
-
-        return () => {
-            mounted = false;
-        };
-    }, []);
 
     useEffect(() => {
         const animation = Animated.loop(
@@ -88,7 +71,7 @@ export default function Index() {
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
                             {!logoError ? (
                                 <Animated.Image
-                                    source={floatingLogo}
+                                    source={{ uri: floatingLogo }}
                                     resizeMode="contain"
                                     style={{ width: logoWidth, height: logoHeight }}
                                     onError={() => setLogoError(true)}

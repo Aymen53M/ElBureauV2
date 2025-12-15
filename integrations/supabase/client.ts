@@ -1,14 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+const metaEnv = (import.meta as any)?.env as Record<string, string | undefined> | undefined;
+const nodeEnv = (globalThis as any)?.process?.env as Record<string, string | undefined> | undefined;
+
 const supabaseUrl =
-    process.env.EXPO_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL;
+    metaEnv?.VITE_SUPABASE_URL ||
+    nodeEnv?.VITE_SUPABASE_URL ||
+    nodeEnv?.SUPABASE_URL;
+
 const supabaseAnonKey =
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    metaEnv?.VITE_SUPABASE_ANON_KEY ||
+    metaEnv?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    nodeEnv?.VITE_SUPABASE_ANON_KEY ||
+    nodeEnv?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    nodeEnv?.SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
 

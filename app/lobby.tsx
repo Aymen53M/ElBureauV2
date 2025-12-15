@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Platform, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from '@/components/ui/SafeArea';
+import { useRouter } from '@/lib/router';
+import { copyToClipboard } from '@/lib/clipboard';
+import { Ionicons } from '@/components/ui/Ionicons';
 import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
@@ -146,7 +146,7 @@ export default function Lobby() {
     const allReady = gameState.players.every(p => p.isReady);
 
     const copyRoomCode = async () => {
-        await Clipboard.setStringAsync(gameState.roomCode);
+        await copyToClipboard(gameState.roomCode);
         Alert.alert(t('copied'), gameState.roomCode);
     };
 
@@ -246,8 +246,8 @@ export default function Lobby() {
                             <CardContent className="p-5 space-y-2">
                                 <Text className="font-display font-bold text-foreground">Realtime not configured</Text>
                                 <Text className="text-sm text-muted-foreground">
-                                    This deployment is missing Supabase environment variables. Set EXPO_PUBLIC_SUPABASE_URL and
-                                    EXPO_PUBLIC_SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY) in Vercel,
+                                    This deployment is missing Supabase environment variables. Set VITE_SUPABASE_URL and
+                                    VITE_SUPABASE_ANON_KEY in Vercel,
                                     then redeploy.
                                 </Text>
                             </CardContent>
