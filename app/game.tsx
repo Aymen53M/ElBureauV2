@@ -111,6 +111,7 @@ export default function Game() {
     const refreshInFlightRef = React.useRef(false);
     const lastQuestionsSignatureRef = React.useRef<string>('');
     const autoAdvanceInFlightRef = React.useRef(false);
+    const timeoutAdvanceInFlightRef = React.useRef(false);
     const submitInFlightRef = React.useRef(false);
     const personalFinalGenerationInFlightRef = React.useRef(false);
     const roomQuestionsCountRef = React.useRef<number>(0);
@@ -184,6 +185,41 @@ export default function Game() {
         if (!Number.isFinite(started)) return undefined;
         return started + timePerQuestionSeconds * 1000;
     }, [phase, phaseStartedAt, timePerQuestionSeconds]);
+
+    useEffect(() => {
+        if (!gameState?.roomCode) return;
+        if (!(phase === 'question' || phase === 'final-question')) return;
+        if (typeof phaseEndsAtMs !== 'number' || !Number.isFinite(phaseEndsAtMs)) return;
+
+        const hostId = gameState?.hostId;
+        const isHostNow = !!currentPlayer?.id && !!hostId && currentPlayer.id === hostId;
+        if (!isHostNow) return;
+
+        const fromPhase = phase;
+        const toPhase = phase === 'question' ? 'preview' : 'final-validation';
+        const roomCode = gameState.roomCode;
+
+        const runAdvance = () => {
+            if (timeoutAdvanceInFlightRef.current) return;
+            timeoutAdvanceInFlightRef.current = true;
+            setRoomPhaseIfCurrent({ roomCode, fromPhase, toPhase })
+                .catch((err) => {
+                    console.error('Failed to advance on timeout', err);
+                })
+                .finally(() => {
+                    timeoutAdvanceInFlightRef.current = false;
+                });
+        };
+
+        const msRemaining = phaseEndsAtMs - Date.now();
+        if (msRemaining <= 0) {
+            runAdvance();
+            return;
+        }
+
+        const timeoutId = setTimeout(runAdvance, msRemaining + 80);
+        return () => clearTimeout(timeoutId);
+    }, [currentPlayer?.id, gameState?.hostId, gameState?.roomCode, phase, phaseEndsAtMs]);
 
     const isFinalRound = phase.startsWith('final');
     const totalQuestions = isFinalRound ? 1 : questions.length;
@@ -266,12 +302,36 @@ export default function Game() {
                 return;
             }
 
-            const betValue = betsByPlayerId[activePlayer.id] ?? selectedBet;
-            if (!betValue) return;
+            const resolveSmallestUnusedBet = (total: number, used: number[]) => {
+                if (!Number.isFinite(total) || total <= 0) return null;
+                for (let i = 1; i <= total; i++) {
+                    if (!used.includes(i)) return i;
+                }
+                return null;
+            };
 
-            if (usedBetsForPlayer.includes(betValue)) {
-                Alert.alert(t('placeBet'), t('betAlreadyUsed'));
-                return;
+            const persistedBet = betsByPlayerId[activePlayer.id];
+            let betValue = typeof persistedBet === 'number' && Number.isFinite(persistedBet)
+                ? persistedBet
+                : (typeof selectedBet === 'number' && Number.isFinite(selectedBet) ? selectedBet : null);
+
+            if (typeof betValue === 'number' && usedBetsForPlayer.includes(betValue)) {
+                betValue = null;
+            }
+
+            if (typeof betValue !== 'number' || !Number.isFinite(betValue) || betValue <= 0) {
+                const total =
+                    questions.length ||
+                    roomQuestionsCountRef.current ||
+                    gameState.settings.numberOfQuestions ||
+                    0;
+                const smallest = resolveSmallestUnusedBet(total, usedBetsForPlayer || []);
+                if (!smallest) {
+                    Alert.alert(t('placeBet'), t('betAlreadyUsed'));
+                    return;
+                }
+                betValue = smallest;
+                setSelectedBet(smallest);
             }
 
             await submitBet({
@@ -812,6 +872,9 @@ export default function Game() {
 
     const handleTimerComplete = () => {
         if (!gameState?.roomCode) return;
+        const hostId = gameState?.hostId;
+        const isHostNow = !!currentPlayer?.id && !!hostId && currentPlayer.id === hostId;
+        if (!isHostNow) return;
         if (phase === 'question') {
             setRoomPhaseIfCurrent({ roomCode: gameState.roomCode, fromPhase: 'question', toPhase: 'preview' }).catch((err) => {
                 console.error('Failed to advance on timer (question->preview)', err);
@@ -836,29 +899,41 @@ export default function Game() {
         try {
             if (!phase.startsWith('final')) {
                 const answers = await fetchAnswers({ roomCode: gameState.roomCode, questionIndex: currentQuestionIndex });
+                const answerMap: Record<string, string> = {};
+                answers.forEach((a) => {
+                    answerMap[a.player_id] = a.answer;
+                });
                 await Promise.all(
-                    answers.map((a) =>
-                        upsertValidation({
+                    gameState.players.map((p) => {
+                        const a = (answerMap[p.id] || '').trim();
+                        const isCorrect = a ? isAnswerCorrect(a, activeQuestion) : false;
+                        return upsertValidation({
                             roomCode: gameState.roomCode,
                             questionIndex: currentQuestionIndex,
-                            playerId: a.player_id,
-                            isCorrect: isAnswerCorrect(a.answer, activeQuestion),
+                            playerId: p.id,
+                            isCorrect,
                             validatedBy: currentPlayer?.id,
-                        })
-                    )
+                        });
+                    })
                 );
                 await setRoomPhase({ roomCode: gameState.roomCode, phase: 'validation' });
             } else {
                 const answers = await fetchFinalAnswers(gameState.roomCode);
+                const answerMap: Record<string, string> = {};
+                answers.forEach((a) => {
+                    answerMap[a.player_id] = a.answer;
+                });
                 await Promise.all(
-                    answers.map((a) =>
-                        upsertFinalValidation({
+                    gameState.players.map((p) => {
+                        const a = (answerMap[p.id] || '').trim();
+                        const isCorrect = a ? isAnswerCorrect(a, activeQuestion) : false;
+                        return upsertFinalValidation({
                             roomCode: gameState.roomCode,
-                            playerId: a.player_id,
-                            isCorrect: isAnswerCorrect(a.answer, activeQuestion),
+                            playerId: p.id,
+                            isCorrect,
                             validatedBy: currentPlayer?.id,
-                        })
-                    )
+                        });
+                    })
                 );
                 await setRoomPhase({ roomCode: gameState.roomCode, phase: 'final-validation' });
             }
@@ -1272,7 +1347,7 @@ export default function Game() {
                             <Button
                                 variant="hero"
                                 onPress={handleSubmit}
-                                disabled={!selectedAnswer?.trim() || !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) || !!answerBoard[activePlayer.id]?.hasAnswered}
+                                disabled={!selectedAnswer?.trim() || !!answerBoard[activePlayer.id]?.hasAnswered}
                                 className="w-full"
                             >
                                 <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
@@ -1430,7 +1505,7 @@ export default function Game() {
                                 totalQuestions={totalQuestions}
                                 selectedAnswer={selectedAnswer}
                                 onSelectAnswer={handleAnswerSubmit}
-                                isAnswerPhase={phase === 'final-question' || (phase === 'preview' && !showCorrectAnswer && !answerBoard[activePlayer.id]?.hasAnswered)}
+                                isAnswerPhase={phase === 'final-question'}
                                 density={isCompact ? 'compact' : 'default'}
                                 headerAccessory={
                                     phase === 'final-question' ? (
@@ -1447,42 +1522,7 @@ export default function Game() {
                                 hintsEnabled={gameState.settings.hintsEnabled}
                             />
 
-                            {phase === 'preview' && !showCorrectAnswer && !isFinalRound && !answerBoard[activePlayer.id]?.hasAnswered && (
-                                <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
-                                    <Card className="border-accent/30 rounded-3xl">
-                                        <CardContent className={isCompact ? 'p-6 space-y-4' : 'p-9 space-y-6'}>
-                                            <View className="items-center">
-                                                <View className="px-4 py-2 rounded-full bg-accent/20">
-                                                    <Text className="text-accent font-display font-bold">
-                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <BetSelector
-                                                totalQuestions={totalQuestions}
-                                                usedBets={usedBetsForPlayer}
-                                                selectedBet={selectedBet}
-                                                onSelectBet={setSelectedBet}
-                                                showHeader={false}
-                                                density={isCompact ? 'compact' : 'default'}
-                                                variant="grid"
-                                            />
-                                        </CardContent>
-                                    </Card>
-
-                                    <Button
-                                        variant="hero"
-                                        onPress={handleSubmit}
-                                        disabled={!selectedAnswer?.trim() || !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) || !!answerBoard[activePlayer.id]?.hasAnswered}
-                                        className="w-full"
-                                    >
-                                        <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
-                                            {t('submit')}
-                                        </Text>
-                                    </Button>
-                                </View>
-                            )}
+                            {phase === 'preview' && !showCorrectAnswer && !isFinalRound && !answerBoard[activePlayer.id]?.hasAnswered && null}
 
                             {phase === 'final-question' && (
                                 <Button
