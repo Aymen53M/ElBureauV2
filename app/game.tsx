@@ -9,6 +9,7 @@ import BetSelector from '@/components/BetSelector';
 import Timer from '@/components/Timer';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
+import Slider from '@/components/ui/Slider';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player, GameSettings } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -140,6 +141,7 @@ export default function Game() {
     const [finalMode, setFinalMode] = useState<'personalized' | 'shared'>('shared');
     const [finalQuestion, setFinalQuestion] = useState<Question | null>(null);
     const [isLoadingFinal, setIsLoadingFinal] = useState(false);
+    const [finalWagerDraft, setFinalWagerDraft] = useState(0);
 
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
     const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
@@ -191,6 +193,29 @@ export default function Game() {
         ? currentFinalChoice.wager
         : (betsByPlayerId[activePlayer?.id || ''] ?? selectedBet ?? null);
 
+    const difficultyVote = useMemo(() => {
+        const counts = { easy: 0, medium: 0, hard: 0 } as Record<'easy' | 'medium' | 'hard', number>;
+        (gameState?.players || []).forEach((p) => {
+            const raw = finalChoices[p.id]?.difficulty || 'medium';
+            const d = (raw === 'easy' || raw === 'hard' ? raw : 'medium') as 'easy' | 'medium' | 'hard';
+            counts[d] += 1;
+        });
+        const entries = (Object.entries(counts) as Array<['easy' | 'medium' | 'hard', number]>);
+        let best: 'easy' | 'medium' | 'hard' = 'medium';
+        let bestCount = -1;
+        let tie = false;
+        for (const [d, c] of entries) {
+            if (c > bestCount) {
+                best = d;
+                bestCount = c;
+                tie = false;
+            } else if (c === bestCount) {
+                tie = true;
+            }
+        }
+        return { counts, selected: (tie ? 'medium' : best) as Difficulty };
+    }, [finalChoices, gameState?.players]);
+
     const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
     const showCorrectAnswer =
         phase === 'validation' ||
@@ -210,6 +235,14 @@ export default function Game() {
             setTimerKey((prev) => prev + 1);
         }
     }, [phase, currentQuestionIndex]);
+
+    useEffect(() => {
+        if (phase !== 'final-wager') return;
+        if (!activePlayer?.id) return;
+        const saved = finalChoices[activePlayer.id]?.wager;
+        const next = typeof saved === 'number' && Number.isFinite(saved) ? saved : 0;
+        setFinalWagerDraft((prev) => (prev === next ? prev : next));
+    }, [activePlayer?.id, finalChoices, phase]);
 
     useEffect(() => {
         if (!(phase === 'question' || phase === 'final-question')) return;
@@ -738,27 +771,31 @@ export default function Game() {
 
     if (!gameState || !activePlayer) {
         return (
-            <SafeAreaView className="flex-1 bg-background items-center justify-center p-4">
+            <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8EF', position: 'relative' }}>
                 <ScreenBackground variant="game" />
-                <ActivityIndicator size="large" color="#C97B4C" />
-                <Text className="text-base text-muted-foreground mt-4">{t('loading')}</Text>
+                <View className="flex-1 w-full items-center justify-center p-4">
+                    <ActivityIndicator size="large" color="#C97B4C" />
+                    <Text className="text-base text-muted-foreground mt-4">{t('loading')}</Text>
+                </View>
             </SafeAreaView>
         );
     }
 
     if (isLoading) {
         return (
-            <SafeAreaView className="flex-1 bg-background items-center justify-center p-4">
+            <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8EF', position: 'relative' }}>
                 <ScreenBackground variant="game" />
-                <Logo size="lg" animated />
-                <View className="mt-8 items-center max-w-2xl">
-                    <ActivityIndicator size="large" color="#C97B4C" />
-                    <Text className="text-2xl font-display font-bold text-foreground mt-4 text-center">
-                        {loadingMessage || 'Loading...'}
-                    </Text>
-                    <Text className="text-muted-foreground mt-2 text-center">
-                        {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
-                    </Text>
+                <View className="flex-1 w-full items-center justify-center p-4">
+                    <Logo size="lg" animated />
+                    <View className="mt-8 items-center max-w-2xl">
+                        <ActivityIndicator size="large" color="#C97B4C" />
+                        <Text className="text-2xl font-display font-bold text-foreground mt-4 text-center">
+                            {loadingMessage || 'Loading...'}
+                        </Text>
+                        <Text className="text-muted-foreground mt-2 text-center">
+                            {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
+                        </Text>
+                    </View>
                 </View>
             </SafeAreaView>
         );
@@ -971,12 +1008,17 @@ export default function Game() {
         };
         setFinalChoices((prev) => ({ ...prev, [activePlayer.id]: next }));
 
-        if (next.wager === null) return;
+        const shouldPersist = typeof updates.wager !== 'undefined' || typeof updates.difficulty !== 'undefined';
+        if (!shouldPersist) return;
+
+        const wagerToPersist = typeof next.wager === 'number' && Number.isFinite(next.wager)
+            ? next.wager
+            : Math.max(0, Math.min(activePlayer.score, Math.round(finalWagerDraft || 0)));
         try {
             await upsertFinalChoice({
                 roomCode: gameState.roomCode,
                 playerId: activePlayer.id,
-                wager: next.wager,
+                wager: wagerToPersist,
                 difficulty: next.difficulty,
                 mode: finalMode,
             });
@@ -997,11 +1039,7 @@ export default function Game() {
             return;
         }
 
-        const hostChoice = finalChoices[currentPlayer?.id || ''] || { wager: null, difficulty: 'medium' as Difficulty };
-        if (hostChoice.wager === null) {
-            Alert.alert(t('finalWager'), t('finalWagerDesc'));
-            return;
-        }
+        const votedDifficulty = difficultyVote.selected;
 
         const hostKey = gameState.hostApiKey || apiKey;
         if (!hostKey) {
@@ -1013,7 +1051,7 @@ export default function Game() {
         const finalSettings = {
             ...gameState.settings,
             numberOfQuestions: 1,
-            difficulty: hostChoice.difficulty,
+            difficulty: votedDifficulty,
             questionType: 'open-ended' as const,
         };
         const result = await generateQuestions(finalSettings, hostKey);
@@ -1173,16 +1211,31 @@ export default function Game() {
                                         </View>
                                     )}
 
-                                    <View className="flex-row justify-center gap-3">
-                                        {[0, 10, 20].map((w) => (
-                                            <TouchableOpacity
-                                                key={w}
-                                                onPress={() => updateFinalChoice({ wager: w })}
-                                                className={`px-4 py-3 rounded-xl border-2 ${currentFinalChoice.wager === w ? 'border-accent bg-accent/20' : 'border-border bg-muted'}`}
-                                            >
-                                                <Text className="font-display font-bold text-foreground">{w} {t('points')}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                    <View className="space-y-2">
+                                        <Text className="text-center font-semibold text-foreground">
+                                            {t('yourBet')}: {finalWagerDraft} {t('points')}
+                                        </Text>
+                                        <Slider
+                                            value={finalWagerDraft}
+                                            onValueChange={(val: number) => setFinalWagerDraft(Math.max(0, Math.min(activePlayer.score, Math.round(val))))}
+                                            minimumValue={0}
+                                            maximumValue={Math.max(0, activePlayer.score)}
+                                            step={1}
+                                            minimumTrackTintColor="#C97B4C"
+                                            maximumTrackTintColor="#E2CFBC"
+                                            thumbTintColor="#C97B4C"
+                                        />
+                                        <View className="flex-row justify-between">
+                                            <Text className="text-xs text-muted-foreground">0</Text>
+                                            <Text className="text-xs text-muted-foreground">{activePlayer.score}</Text>
+                                        </View>
+                                        <Button
+                                            variant="outline"
+                                            onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
+                                            className="w-full"
+                                        >
+                                            <Text className="font-display font-bold text-primary">{t('submit')}</Text>
+                                        </Button>
                                     </View>
 
                                     <View className="space-y-3">
@@ -1198,6 +1251,12 @@ export default function Game() {
                                                 </TouchableOpacity>
                                             ))}
                                         </View>
+                                        <Text className="text-center text-xs text-muted-foreground">
+                                            {t('easy')}: {difficultyVote.counts.easy} · {t('medium')}: {difficultyVote.counts.medium} · {t('hard')}: {difficultyVote.counts.hard}
+                                        </Text>
+                                        <Text className="text-center text-sm text-muted-foreground">
+                                            {t('difficulty')}: {t(difficultyVote.selected)}
+                                        </Text>
                                     </View>
 
                                     {isHost ? (
