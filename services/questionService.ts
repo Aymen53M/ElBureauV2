@@ -7,6 +7,8 @@ interface GenerateQuestionsResponse {
     retryAfterMs?: number;
 }
 
+let geminiCooldownUntilMs = 0;
+
 function normalizeTrueFalseAnswer(raw: string): 'True' | 'False' | '' {
     const v = raw.trim().toLowerCase();
     if (v === 'true' || v === 'vrai' || v === 'صح' || v === 'صحيح' || v === 'نعم' || v === 'oui' || v === 'yes') return 'True';
@@ -62,6 +64,17 @@ async function fetchGeminiJsonText(args: {
     temperature: number;
     maxOutputTokens?: number;
 }): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode; retryAfterMs?: number }> {
+    const now = Date.now();
+    if (now < geminiCooldownUntilMs) {
+        const remainingMs = geminiCooldownUntilMs - now;
+        return {
+            ok: false,
+            code: 'RATE_LIMITED',
+            retryAfterMs: remainingMs,
+            error: `Gemini is busy. Please retry in ${Math.ceil(remainingMs / 1000)}s.`,
+        };
+    }
+
     const buildRequestBody = () =>
         JSON.stringify({
             systemInstruction: { parts: [{ text: args.systemPrompt }] },
@@ -148,6 +161,7 @@ async function fetchGeminiJsonText(args: {
 
         if (response.status === 429) {
             if (retryAfterMs > 0) {
+                geminiCooldownUntilMs = Date.now() + retryAfterMs;
                 return {
                     ok: false,
                     code: 'RATE_LIMITED',
@@ -163,6 +177,15 @@ async function fetchGeminiJsonText(args: {
                     error: 'Gemini quota exceeded for this key. Check your plan/billing and try again later.',
                 };
             }
+
+            const waitMs = 15000;
+            geminiCooldownUntilMs = Date.now() + waitMs;
+            return {
+                ok: false,
+                code: 'RATE_LIMITED',
+                retryAfterMs: waitMs,
+                error: `Gemini rate limit reached. Please retry in ${Math.ceil(waitMs / 1000)}s.`,
+            };
         }
 
         if (response.status === 403 && looksLikeQuota) {
@@ -183,6 +206,7 @@ async function fetchGeminiJsonText(args: {
 
         if (response.status === 503 || response.status >= 500) {
             const waitMs = Math.max(retryAfterMs > 0 ? retryAfterMs : 15000, 15000);
+            geminiCooldownUntilMs = Date.now() + waitMs;
             return {
                 ok: false,
                 code: 'SERVICE_UNAVAILABLE',

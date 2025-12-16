@@ -439,6 +439,7 @@ export default function Game() {
         let cancelled = false;
         let refreshQueued = false;
         let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+        let generationCooldownTimer: ReturnType<typeof setTimeout> | null = null;
         const debounceMs = Platform.OS === 'web' ? 240 : 60;
 
         const scheduleRefresh = () => {
@@ -682,7 +683,17 @@ export default function Game() {
                 const fetchedQuestionsEmpty = includeQuestions && Array.isArray(meta.questions) && meta.questions.length === 0;
                 if (fetchedQuestionsEmpty && (currentPlayer?.id === roomState.room.host_player_id)) {
                     if (Date.now() < questionsGenerationCooldownUntilRef.current) {
-                        setLoadingMessage(t('generatingQuestions'));
+                        const remainingMs = questionsGenerationCooldownUntilRef.current - Date.now();
+                        const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+                        setLoadingMessage(`Gemini is busy. Retrying in ${seconds}s.`);
+
+                        if (!generationCooldownTimer) {
+                            generationCooldownTimer = setTimeout(() => {
+                                generationCooldownTimer = null;
+                                if (cancelled) return;
+                                scheduleRefresh();
+                            }, Math.max(250, remainingMs + 80));
+                        }
                         return;
                     }
                     if (questionsGenerationInFlightRef.current) {
@@ -760,7 +771,7 @@ export default function Game() {
                             if (!tr?.error && tr?.questions?.length) {
                                 byLanguage[targetLanguage] = tr.questions;
                             }
-                            if (tr?.code === 'RATE_LIMITED') {
+                            if (tr?.code === 'RATE_LIMITED' || tr?.code === 'SERVICE_UNAVAILABLE') {
                                 break;
                             }
                         }
@@ -966,6 +977,10 @@ export default function Game() {
             if (refreshTimer) {
                 clearTimeout(refreshTimer);
                 refreshTimer = null;
+            }
+            if (generationCooldownTimer) {
+                clearTimeout(generationCooldownTimer);
+                generationCooldownTimer = null;
             }
             subscriptionRef.current?.unsubscribe();
             subscriptionRef.current = null;
