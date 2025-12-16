@@ -702,6 +702,13 @@ export default function Game() {
                     questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
                     if (result.error) {
+                        if (result.code === 'RATE_LIMITED' && (result as any).retryAfterMs) {
+                            const retryAfterMs = Number((result as any).retryAfterMs);
+                            questionsGenerationCooldownUntilRef.current = Date.now() + Math.max(1000, retryAfterMs);
+                            setLoadingMessage(result.error);
+                            return;
+                        }
+
                         questionsGenerationCooldownUntilRef.current = Date.now() + 60_000;
                         if (result.code === 'QUOTA_EXCEEDED') {
                             Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
@@ -732,27 +739,24 @@ export default function Game() {
                             )
                         );
                         const targets = languagesInRoom.filter((l) => l !== baseLang);
-
-                        const translations = await Promise.all(
-                            targets.map((targetLanguage) =>
-                                translateQuestions({
-                                    sourceQuestions: baseQuestions,
-                                    sourceLanguage: baseLang,
-                                    targetLanguage,
-                                    apiKey: hostKey,
-                                })
-                            )
-                        );
-
                         const byLanguage: Record<string, Question[]> = {
                             [baseLang]: baseQuestions,
                         };
-                        targets.forEach((targetLanguage, idx) => {
-                            const tr = translations[idx];
+
+                        for (const targetLanguage of targets) {
+                            const tr = await translateQuestions({
+                                sourceQuestions: baseQuestions,
+                                sourceLanguage: baseLang,
+                                targetLanguage,
+                                apiKey: hostKey,
+                            });
                             if (!tr?.error && tr?.questions?.length) {
                                 byLanguage[targetLanguage] = tr.questions;
                             }
-                        });
+                            if (tr?.code === 'RATE_LIMITED') {
+                                break;
+                            }
+                        }
 
                         await updateRoomQuestions({
                             roomCode,
@@ -1018,19 +1022,23 @@ export default function Game() {
     }
 
     if (isLoading) {
+        const isHostLoading = !!currentPlayer?.id && currentPlayer.id === gameState.hostId;
+        const isWaitingForHostLoading = loadingMessage === t('waitingForHost');
         return (
             <SafeAreaView className="flex-1 bg-background relative">
                 <ScreenBackground variant="game" />
-                <View className="flex-1 w-full items-center justify-center p-4">
-                    <Logo size="lg" animated />
-                    <View className="mt-8 items-center max-w-2xl bg-white p-6 rounded-lg border-2 border-foreground shadow-[4px_4px_0px_#2B1F17] transform rotate-1">
+                <View className="flex-1 w-full items-center justify-center px-4">
+                    <Logo size={isCompact ? 'md' : 'lg'} animated />
+                    <View className={`mt-6 w-full max-w-xl items-center bg-white ${isCompact ? 'p-5' : 'p-6'} rounded-lg border-2 border-foreground shadow-[4px_4px_0px_#2B1F17] transform rotate-1`}>
                         <ActivityIndicator size="large" color="#C17F59" />
-                        <Text className="text-2xl font-display font-bold text-foreground mt-4 text-center">
-                            {loadingMessage || 'Loading...'}
+                        <Text className={`${isCompact ? 'text-xl mt-3' : 'text-2xl mt-4'} font-display font-bold text-foreground text-center`}>
+                            {loadingMessage || t('loading')}
                         </Text>
-                        <Text className="text-muted-foreground mt-2 text-center text-base font-sans">
-                            {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
-                        </Text>
+                        {isHostLoading && !isWaitingForHostLoading && (
+                            <Text className={`${isCompact ? 'text-sm mt-2' : 'text-base mt-2'} text-muted-foreground text-center font-sans`}>
+                                {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
+                            </Text>
+                        )}
                     </View>
                 </View>
             </SafeAreaView>

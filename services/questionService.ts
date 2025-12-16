@@ -4,6 +4,7 @@ interface GenerateQuestionsResponse {
     questions?: Question[];
     error?: string;
     code?: string;
+    retryAfterMs?: number;
 }
 
 function normalizeTrueFalseAnswer(raw: string): 'True' | 'False' | '' {
@@ -59,7 +60,7 @@ async function fetchGeminiJsonText(args: {
     systemPrompt: string;
     userPrompt: string;
     temperature: number;
-}): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode }> {
+}): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode; retryAfterMs?: number }> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
     const response = await retryFetch(url, {
@@ -83,9 +84,37 @@ async function fetchGeminiJsonText(args: {
 
     if (!response.ok) {
         const body = await response.text();
-        console.error('Gemini error', response.status, body);
 
         const bodyLower = body.toLowerCase();
+        const parseRetryDelayMs = (raw: string) => {
+            try {
+                const parsed = JSON.parse(raw);
+                const details = parsed?.error?.details;
+                if (Array.isArray(details)) {
+                    const retryInfo = details.find((d: any) => String(d?.['@type'] || '').includes('RetryInfo'));
+                    const delayRaw = retryInfo?.retryDelay;
+                    if (typeof delayRaw === 'string') {
+                        const m = delayRaw.trim().match(/^(\d+)(?:\.(\d+))?s$/i);
+                        if (m) {
+                            const seconds = Number(`${m[1]}.${m[2] || '0'}`);
+                            if (Number.isFinite(seconds) && seconds > 0) return Math.round(seconds * 1000);
+                        }
+                    }
+                }
+            } catch {
+                // ignore
+            }
+
+            const msgMatch = raw.match(/retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s/i);
+            if (msgMatch) {
+                const seconds = Number(msgMatch[1]);
+                if (Number.isFinite(seconds) && seconds > 0) return Math.round(seconds * 1000);
+            }
+            return 0;
+        };
+
+        const retryAfterMs = parseRetryDelayMs(body);
+
         const looksLikeQuota =
             bodyLower.includes('quota') ||
             bodyLower.includes('resource_exhausted') ||
@@ -96,11 +125,30 @@ async function fetchGeminiJsonText(args: {
         const looksLikeInvalidKey =
             bodyLower.includes('api key') && (bodyLower.includes('invalid') || bodyLower.includes('not valid') || bodyLower.includes('expired'));
 
-        if ((response.status === 429 || response.status === 403) && looksLikeQuota) {
+        if (response.status === 429) {
+            if (retryAfterMs > 0) {
+                return {
+                    ok: false,
+                    code: 'RATE_LIMITED',
+                    retryAfterMs,
+                    error: `Gemini rate limit reached. Please retry in ${Math.ceil(retryAfterMs / 1000)}s.`,
+                };
+            }
+
+            if (looksLikeQuota) {
+                return {
+                    ok: false,
+                    code: 'QUOTA_EXCEEDED',
+                    error: 'Gemini quota exceeded for this key. Check your plan/billing and try again later.',
+                };
+            }
+        }
+
+        if (response.status === 403 && looksLikeQuota) {
             return {
                 ok: false,
                 code: 'QUOTA_EXCEEDED',
-                error: 'Gemini API quota exceeded for this key. Please update your API key in Settings.',
+                error: 'Gemini quota exceeded for this key. Check your plan/billing and try again later.',
             };
         }
 
@@ -161,6 +209,7 @@ type GeminiErrorCode =
     | 'MISSING_API_KEY'
     | 'INVALID_API_KEY'
     | 'QUOTA_EXCEEDED'
+    | 'RATE_LIMITED'
     | 'HTTP_429'
     | 'HTTP_500'
     | 'HTTP_400'
@@ -204,7 +253,6 @@ async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<
             const retryAfter = response.headers.get('retry-after');
             const retryAfterMs = retryAfter && Number.isFinite(Number(retryAfter)) ? Number(retryAfter) * 1000 : 0;
             const delay = Math.max(calculateBackoffDelay(attempt), retryAfterMs);
-            console.log(`Gemini returned ${response.status}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
             await new Promise((r) => setTimeout(r, delay));
             return retryFetch(url, init, attempt + 1);
         }
@@ -213,7 +261,6 @@ async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<
     } catch (err) {
         if (attempt >= MAX_RETRIES) throw err;
         const delay = calculateBackoffDelay(attempt);
-        console.log(`Network error, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
         await new Promise((r) => setTimeout(r, delay));
         return retryFetch(url, init, attempt + 1);
     }
@@ -317,7 +364,7 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         const prompt = buildUserPrompt(opts?.extraRules);
         const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.2 });
         if (!fetched.ok) {
-            return { error: fetched.error, code: fetched.code };
+            return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };
         }
 
         let parsed: any;
@@ -478,7 +525,7 @@ ${JSON.stringify(source)}
             temperature: 0.2,
         });
         if (!fetched.ok) {
-            return { error: fetched.error, code: fetched.code };
+            return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };
         }
 
         let parsed: any;
