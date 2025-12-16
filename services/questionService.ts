@@ -81,22 +81,23 @@ async function fetchGeminiJsonText(args: {
             },
         });
 
-    const callModel = async (model: string) => {
+    const callModel = async (model: string, maxRetries: number) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const response = await retryFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
             body: buildRequestBody(),
-        });
+        }, 1, maxRetries);
         return response;
     };
 
     // Strategy:
     // 1) Try primary model.
     // 2) If Gemini is overloaded/unavailable (503/5xx) after retries, fallback to gemini-2.0.
-    let response = await callModel(MODEL_PRIMARY);
+    let response = await callModel(MODEL_PRIMARY, 3);
     if (!response.ok && (response.status === 503 || response.status >= 500)) {
-        response = await callModel(MODEL_FALLBACK);
+        // Fallback should not do extra retries; otherwise we can quickly hit 429 after a 503 storm.
+        response = await callModel(MODEL_FALLBACK, 1);
     }
 
     if (!response.ok) {
@@ -181,7 +182,7 @@ async function fetchGeminiJsonText(args: {
         }
 
         if (response.status === 503 || response.status >= 500) {
-            const waitMs = retryAfterMs > 0 ? retryAfterMs : 5000;
+            const waitMs = Math.max(retryAfterMs > 0 ? retryAfterMs : 15000, 15000);
             return {
                 ok: false,
                 code: 'SERVICE_UNAVAILABLE',
@@ -251,7 +252,7 @@ type GeminiErrorCode =
     | 'INVALID_RESPONSE'
     | 'MODEL_UNAVAILABLE';
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 60000;
 
@@ -259,26 +260,26 @@ const MAX_RETRY_DELAY_MS = 60000;
  * Retry fetch with exponential backoff and jitter.
  * Handles network errors and retryable HTTP status codes (429, 503, 5xx).
  */
-async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<Response> {
+async function retryFetch(url: string, init: RequestInit, attempt = 1, maxRetries = MAX_RETRIES): Promise<Response> {
     try {
         const response = await fetch(url, init);
 
         // Retry on 503 (overloaded) or 5xx server errors.
         // Do NOT auto-retry 429 here; rate limiting is handled higher up with cooldown messaging.
-        if ((response.status === 503 || response.status >= 500) && attempt < MAX_RETRIES) {
+        if ((response.status === 503 || response.status >= 500) && attempt < maxRetries) {
             const retryAfter = response.headers.get('retry-after');
             const retryAfterMs = retryAfter && Number.isFinite(Number(retryAfter)) ? Number(retryAfter) * 1000 : 0;
             const delay = Math.max(calculateBackoffDelay(attempt), retryAfterMs);
             await new Promise((r) => setTimeout(r, delay));
-            return retryFetch(url, init, attempt + 1);
+            return retryFetch(url, init, attempt + 1, maxRetries);
         }
 
         return response;
     } catch (err) {
-        if (attempt >= MAX_RETRIES) throw err;
+        if (attempt >= maxRetries) throw err;
         const delay = calculateBackoffDelay(attempt);
         await new Promise((r) => setTimeout(r, delay));
-        return retryFetch(url, init, attempt + 1);
+        return retryFetch(url, init, attempt + 1, maxRetries);
     }
 }
 
