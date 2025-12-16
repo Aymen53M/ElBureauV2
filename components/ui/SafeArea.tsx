@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 export type Insets = {
     top: number;
@@ -19,12 +19,16 @@ export function useSafeAreaInsets(): Insets {
 type SafeAreaViewProps = React.ComponentProps<typeof View>;
 
 export function SafeAreaView({ style, ...props }: SafeAreaViewProps) {
+    if (Platform.OS !== 'web') {
+        return <View {...props} style={style} />;
+    }
+
     const safeStyle = [
         {
-            paddingTop: 'env(safe-area-inset-top)',
-            paddingRight: 'env(safe-area-inset-right)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingLeft: 'env(safe-area-inset-left)',
+            paddingTop: 'var(--safe-area-top, env(safe-area-inset-top))',
+            paddingRight: 'var(--safe-area-right, env(safe-area-inset-right))',
+            paddingBottom: 'var(--safe-area-bottom, env(safe-area-inset-bottom))',
+            paddingLeft: 'var(--safe-area-left, env(safe-area-inset-left))',
         } as any,
         style,
     ];

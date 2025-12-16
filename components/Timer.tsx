@@ -57,56 +57,18 @@ const Timer: React.FC<TimerProps> = ({
     useEffect(() => {
         if (isPaused) return;
 
-        const nextEndsAt = endsAtRef.current;
-        const canUseRaf =
-            Platform.OS === 'web' &&
-            typeof nextEndsAt === 'number' &&
-            Number.isFinite(nextEndsAt) &&
-            typeof requestAnimationFrame === 'function' &&
-            typeof cancelAnimationFrame === 'function';
-
-        if (canUseRaf) {
-            let lastValue = -1;
-            const tick = () => {
-                const next = computeSecondsLeft();
-                if (next !== lastValue) {
-                    lastValue = next;
-                    setSeconds(next);
-                    if (next <= 0 && !completedRef.current) {
-                        completedRef.current = true;
-                        onCompleteRef.current?.();
-                    }
-                }
-                rafRef.current = requestAnimationFrame(tick);
-            };
-
-            tick();
-
-            return () => {
-                if (rafRef.current != null) {
-                    cancelAnimationFrame(rafRef.current);
-                }
-                rafRef.current = null;
-            };
-        }
-
+        const intervalMs = Platform.OS === 'web' ? 200 : 500;
         const interval = setInterval(() => {
-            setSeconds((prev) => {
-                const next = typeof nextEndsAt === 'number' && Number.isFinite(nextEndsAt)
-                    ? computeSecondsLeft()
-                    : Math.max(0, prev - 1);
-
-                if (next <= 0 && !completedRef.current) {
-                    completedRef.current = true;
-                    onCompleteRef.current?.();
-                }
-
-                return next;
-            });
-        }, 500);
+            const next = computeSecondsLeft();
+            setSeconds((prev) => (prev === next ? prev : next));
+            if (next <= 0 && !completedRef.current) {
+                completedRef.current = true;
+                onCompleteRef.current?.();
+            }
+        }, intervalMs);
 
         return () => clearInterval(interval);
-    }, [isPaused]);
+    }, [computeSecondsLeft, isPaused]);
 
     // Shake animation when critical
     useEffect(() => {
@@ -154,7 +116,7 @@ const Timer: React.FC<TimerProps> = ({
             <Svg
                 width={config.container}
                 height={config.container}
-                style={{ position: 'absolute', transform: 'rotate(-90deg)' }}
+                style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] as any }}
             >
                 {/* Background circle */}
                 <Circle

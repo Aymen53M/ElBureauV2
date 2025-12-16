@@ -35,7 +35,13 @@ function GlobalImmersiveToggle() {
         const doc = (globalThis as any).document as any;
         if (!doc?.addEventListener) return;
         const handler = () => {
-            setIsImmersive(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+            const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+            setIsImmersive(isFs);
+            try {
+                doc.documentElement?.classList?.toggle?.('immersive-fullscreen', isFs);
+            } catch {
+                // noop
+            }
         };
         handler();
         doc.addEventListener('fullscreenchange', handler);
@@ -62,7 +68,17 @@ function GlobalImmersiveToggle() {
                     return;
                 }
 
-                const request = target?.requestFullscreen || target?.webkitRequestFullscreen;
+                if (target?.requestFullscreen) {
+                    try {
+                        await target.requestFullscreen({ navigationUI: 'hide' } as any);
+                    } catch {
+                        await target.requestFullscreen();
+                    }
+                    setIsImmersive(true);
+                    return;
+                }
+
+                const request = target?.webkitRequestFullscreen;
                 if (!request) {
                     Alert.alert('Fullscreen', 'Fullscreen is not supported in this browser. Try “Add to Home Screen” for a more immersive experience.');
                     return;

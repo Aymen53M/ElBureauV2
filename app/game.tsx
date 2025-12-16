@@ -104,8 +104,9 @@ export default function Game() {
     const { gameState, setGameState, currentPlayer, apiKey } = useGame();
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
     const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = windowHeight < compactHeight;
     const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 1024;
+    const isCompact = windowHeight < compactHeight || isDesktopWeb;
+    const isTightLayout = isCompact;
 
     const gameStateRef = React.useRef(gameState);
     useEffect(() => {
@@ -164,10 +165,18 @@ export default function Game() {
     const [betsByPlayerId, setBetsByPlayerId] = useState<Record<string, number>>({});
     const [usedBetsForPlayer, setUsedBetsForPlayer] = useState<number[]>([]);
 
+    const answerChangedAtRef = React.useRef<number>(0);
+    const betChangedAtRef = React.useRef<number>(0);
+
     const selectedAnswerRef = React.useRef<string | null>(null);
     useEffect(() => {
         selectedAnswerRef.current = selectedAnswer;
+        answerChangedAtRef.current = Date.now();
     }, [selectedAnswer]);
+
+    useEffect(() => {
+        betChangedAtRef.current = Date.now();
+    }, [selectedBet]);
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
 
@@ -402,6 +411,27 @@ export default function Game() {
             submitInFlightRef.current = false;
         }
     };
+
+    useEffect(() => {
+        if (!gameState?.roomCode || !activePlayer?.id) return;
+        if (phase !== 'question') return;
+        if (!activeQuestion || activeQuestion.type === 'open-ended') {
+            // Open-ended: only auto-submit when the bet was chosen after the latest typing.
+            if (betChangedAtRef.current <= answerChangedAtRef.current) return;
+        }
+
+        const answer = (selectedAnswer || '').trim();
+        if (!answer) return;
+
+        const bet = typeof selectedBet === 'number' && Number.isFinite(selectedBet) ? selectedBet : null;
+        if (!bet || bet <= 0) return;
+
+        const already = !!answerBoard[activePlayer.id]?.hasAnswered;
+        if (already) return;
+        if (submitInFlightRef.current) return;
+
+        handleSubmit().catch(() => undefined);
+    }, [activePlayer?.id, activeQuestion, answerBoard, gameState?.roomCode, phase, selectedAnswer, selectedBet]);
 
     useEffect(() => {
         if (!isSupabaseConfigured || !gameState?.roomCode) return;
@@ -1472,6 +1502,7 @@ export default function Game() {
 
     const isCorrectAnswer = !!answerBoard[activePlayer.id]?.isCorrect;
     const viewerHasAnswered = answerBoard[activePlayer.id]?.hasAnswered;
+    const showLocalPreviewWhileQuestion = phase === 'question' && !!viewerHasAnswered;
 
     return (
         <SafeAreaView className="flex-1 bg-background relative">
@@ -1481,10 +1512,10 @@ export default function Game() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View
-                    className={`${isDesktopWeb ? 'px-10 py-6' : (isCompact ? 'p-3' : 'p-7')} w-full flex-1 ${isCompact ? 'space-y-4' : 'space-y-10'}`}
+                    className={`${isDesktopWeb ? 'px-10 py-4' : (isCompact ? 'p-3' : 'p-7')} w-full flex-1 ${isTightLayout ? 'space-y-4' : 'space-y-10'}`}
                 >
                     {/* Header */}
-                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
+                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isTightLayout ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
                         <Logo size="sm" animated={false} />
                         {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
                             <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
@@ -1515,10 +1546,10 @@ export default function Game() {
                                     </View>
                                 )}
 
-                                <View className={`${isDesktopWeb ? 'w-full' : 'max-w-3xl mx-auto w-full'} ${isCompact ? 'space-y-4' : 'space-y-10'} flex-1`}>
+                                <View className={`${isDesktopWeb ? 'w-full' : 'max-w-3xl mx-auto w-full'} ${isTightLayout ? 'space-y-4' : 'space-y-10'} flex-1`}>
                                     {/* Unified Round Screen (Bet + Answer) */}
                                     {!isFinalRound && phase === 'question' && activeQuestion && (
-                                        <View className={isCompact ? 'space-y-4' : 'space-y-8'}>
+                                        <View className={isTightLayout ? 'space-y-4' : 'space-y-8'}>
                                             {/* Question + answers (always visible) */}
                                             <QuestionCard
                                                 question={activeQuestion}
@@ -1527,21 +1558,22 @@ export default function Game() {
                                                 selectedAnswer={selectedAnswer}
                                                 onSelectAnswer={handleAnswerSubmit}
                                                 isAnswerPhase={true}
-                                                density={isCompact ? 'compact' : 'default'}
+                                                density={isTightLayout ? 'compact' : 'default'}
+                                                disabled={!!viewerHasAnswered}
                                                 headerAccessory={
                                                     <Timer
                                                         key={timerKey}
                                                         seconds={timePerQuestionSeconds}
                                                         onComplete={handleRoundTimerComplete}
                                                         endsAt={phaseEndsAtMs}
-                                                        size="xxs"
+                                                        size={isDesktopWeb ? 'xs' : 'xxs'}
                                                     />
                                                 }
                                                 showCorrectAnswer={false}
                                                 hintsEnabled={gameState.settings.hintsEnabled}
                                             />
 
-                                            {!((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) && (
+                                            {!showLocalPreviewWhileQuestion && !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) && (
                                                 <View className="items-center bg-white p-2 rounded-lg border-2 border-foreground/20 mx-auto transform -rotate-1">
                                                     <Text className="text-foreground/60 text-sm italic text-center font-bold font-sans">
                                                         {t('placeBetFirst') || 'Choose your bet below to confirm your answer'}
@@ -1549,34 +1581,65 @@ export default function Game() {
                                                 </View>
                                             )}
 
-                                            {/* Bet selection (no confirm; submitting answer commits the bet) */}
-                                            <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
-                                                <CardContent className={`${isCompact ? 'p-4 space-y-3' : 'p-9 space-y-6'}`}>
-                                                    <View className="items-center">
-                                                        <View className="px-5 py-2.5 rounded-lg bg-accent/10 border-2 border-accent">
-                                                            <Text className="text-accent font-display font-bold text-lg">
-                                                                {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                            {!showLocalPreviewWhileQuestion && (
+                                                <>
+                                                    {/* Bet selection (no confirm; submitting answer commits the bet) */}
+                                                    <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
+                                                        <CardContent className={`${isTightLayout ? 'p-4 space-y-3' : 'p-9 space-y-6'}`}>
+                                                            <View className="items-center">
+                                                                <View className="px-5 py-2.5 rounded-lg bg-accent/10 border-2 border-accent">
+                                                                    <Text className="text-accent font-display font-bold text-lg">
+                                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+
+                                                            <BetSelector
+                                                                totalQuestions={totalQuestions}
+                                                                usedBets={usedBetsForPlayer}
+                                                                selectedBet={selectedBet}
+                                                                onSelectBet={setSelectedBet}
+                                                                showHeader={false}
+                                                                density={isTightLayout ? 'compact' : 'default'}
+                                                                variant="grid"
+                                                            />
+
+                                                            <View className="items-center">
+                                                                <Text className="text-sm text-foreground/60 text-center font-bold font-sans">
+                                                                    {t('betDescription')}
+                                                                </Text>
+                                                            </View>
+                                                        </CardContent>
+                                                    </Card>
+                                                </>
+                                            )}
+
+                                            {showLocalPreviewWhileQuestion && (
+                                                <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
+                                                    <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
+                                                        <CardContent className={isCompact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
+                                                            <Text className="text-lg font-display font-semibold text-foreground">
+                                                                {t('answerPreview')}
                                                             </Text>
-                                                        </View>
+                                                            {gameState.players.map((player) => {
+                                                                const entry = answerBoard[player.id];
+                                                                return (
+                                                                    <View key={player.id} className={`flex-row justify-between items-center ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
+                                                                        <Text className="font-semibold text-foreground">{player.name}</Text>
+                                                                        <Text className="text-sm text-muted-foreground bg-white/50 px-2 py-1 rounded-md overflow-hidden max-w-[50%]" numberOfLines={1}>
+                                                                            {entry?.hasAnswered ? entry.answer : t('waitingForAnswer')}
+                                                                        </Text>
+                                                                    </View>
+                                                                );
+                                                            })}
+                                                        </CardContent>
+                                                    </Card>
+                                                    <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
+                                                        <ActivityIndicator size="small" color="#4A3B32" />
+                                                        <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waiting')}</Text>
                                                     </View>
-
-                                                    <BetSelector
-                                                        totalQuestions={totalQuestions}
-                                                        usedBets={usedBetsForPlayer}
-                                                        selectedBet={selectedBet}
-                                                        onSelectBet={setSelectedBet}
-                                                        showHeader={false}
-                                                        density={isCompact ? 'compact' : 'default'}
-                                                        variant="grid"
-                                                    />
-
-                                                    <View className="items-center">
-                                                        <Text className="text-sm text-foreground/60 text-center font-bold font-sans">
-                                                            {t('betDescription')}
-                                                        </Text>
-                                                    </View>
-                                                </CardContent>
-                                            </Card>
+                                                </View>
+                                            )}
                                         </View>
                                     )}
 
@@ -1882,7 +1945,7 @@ export default function Game() {
                                             phase === 'final-scoring' ||
                                             phase === 'final-validation'
                                         }
-                                        compact={false}
+                                        compact={isCompact}
                                         orientation="vertical"
                                     />
                                 </View>

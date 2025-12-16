@@ -27,38 +27,6 @@ const BetSelector: React.FC<BetSelectorProps> = ({
     // Generate bet options from 1 to totalQuestions
     const betOptions = Array.from({ length: totalQuestions }, (_, i) => i + 1);
 
-    const shuffledBetOptions = React.useMemo(() => {
-        const mix = (seed: number, value: number) => {
-            let s = seed ^ (value + 0x9e3779b9);
-            s = Math.imul(s ^ (s >>> 16), 0x85ebca6b);
-            s = Math.imul(s ^ (s >>> 13), 0xc2b2ae35);
-            return (s ^ (s >>> 16)) >>> 0;
-        };
-
-        let seed = 0x811c9dc5 ^ (totalQuestions >>> 0);
-        for (const v of usedBets) seed = mix(seed, v >>> 0);
-
-        const rng = (() => {
-            let a = seed >>> 0;
-            return () => {
-                a += 0x6d2b79f5;
-                let t = a;
-                t = Math.imul(t ^ (t >>> 15), t | 1);
-                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-            };
-        })();
-
-        const arr = [...betOptions];
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(rng() * (i + 1));
-            const tmp = arr[i];
-            arr[i] = arr[j];
-            arr[j] = tmp;
-        }
-        return arr;
-    }, [totalQuestions, usedBets]);
-
     const isCompact = density === 'compact';
     const isTight = isCompact && totalQuestions > 12;
     const cellClass = isTight
@@ -70,8 +38,8 @@ const BetSelector: React.FC<BetSelectorProps> = ({
     const gridClass = isTight ? 'gap-1 py-2' : isCompact ? 'gap-2 py-2' : 'gap-3 py-4';
 
     const availableOrder = React.useMemo(() => {
-        return shuffledBetOptions.filter((b) => !usedBets.includes(b));
-    }, [shuffledBetOptions, usedBets]);
+        return betOptions.filter((b) => !usedBets.includes(b));
+    }, [betOptions, usedBets]);
 
     const firstAvailable = availableOrder[0] ?? null;
     const current = selectedBet ?? firstAvailable;
@@ -89,9 +57,7 @@ const BetSelector: React.FC<BetSelectorProps> = ({
         return availableOrder[idx + 1] ?? null;
     };
 
-    const gridItems = React.useMemo(() => {
-        return availableOrder.length > 0 ? availableOrder : shuffledBetOptions;
-    }, [availableOrder, shuffledBetOptions]);
+    const gridItems = betOptions;
 
     return (
         <View className={isCompact ? 'space-y-3' : 'space-y-4'}>
