@@ -103,7 +103,8 @@ export default function Game() {
     const { t, isRTL, language } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey } = useGame();
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-    const isCompact = windowHeight < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = windowHeight < compactHeight;
     const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 1024;
 
     const gameStateRef = React.useRef(gameState);

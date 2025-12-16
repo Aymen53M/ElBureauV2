@@ -13,7 +13,8 @@ import floatingLogo from '../assets/Flowting Logo.png';
 export default function Index() {
     const { t, isRTL } = useLanguage();
     const { width, height } = useWindowDimensions();
-    const isCompact = height < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = height < compactHeight;
 
     const [logoError, setLogoError] = useState(false);
 
@@ -49,8 +50,14 @@ export default function Index() {
         outputRange: ['0deg', isRTL ? '-1.2deg' : '1.2deg'],
     });
 
-    const logoWidth = Math.max(300, Math.min(620, Math.round(width * 0.96)));
-    const logoHeight = Math.round(logoWidth * 0.62);
+    const logoAspect = 0.62;
+    let logoWidth = Math.max(320, Math.min(900, Math.round(width * (isCompact ? 0.98 : 0.86))));
+    let logoHeight = Math.round(logoWidth * logoAspect);
+    const maxLogoHeight = Math.max(240, Math.round(height * (isCompact ? 0.42 : 0.46)));
+    if (logoHeight > maxLogoHeight) {
+        logoHeight = maxLogoHeight;
+        logoWidth = Math.round(logoHeight / logoAspect);
+    }
 
     return (
         <SafeAreaView className="flex-1 bg-background">
@@ -65,7 +72,7 @@ export default function Index() {
                 </Link>
             </View>
 
-            <View className={`flex-1 items-center justify-center px-6 w-full ${isCompact ? 'space-y-8' : 'space-y-14'}`}>
+            <View className={`flex-1 items-center justify-center px-6 w-full ${isCompact ? 'space-y-8' : 'space-y-10'}`}>
                 <View className={`items-center w-full ${isCompact ? 'space-y-8' : 'space-y-12'}`}>
                     <View className={isCompact ? 'mb-2' : 'mb-6'}>
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>

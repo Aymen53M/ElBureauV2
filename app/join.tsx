@@ -20,7 +20,8 @@ export default function JoinRoom() {
     const { t, isRTL, language } = useLanguage();
     const { playerName, apiKey, playerId, setGameState, setCurrentPlayer } = useGame();
     const { height: windowHeight } = useWindowDimensions();
-    const isCompact = windowHeight < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = windowHeight < compactHeight;
 
     const [roomCode, setRoomCode] = useState('');
     const [localPlayerName, setLocalPlayerName] = useState(playerName);

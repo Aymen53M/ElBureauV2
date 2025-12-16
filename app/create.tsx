@@ -26,7 +26,8 @@ export default function CreateRoom() {
     const { t, language, isRTL } = useLanguage();
     const { apiKey, playerName, playerId, setGameState, setCurrentPlayer } = useGame();
     const { height: windowHeight } = useWindowDimensions();
-    const isCompact = windowHeight < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = windowHeight < compactHeight;
 
     const [theme, setTheme] = useState('movies');
     const [customTheme, setCustomTheme] = useState('');

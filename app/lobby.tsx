@@ -22,7 +22,8 @@ export default function Lobby() {
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, setCurrentPlayer, apiKey } = useGame();
     const { height: windowHeight } = useWindowDimensions();
-    const isCompact = windowHeight < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = windowHeight < compactHeight;
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
     const hasNavigatedRef = React.useRef(false);

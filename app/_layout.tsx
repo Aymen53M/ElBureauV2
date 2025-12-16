@@ -82,7 +82,7 @@ function GlobalImmersiveToggle() {
                 style={{
                     position: 'absolute',
                     bottom: insets.bottom + 14,
-                    right: 14,
+                    left: insets.left + 14,
                     zIndex: 9999,
                 }}
             >
