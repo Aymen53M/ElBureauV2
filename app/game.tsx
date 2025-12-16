@@ -1403,10 +1403,11 @@ export default function Game() {
                     ...gameState.settings,
                     numberOfQuestions: 1,
                     difficulty: next.difficulty,
-                    questionType: 'open-ended' as const,
+                    questionType: gameState.settings.questionType,
+                    language: activePlayer.language || gameState.settings.language || 'en',
                 };
 
-                const prior = collectPriorCorrectAnswers((gameState.settings.language as any) || language);
+                const prior = collectPriorCorrectAnswers(activePlayer.language || (gameState.settings.language as any) || language);
                 try {
                     const q = await generateUniqueFinalQuestion({
                         finalSettings,
@@ -1505,11 +1506,13 @@ export default function Game() {
             ...gameState.settings,
             numberOfQuestions: 1,
             difficulty: votedDifficulty,
-            questionType: 'open-ended' as const,
+            questionType: gameState.settings.questionType,
         };
 
         const prior = collectPriorCorrectAnswers((gameState.settings.language as any) || language);
         let q: Question;
+        let questionsByLang: Record<string, Question> = {};
+
         try {
             q = await generateUniqueFinalQuestion({
                 finalSettings,
@@ -1518,6 +1521,25 @@ export default function Game() {
                 priorRawAnswers: prior.raw,
                 maxAttempts: 3,
             });
+            questionsByLang[finalSettings.language] = q;
+
+            // Translate for other languages
+            const baseLang = finalSettings.language;
+            const uniqueLangs = Array.from(new Set(gameState.players.map(p => p.language || 'en')));
+            const targets = uniqueLangs.filter(l => l !== baseLang);
+
+            for (const targetLang of targets) {
+                const tr = await translateQuestions({
+                    sourceQuestions: [q],
+                    sourceLanguage: baseLang as Language,
+                    targetLanguage: targetLang as Language,
+                    apiKey: hostKey,
+                });
+                if (tr?.questions && tr.questions.length > 0) {
+                    questionsByLang[targetLang] = tr.questions[0];
+                }
+            }
+
         } catch (err) {
             const msg = err instanceof Error ? err.message : t('generationFailed');
             Alert.alert(t('loading'), msg);
@@ -1526,7 +1548,11 @@ export default function Game() {
         }
 
         await Promise.all(
-            gameState.players.map((p) => upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: q }))
+            gameState.players.map((p) => {
+                const pLang = p.language || 'en';
+                const questionForPlayer = questionsByLang[pLang] || questionsByLang[finalSettings.language] || q;
+                return upsertFinalQuestion({ roomCode: gameState.roomCode, playerId: p.id, question: questionForPlayer });
+            })
         );
         setIsLoadingFinal(false);
 

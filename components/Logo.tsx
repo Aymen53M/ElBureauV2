@@ -13,7 +13,7 @@ interface LogoProps {
     goHomeOnPress?: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) => {
+const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className, goHomeOnPress }) => {
     const router = useRouter();
     const pathname = usePathname();
     const animatedValue = React.useRef(new Animated.Value(0)).current;
@@ -52,7 +52,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className }) 
         }
     })();
 
-    const enableHomeNav = (size === 'sm' && !animated);
+    const enableHomeNav = goHomeOnPress ?? (size === 'sm');
 
     const handlePress = () => {
         if (!enableHomeNav) return;
