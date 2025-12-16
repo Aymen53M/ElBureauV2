@@ -1528,7 +1528,7 @@ export default function Game() {
                         <View className={isDesktopWeb ? 'flex-row gap-8 flex-1' : 'flex-1'}>
                             <View className={isDesktopWeb ? 'flex-1 min-w-0' : 'flex-1'}>
                                 {/* Opponent Status (Visible when not in lobby/results) */}
-                                {!isDesktopWeb && phase !== 'lobby' && phase !== 'results' && (
+                                {!isDesktopWeb && phase !== 'lobby' && phase !== 'results' && phase !== 'question' && (
                                     <View className={isCompact ? 'mb-2' : 'mb-4'}>
                                         <OpponentStatusList
                                             players={gameState.players}
