@@ -1601,7 +1601,7 @@ export default function Game() {
                                                                 onSelectBet={setSelectedBet}
                                                                 showHeader={false}
                                                                 density={isTightLayout ? 'compact' : 'default'}
-                                                                variant="grid"
+                                                                variant={totalQuestions > 12 ? 'stepper' : 'grid'}
                                                             />
 
                                                             <View className="items-center">

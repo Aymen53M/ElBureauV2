@@ -120,7 +120,9 @@ export default function Results() {
     const { t } = useLanguage();
     const { gameState, setGameState } = useGame();
     const { height: windowHeight } = useWindowDimensions();
-    const isCompact = windowHeight < 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const isCompact = windowHeight < compactHeight;
+    const isTiny = windowHeight < 700;
 
     const [showConfetti, setShowConfetti] = useState(false);
     const [revealedRanks, setRevealedRanks] = useState<number[]>([]);
@@ -213,16 +215,16 @@ export default function Results() {
             {/* Animated Confetti */}
             <ConfettiAnimation show={showConfetti} />
 
-            <View className={`flex-1 ${isCompact ? 'p-4' : 'p-6'} w-full`}>
+            <View className={`flex-1 ${isCompact ? 'p-3' : 'p-6'} w-full`}>
                 {/* Header */}
-                <View className={`items-center ${isCompact ? 'pt-2' : 'pt-6'} ${isCompact ? 'mb-3' : 'mb-8'}`}>
+                <View className={`items-center ${isCompact ? 'pt-1' : 'pt-6'} ${isCompact ? 'mb-2' : 'mb-8'}`}>
                     <Logo size={isCompact ? 'sm' : 'md'} animated={false} />
                 </View>
 
                 {/* Title + Tabs */}
                 <View className={isCompact ? 'space-y-3' : 'space-y-6'}>
                     <View className="items-center">
-                        <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold text-primary ${isCompact ? 'mb-1' : 'mb-2'}`} style={{
+                        <Text className={`${isTiny ? 'text-3xl' : (isCompact ? 'text-4xl' : 'text-5xl')} font-display font-bold text-primary ${isCompact ? 'mb-1' : 'mb-2'}`} style={{
                             textShadowColor: 'rgba(193, 127, 89, 0.2)',
                             textShadowOffset: { width: 0, height: 2 },
                             textShadowRadius: 4,
@@ -242,25 +244,25 @@ export default function Results() {
                 </View>
 
                 {/* Content */}
-                <View className="flex-1 justify-center mt-4">
+                <View className={`flex-1 justify-center ${isCompact ? 'mt-2' : 'mt-4'} min-h-0`}>
                     {view === 'podium' && (
                         <Card className="border-2 border-foreground bg-white rounded-lg transform rotate-1" style={styles.winnerCard}>
-                            <CardContent className={`${isCompact ? 'p-6' : 'p-10'} items-center`}>
-                                <View className="mb-6 p-6 rounded-full bg-accent/10 border-2 border-accent/20">
-                                    <Ionicons name="trophy" size={isCompact ? 56 : 80} color="#D4AF37" />
+                            <CardContent className={`${isCompact ? (isTiny ? 'p-4' : 'p-5') : 'p-10'} items-center`}>
+                                <View className={`${isCompact ? 'mb-3 p-4' : 'mb-6 p-6'} rounded-full bg-accent/10 border-2 border-accent/20`}>
+                                    <Ionicons name="trophy" size={isTiny ? 44 : (isCompact ? 52 : 80)} color="#D4AF37" />
                                 </View>
                                 <Text className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-3 font-sans">{t('winner')}</Text>
-                                <View className={isCompact ? 'items-center mb-4' : 'items-center mb-6'}>
-                                    <PlayerAvatar name={winner.name} size={isCompact ? 'lg' : 'xl'} showName={false} />
+                                <View className={isCompact ? 'items-center mb-3' : 'items-center mb-6'}>
+                                    <PlayerAvatar name={winner.name} size={isTiny ? 'md' : (isCompact ? 'lg' : 'xl')} showName={false} />
                                 </View>
-                                <Text className={`${isCompact ? 'text-3xl' : 'text-4xl'} font-display font-bold text-foreground mb-2`}>
+                                <Text className={`${isTiny ? 'text-2xl' : (isCompact ? 'text-3xl' : 'text-4xl')} font-display font-bold text-foreground mb-2`}>
                                     {winner.name}
                                 </Text>
                                 <View className="flex-row items-baseline gap-2">
-                                    <Text className={`${isCompact ? 'text-5xl' : 'text-6xl'} font-display font-bold text-primary`}>
+                                    <Text className={`${isTiny ? 'text-4xl' : (isCompact ? 'text-5xl' : 'text-6xl')} font-display font-bold text-primary`}>
                                         {winner.score}
                                     </Text>
-                                    <Text className="text-xl font-bold text-primary/60 font-sans">{t('points')}</Text>
+                                    <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-bold text-primary/60 font-sans`}>{t('points')}</Text>
                                 </View>
                             </CardContent>
                         </Card>
@@ -376,15 +378,15 @@ export default function Results() {
                 </View>
 
                 {/* Actions */}
-                <View className={`flex-row gap-4 ${isCompact ? 'pt-4' : 'pt-8'}`}>
+                <View className={`flex-row gap-3 ${isCompact ? 'pt-3' : 'pt-8'}`}>
                     <Button
                         variant="hero"
                         onPress={handlePlayAgain}
                         className="flex-1 shadow-none"
                     >
                         <View className="flex-row items-center gap-2">
-                            <Ionicons name="refresh" size={24} color="#FFF8EF" />
-                            <Text className="font-display font-bold text-primary-foreground text-lg">
+                            <Ionicons name="refresh" size={isCompact ? 20 : 24} color="#FFF8EF" />
+                            <Text className={`font-display font-bold text-primary-foreground ${isCompact ? 'text-base' : 'text-lg'}`}>
                                 {t('playAgain')}
                             </Text>
                         </View>
@@ -396,8 +398,8 @@ export default function Results() {
                         className="flex-1 shadow-none border-2 border-foreground"
                     >
                         <View className="flex-row items-center gap-2">
-                            <Ionicons name="home" size={24} color="#2B1F17" />
-                            <Text className="font-display font-bold text-foreground text-lg">
+                            <Ionicons name="home" size={isCompact ? 20 : 24} color="#2B1F17" />
+                            <Text className={`font-display font-bold text-foreground ${isCompact ? 'text-base' : 'text-lg'}`}>
                                 {t('home')}
                             </Text>
                         </View>
