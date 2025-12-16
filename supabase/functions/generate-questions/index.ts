@@ -56,7 +56,7 @@ serve(async (req) => {
 
   try {
     const { theme, customTheme, difficulty, numberOfQuestions, questionType, language }: QuestionRequest = await req.json();
-    
+
     console.log('Generating questions with params:', { theme, customTheme, difficulty, numberOfQuestions, questionType, language });
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
@@ -66,65 +66,59 @@ serve(async (req) => {
     }
 
     // Build the theme description
-    const themeDesc = theme === 'custom' && customTheme 
-      ? customTheme 
+    const themeDesc = theme === 'custom' && customTheme
+      ? customTheme
       : themeDescriptions[theme]?.[language] || theme;
 
-    // Build question type instructions
-    let questionTypeInstructions = '';
-    if (questionType === 'multiple-choice') {
-      questionTypeInstructions = 'Each question must have exactly 4 options with one correct answer.';
-    } else if (questionType === 'true-false') {
-      questionTypeInstructions = 'Each question must be a statement that is either True or False.';
-    } else {
-      questionTypeInstructions = 'Each question should have a short, clear answer (1-3 words typically).';
-    }
-
-    // Build difficulty instructions for mixed mode
-    let difficultyInstructions = difficultyDescriptions[difficulty];
-    if (difficulty === 'mixed') {
-      difficultyInstructions = `Include approximately equal amounts of easy, medium, and hard questions. Vary the difficulty throughout.`;
-    }
+    const languageLabel = languageNames[language] || 'English';
 
     const systemPrompt = `You are a quiz game question generator for a fun party game called ElBureau.
 Generate engaging, accurate, and entertaining trivia questions.
-All questions and answers MUST be in ${languageNames[language]}.
+All questions and answers MUST be in ${languageLabel}.
 Ensure all facts are accurate and answers are unambiguous.
-Always respond with raw JSON only (no markdown, no explanations).
 ${language === 'ar' ? 'Use proper Arabic grammar and diacritics where appropriate.' : ''}`;
 
     const userPrompt = `Generate ${numberOfQuestions} ${questionType} trivia questions about "${themeDesc}".
 
 Requirements:
-- Difficulty: ${difficultyInstructions}
-- ${questionTypeInstructions}
-- All content must be in ${languageNames[language]}
+- Difficulty: ${difficulty === 'mixed' ? 'Mix of easy, medium, and hard' : difficultyDescriptions[difficulty]}
+- ${questionType === 'multiple-choice' ? 'Each question must have exactly 4 options with one clear correct answer.' : questionType === 'true-false' ? 'Statement must be clearly True or False.' : 'Short, clear answer.'}
+- All content must be in ${languageLabel}
 - Questions should be fun and engaging for a party game
 - Avoid controversial or offensive topics
 - Each question must have a clear, unambiguous correct answer
 
-Return the response as a valid JSON array with this exact structure and nothing else:
-[
-  {
-    "text": "The question text",
-    "type": "${questionType}",
-    ${questionType === 'multiple-choice' ? '"options": ["Option A", "Option B", "Option C", "Option D"],' : ''}
-    "correctAnswer": "The correct answer",
-    "hint": "A helpful hint (optional)",
-    "difficulty": "easy" | "medium" | "hard"
-  }
-]
+Return a JSON array where each object matches the schema.`;
 
-IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid JSON.`;
+    // Define the response schema explicitly
+    const responseSchema = {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          text: { type: "STRING" },
+          type: { type: "STRING", enum: ["multiple-choice", "open-ended", "true-false"] },
+          options: { type: "ARRAY", items: { type: "STRING" } },
+          correctAnswer: { type: "STRING" },
+          hint: { type: "STRING" },
+          difficulty: { type: "STRING", enum: ["easy", "medium", "hard"] }
+        },
+        required: ["text", "type", "correctAnswer", "difficulty"]
+      }
+    };
 
     console.log('Calling Gemini generateContent...');
 
-    const maxRetries = 3;
-    const baseDelay = 700;
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'];
 
-    const callGateway = async (attempt = 1): Promise<Response> => {
+    const callGateway = async (modelIndex = 0, retryCount = 0): Promise<Response> => {
+      const currentModel = models[modelIndex];
+      const maxRetriesPerModel = 1; // Quick failover to next model
+
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/google/${'gemini-2.5-flash'}:generateContent?key=${GEMINI_API_KEY}`, {
+        console.log(`Trying model: ${currentModel} (attempt ${retryCount + 1})`);
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/google/${currentModel}:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -143,20 +137,46 @@ IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid J
               temperature: 0.8,
               topP: 0.9,
               responseMimeType: 'application/json',
+              responseSchema: responseSchema
             },
           }),
         });
-        if ((res.status >= 500 || res.status === 429) && attempt < maxRetries) {
-          const delay = baseDelay * Math.pow(2, attempt - 1);
-          await new Promise((r) => setTimeout(r, delay));
-          return callGateway(attempt + 1);
+
+        if (res.ok) return res;
+
+        // processing error logic
+        const status = res.status;
+        console.warn(`Model ${currentModel} failed with status ${status}`);
+
+        // If 429 (Rate Limit) or 5xx (Server Error), try next model or retry same
+        if (status === 429 || status >= 500) {
+          if (retryCount < maxRetriesPerModel) {
+            // Retry same model
+            const delay = 1000 * Math.pow(2, retryCount);
+            await new Promise(r => setTimeout(r, delay));
+            return callGateway(modelIndex, retryCount + 1);
+          } else if (modelIndex < models.length - 1) {
+            // Move to next model
+            console.log(`Falling back to next model from ${currentModel}`);
+            return callGateway(modelIndex + 1, 0);
+          }
         }
-        return res;
+
+        // If it's a client error (400, 403, 404), might simply be that model doesn't exist or bad request.
+        // If 404 (Not Found), definitely try next model.
+        if (status === 404 && modelIndex < models.length - 1) {
+          console.log(`Model ${currentModel} not found (404), falling back...`);
+          return callGateway(modelIndex + 1, 0);
+        }
+
+        return res; // Return the error response if we can't handle it
+
       } catch (err) {
-        if (attempt >= maxRetries) throw err;
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        await new Promise((r) => setTimeout(r, delay));
-        return callGateway(attempt + 1);
+        console.error(`Error calling ${currentModel}:`, err);
+        if (modelIndex < models.length - 1) {
+          return callGateway(modelIndex + 1, 0);
+        }
+        throw err;
       }
     };
 
@@ -164,29 +184,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid J
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini HTTP error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ 
-          error: 'Rate limit exceeded. Please try again in a moment.',
-          code: 'RATE_LIMIT'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ 
-          error: 'Billing or quota issue. Check your Gemini quota/billing.',
-          code: 'BILLING'
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      throw new Error(`Gemini error: ${response.status}`);
+      console.error('Gemini HTTP error data:', errorText);
+      throw new Error(`Gemini error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -195,29 +194,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid J
     const parts = data?.candidates?.[0]?.content?.parts || [];
     const content = parts.find((p: any) => p.text)?.text;
     if (!content) {
-      console.error('No content in Gemini response:', data);
       throw new Error('No content in Gemini response');
     }
 
-    // Parse the JSON response
+    // With responseSchema, content SHOULD be valid JSON string already
     let questions: Question[];
     try {
-      // Clean up the response - remove markdown code blocks if present
-      let cleanedContent = content.trim();
-      if (cleanedContent.startsWith('```json')) {
-        cleanedContent = cleanedContent.slice(7);
-      } else if (cleanedContent.startsWith('```')) {
-        cleanedContent = cleanedContent.slice(3);
-      }
-      if (cleanedContent.endsWith('```')) {
-        cleanedContent = cleanedContent.slice(0, -3);
-      }
-      cleanedContent = cleanedContent.trim();
-      
-      const parsed = JSON.parse(cleanedContent);
-      
-      // Add IDs to questions
-      questions = parsed.map((q: any, index: number) => ({
+      const parsed = JSON.parse(content);
+      // The schema returns specific structure, but we might get an object wrapping the array or just the array depending on how Gemini handles the root 'ARRAY' type.
+      // Usually it returns the array directly if schema type is ARRAY.
+      const rawList = Array.isArray(parsed) ? parsed : (parsed.questions || []); // Fallback just in case
+
+      questions = rawList.map((q: any, index: number) => ({
         id: `q-${Date.now()}-${index}`,
         text: q.text,
         type: q.type || questionType,
@@ -226,8 +214,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid J
         hint: q.hint,
         difficulty: q.difficulty || difficulty,
       }));
-      
-      console.log(`Successfully generated ${questions.length} questions`);
+
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, 'Content:', content);
       throw new Error('Failed to parse question data from AI');
@@ -239,7 +226,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown, no explanation, just valid J
 
   } catch (error) {
     console.error('Error in generate-questions function:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'An unexpected error occurred',
       code: 'INTERNAL_ERROR'
     }), {

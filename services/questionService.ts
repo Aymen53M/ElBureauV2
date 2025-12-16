@@ -63,6 +63,7 @@ async function fetchGeminiJsonText(args: {
     userPrompt: string;
     temperature: number;
     maxOutputTokens?: number;
+    responseSchema?: any;
 }): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode; retryAfterMs?: number }> {
     const now = Date.now();
     if (now < geminiCooldownUntilMs) {
@@ -88,6 +89,7 @@ async function fetchGeminiJsonText(args: {
                 temperature: args.temperature,
                 topP: 0.9,
                 responseMimeType: 'application/json',
+                ...(args.responseSchema ? { responseSchema: args.responseSchema } : {}),
                 ...(typeof args.maxOutputTokens === 'number' && args.maxOutputTokens > 0
                     ? { maxOutputTokens: Math.round(args.maxOutputTokens) }
                     : {}),
@@ -105,12 +107,19 @@ async function fetchGeminiJsonText(args: {
     };
 
     // Strategy:
-    // 1) Try primary model.
-    // 2) If Gemini is overloaded/unavailable (503/5xx) after retries, fallback to gemini-2.0.
-    let response = await callModel(MODEL_PRIMARY, 3);
-    if (!response.ok && (response.status === 503 || response.status >= 500)) {
-        // Fallback should not do extra retries; otherwise we can quickly hit 429 after a 503 storm.
-        response = await callModel(MODEL_FALLBACK, 1);
+    // Try primary -> secondary -> tertiary
+    let response = await callModel(MODEL_PRIMARY, 1); // 1 try 
+
+    // If not OK, try next
+    if (!response.ok && (response.status === 404 || response.status === 429 || response.status >= 500)) {
+        console.log(`Falling back from ${MODEL_PRIMARY} to ${MODEL_SECONDARY}`);
+        response = await callModel(MODEL_SECONDARY, 1);
+    }
+
+    // If still not OK, try tertiary
+    if (!response.ok && (response.status === 404 || response.status === 429 || response.status >= 500)) {
+        console.log(`Falling back from ${MODEL_SECONDARY} to ${MODEL_TERTIARY}`);
+        response = await callModel(MODEL_TERTIARY, 1);
     }
 
     if (!response.ok) {
@@ -257,9 +266,10 @@ const languageNames: Record<string, string> = {
  * player key for personal/final rounds.
  */
 // Google GenAI REST (v1beta) compatible model names.
-// Primary + fallback model used when Gemini is temporarily overloaded (503).
+// Fallback chain: 2.5 Flash -> 2.5 Flash-Lite -> 2.0 Flash-Lite
 const MODEL_PRIMARY = 'gemini-2.5-flash';
-const MODEL_FALLBACK = 'gemini-2.0-flash';
+const MODEL_SECONDARY = 'gemini-2.5-flash-lite';
+const MODEL_TERTIARY = 'gemini-2.0-flash-lite';
 
 type GeminiErrorCode =
     | 'MISSING_API_KEY'
@@ -318,6 +328,23 @@ function calculateBackoffDelay(attempt: number): number {
     // Cap at max delay
     return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY_MS);
 }
+
+// Schema definitions
+const QUESTIONS_SCHEMA = {
+    type: "ARRAY",
+    items: {
+        type: "OBJECT",
+        properties: {
+            text: { type: "STRING" },
+            type: { type: "STRING", enum: ["multiple-choice", "open-ended", "true-false"] },
+            options: { type: "ARRAY", items: { type: "STRING" } },
+            correctAnswer: { type: "STRING" },
+            hint: { type: "STRING" },
+            difficulty: { type: "STRING", enum: ["easy", "medium", "hard"] }
+        },
+        required: ["text", "type", "correctAnswer", "difficulty"]
+    }
+};
 
 export async function generateQuestions(
     settings: GameSettings,
@@ -412,7 +439,14 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         );
 
         const prompt = buildUserPrompt(opts?.extraRules);
-        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.2, maxOutputTokens });
+        const fetched = await fetchGeminiJsonText({
+            apiKey,
+            systemPrompt,
+            userPrompt: prompt,
+            temperature: 0.2,
+            maxOutputTokens,
+            responseSchema: QUESTIONS_SCHEMA
+        });
         if (!fetched.ok) {
             return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };
         }
@@ -575,6 +609,7 @@ ${JSON.stringify(source)}
             userPrompt,
             temperature: 0.2,
             maxOutputTokens,
+            responseSchema: QUESTIONS_SCHEMA
         });
         if (!fetched.ok) {
             return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };

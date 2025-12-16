@@ -1044,8 +1044,12 @@ export default function Game() {
     }
 
     if (isLoading) {
-        const isHostLoading = !!currentPlayer?.id && currentPlayer.id === gameState.hostId;
+        const isHostLoading = !!currentPlayer && (currentPlayer.isHost || currentPlayer.id === gameState.hostId);
         const isWaitingForHostLoading = loadingMessage === t('waitingForHost');
+        const showGenerationDetail =
+            loadingMessage === '' ||
+            loadingMessage === t('generatingQuestions') ||
+            isWaitingForHostLoading;
         return (
             <SafeAreaView className="flex-1 bg-background relative">
                 <ScreenBackground variant="game" />
@@ -1056,8 +1060,8 @@ export default function Game() {
                         <Text className={`${isCompact ? 'text-xl mt-3' : 'text-2xl mt-4'} font-display font-bold text-foreground text-center`}>
                             {loadingMessage || t('loading')}
                         </Text>
-                        {isHostLoading && !isWaitingForHostLoading && (
-                            <Text className={`${isCompact ? 'text-sm mt-2' : 'text-base mt-2'} text-muted-foreground text-center font-sans`}>
+                        {(isHostLoading || isWaitingForHostLoading) && showGenerationDetail && (
+                            <Text className={`${isCompact ? 'text-sm mt-2' : 'text-base mt-2'} text-muted-foreground text-center font-sans w-full px-2`}>
                                 {t('generatingQuestions')} {gameState.settings.numberOfQuestions} {t('questionsAbout')} {gameState.settings.customTheme || t(gameState.settings.theme)}
                             </Text>
                         )}
