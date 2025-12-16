@@ -22,7 +22,7 @@ export default function Lobby() {
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, setCurrentPlayer, apiKey } = useGame();
     const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
+    const compactHeight = Platform.OS === 'web' ? 900 : 900;
     const isCompact = windowHeight < compactHeight;
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
@@ -191,9 +191,9 @@ export default function Lobby() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="default" />
-            <View className={`${isCompact ? 'p-4' : 'p-7'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-6' : 'space-y-10'}`}>
+            <View className={`${isCompact ? 'p-3' : 'p-6'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-4' : 'space-y-8'}`}>
                 {/* Header */}
-                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'mb-4 pt-2' : 'mb-8 pt-8'}`}>
+                <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'mb-3 pt-1' : 'mb-6 pt-5'}`}>
                     <TouchableOpacity onPress={exitLobby} className="p-2 bg-white rounded-lg border-2 border-foreground">
                         <Ionicons name="arrow-back" size={24} color="#2B1F17" />
                     </TouchableOpacity>
@@ -233,10 +233,10 @@ export default function Lobby() {
 
                     {/* Room Code */}
                     <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
-                        <CardContent className={`${isCompact ? 'p-5' : 'p-7'} items-center space-y-2`}>
+                        <CardContent className={`${isCompact ? 'p-4' : 'p-6'} items-center space-y-2`}>
                             <Text className="text-sm text-muted-foreground mb-2 font-bold uppercase tracking-wider font-sans">{t('roomCode')}</Text>
-                            <View className="flex-row items-center gap-4 bg-muted/20 p-3 px-6 rounded-lg border-2 border-dashed border-foreground/30">
-                                <Text className={`${isCompact ? 'text-4xl' : 'text-5xl'} font-display font-bold tracking-widest text-primary`}>
+                            <View className={`flex-row items-center gap-4 bg-muted/20 ${isCompact ? 'p-2 px-4' : 'p-3 px-6'} rounded-lg border-2 border-dashed border-foreground/30`}>
+                                <Text className={`${isCompact ? 'text-3xl' : 'text-4xl'} font-display font-bold tracking-widest text-primary`}>
                                     {gameState.roomCode}
                                 </Text>
                                 <View className="h-8 w-[2px] bg-foreground/20" />
@@ -252,7 +252,7 @@ export default function Lobby() {
 
                     {/* Game Settings Preview */}
                     <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
-                        <CardContent className="p-4">
+                        <CardContent className={isCompact ? 'p-3' : 'p-4'}>
                             <View className="flex-row flex-wrap gap-2 justify-center">
                                 <View className="px-3 py-1.5 rounded-lg bg-secondary/10 border-2 border-secondary/30 flex-row items-center gap-1.5">
                                     <Text className="text-sm">🎯</Text>
@@ -284,8 +284,8 @@ export default function Lobby() {
                     </Card>
 
                     {/* Players */}
-                    <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
-                        <View className="flex-row items-center justify-center gap-2 mb-2">
+                    <View className={isCompact ? 'space-y-2' : 'space-y-4'}>
+                        <View className={`flex-row items-center justify-center gap-2 ${isCompact ? 'mb-1' : 'mb-2'}`}>
                             <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-center text-foreground`}>
                                 {t('players')}
                             </Text>
@@ -294,12 +294,12 @@ export default function Lobby() {
                             </View>
                         </View>
 
-                        <View className={`flex-row flex-wrap justify-center ${isCompact ? 'gap-4 pt-1' : 'gap-7 pt-2'}`}>
+                        <View className={`flex-row flex-wrap justify-center ${isCompact ? 'gap-3 pt-0' : 'gap-6 pt-1'}`}>
                             {gameState.players.map((player) => (
                                 <PlayerAvatar
                                     key={player.id}
                                     name={player.name}
-                                    size={isCompact ? 'md' : 'lg'}
+                                    size={isCompact ? 'sm' : 'lg'}
                                     isHost={player.isHost}
                                     isReady={player.isReady}
                                 />
@@ -307,22 +307,22 @@ export default function Lobby() {
 
                             {/* Waiting for more players */}
                             {gameState.players.length < 8 && (
-                                <View className={`${isCompact ? 'w-14 h-14' : 'w-20 h-20'} rounded-full border-2 border-dashed border-foreground/30 bg-white items-center justify-center transform rotate-3`}>
-                                    <Text className={`${isCompact ? 'text-2xl' : 'text-3xl'} text-foreground/40 pl-0.5 pt-0.5 font-display`}>+</Text>
+                                <View className={`${isCompact ? 'w-12 h-12' : 'w-20 h-20'} rounded-full border-2 border-dashed border-foreground/30 bg-white items-center justify-center transform rotate-3`}>
+                                    <Text className={`${isCompact ? 'text-xl' : 'text-3xl'} text-foreground/40 pl-0.5 pt-0.5 font-display`}>+</Text>
                                 </View>
                             )}
                         </View>
                     </View>
 
                     {/* Waiting Status */}
-                    <View className="items-center py-2">
+                    <View className={`items-center ${isCompact ? 'py-1' : 'py-2'}`}>
                         <Text className="text-center text-muted-foreground font-medium font-sans">
                             {t('waiting')}
                         </Text>
                     </View>
 
                     {/* Actions */}
-                    <View className="space-y-3 pb-4">
+                    <View className={isCompact ? 'space-y-2 pb-2' : 'space-y-3 pb-4'}>
                         {isHost && (
                             <Button
                                 variant="hero"
