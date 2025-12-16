@@ -51,21 +51,24 @@ function GlobalImmersiveToggle() {
             const doc = (globalThis as any).document as any;
             if (!doc) return;
 
+            const target = doc.documentElement || doc.body;
+
             const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
             try {
                 if (isFs) {
                     const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
                     if (exit) await exit.call(doc);
+                    setIsImmersive(false);
                     return;
                 }
 
-                const target = doc.documentElement || doc.body;
                 const request = target?.requestFullscreen || target?.webkitRequestFullscreen;
                 if (!request) {
                     Alert.alert('Fullscreen', 'Fullscreen is not supported in this browser. Try “Add to Home Screen” for a more immersive experience.');
                     return;
                 }
                 await request.call(target);
+                setIsImmersive(true);
             } catch {
                 Alert.alert('Fullscreen', 'Unable to enter fullscreen on this device.');
             }
@@ -80,9 +83,9 @@ function GlobalImmersiveToggle() {
             <View
                 pointerEvents="box-none"
                 style={{
-                    position: 'absolute',
-                    bottom: insets.bottom + 14,
-                    left: insets.left + 14,
+                    position: Platform.OS === 'web' ? ('fixed' as any) : 'absolute',
+                    bottom: Platform.OS === 'web' ? ('calc(env(safe-area-inset-bottom) + 14px)' as any) : insets.bottom + 14,
+                    left: Platform.OS === 'web' ? ('calc(env(safe-area-inset-left) + 14px)' as any) : insets.left + 14,
                     zIndex: 9999,
                 }}
             >
