@@ -1580,7 +1580,7 @@ export default function Game() {
                         className={`${isDesktopWeb ? 'px-10 py-4' : (isCompact ? 'p-3' : 'p-7')} w-full flex-1 ${isTightLayout ? 'space-y-4' : 'space-y-10'}`}
                     >
                         {/* Header */}
-                        <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isTightLayout ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
+                        <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isTightLayout ? 'mb-2 pt-2' : 'mb-9 pt-12'} z-50`}>
                             <Logo size="sm" animated={false} />
                             {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
                                 <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">

@@ -66,7 +66,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'lg', animated = true, className, go
     return (
         <Pressable
             onPress={handlePress}
-            className={twMerge('relative', className)}
+            className={twMerge('relative z-50', className)}
             accessibilityRole={enableHomeNav ? 'button' : undefined}
         >
             {/* Glow effect behind */}

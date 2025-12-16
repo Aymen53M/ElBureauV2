@@ -122,10 +122,10 @@ function GlobalImmersiveToggle() {
                         Platform.OS === 'web'
                             ? ('calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 14px)' as any)
                             : insets.bottom + 14,
-                    left:
+                    right:
                         Platform.OS === 'web'
-                            ? ('calc(var(--safe-area-left, env(safe-area-inset-left)) + 14px)' as any)
-                            : insets.left + 14,
+                            ? ('calc(var(--safe-area-right, env(safe-area-inset-right)) + 14px)' as any)
+                            : insets.right + 14,
                     zIndex: 100000,
                 }}
             >

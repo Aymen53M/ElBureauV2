@@ -72,7 +72,7 @@ export default function Index() {
                 </Link>
             </View>
 
-            <View className={`flex-1 items-center justify-center px-6 w-full ${isCompact ? 'space-y-8' : 'space-y-10'}`}>
+            <View className="flex-1 px-6 w-full">
                 <View className={`items-center w-full ${isCompact ? 'space-y-8' : 'space-y-12'}`}>
                     <View className={isCompact ? 'mb-2' : 'mb-6'}>
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
@@ -95,41 +95,44 @@ export default function Index() {
                             {t('tagline')}
                         </Text>
                     </View>
+                </View>
 
-                    <View className={`w-full ${isCompact ? 'space-y-3 pt-2' : 'space-y-6 pt-8'}`}>
-                        <Link href="/create" asChild>
-                            <Button variant="hero" className={`w-full ${isCompact ? 'py-4' : 'py-5'} transform -rotate-1`}>
-                                <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="add-circle-outline" size={isCompact ? 22 : 26} color="#FFFFFF" />
-                                    <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-display font-bold text-white`}>
-                                        {t('createRoom')}
-                                    </Text>
-                                </View>
-                            </Button>
-                        </Link>
+                {/* Spacer to push buttons down */}
+                <View className="flex-1" />
 
-                        <Link href="/join" asChild>
-                            <Button variant="secondary" size="lg" className="w-full bg-secondary text-secondary-foreground border-2 border-foreground transform rotate-1">
-                                <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="people-outline" size={isCompact ? 20 : 22} color="#2B1F17" />
-                                    <Text className="font-display font-bold text-lg text-foreground">
-                                        {t('joinRoom')}
-                                    </Text>
-                                </View>
-                            </Button>
-                        </Link>
+                <View className={`w-full ${isCompact ? 'space-y-3 pb-8' : 'space-y-6 pb-12'}`}>
+                    <Link href="/create" asChild>
+                        <Button variant="hero" className={`w-full ${isCompact ? 'py-4' : 'py-5'} transform -rotate-1`}>
+                            <View className="flex-row items-center justify-center gap-2">
+                                <Ionicons name="add-circle-outline" size={isCompact ? 22 : 26} color="#FFFFFF" />
+                                <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-display font-bold text-white`}>
+                                    {t('createRoom')}
+                                </Text>
+                            </View>
+                        </Button>
+                    </Link>
 
-                        <Link href="/how-to-play" asChild>
-                            <Button variant="outline" size="lg" className="w-full border-2 border-foreground bg-white transform -rotate-1">
-                                <View className="flex-row items-center justify-center gap-2">
-                                    <Ionicons name="help-circle-outline" size={isCompact ? 20 : 22} color="#C17F59" />
-                                    <Text className="font-display font-bold text-lg text-foreground">
-                                        {t('howToPlay')}
-                                    </Text>
-                                </View>
-                            </Button>
-                        </Link>
-                    </View>
+                    <Link href="/join" asChild>
+                        <Button variant="secondary" size="lg" className="w-full bg-secondary text-secondary-foreground border-2 border-foreground transform rotate-1">
+                            <View className="flex-row items-center justify-center gap-2">
+                                <Ionicons name="people-outline" size={isCompact ? 20 : 22} color="#2B1F17" />
+                                <Text className="font-display font-bold text-lg text-foreground">
+                                    {t('joinRoom')}
+                                </Text>
+                            </View>
+                        </Button>
+                    </Link>
+
+                    <Link href="/how-to-play" asChild>
+                        <Button variant="outline" size="lg" className="w-full border-2 border-foreground bg-white transform -rotate-1">
+                            <View className="flex-row items-center justify-center gap-2">
+                                <Ionicons name="help-circle-outline" size={isCompact ? 20 : 22} color="#C17F59" />
+                                <Text className="font-display font-bold text-lg text-foreground">
+                                    {t('howToPlay')}
+                                </Text>
+                            </View>
+                        </Button>
+                    </Link>
                 </View>
             </View>
 
