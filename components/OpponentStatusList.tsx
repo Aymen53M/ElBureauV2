@@ -9,6 +9,7 @@ interface OpponentStatusListProps {
     showBets?: boolean;
     showScores?: boolean;
     compact?: boolean;
+    orientation?: 'horizontal' | 'vertical';
 }
 
 export const OpponentStatusList: React.FC<OpponentStatusListProps> = ({
@@ -17,14 +18,20 @@ export const OpponentStatusList: React.FC<OpponentStatusListProps> = ({
     showBets = false,
     showScores = true,
     compact = false,
+    orientation = 'horizontal',
 }) => {
     const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+    const isVertical = orientation === 'vertical';
 
     return (
         <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName={compact ? 'gap-2 px-1 py-1' : 'gap-3 px-2 py-2'}
+            horizontal={!isVertical}
+            showsHorizontalScrollIndicator={!isVertical ? false : undefined}
+            showsVerticalScrollIndicator={isVertical ? false : undefined}
+            contentContainerClassName={twMerge(
+                compact ? 'gap-2 px-1 py-1' : 'gap-3 px-2 py-2',
+                isVertical ? 'flex-col' : 'flex-row'
+            )}
         >
             {sortedPlayers.map((player) => {
                 const isMe = player.id === currentPlayerId;
@@ -35,8 +42,8 @@ export const OpponentStatusList: React.FC<OpponentStatusListProps> = ({
                         key={player.id}
                         className={twMerge(
                             compact
-                                ? 'rounded-lg border-2 p-2 min-w-[86px] items-center bg-white shadow-sm'
-                                : 'rounded-lg border-2 p-3 min-w-[100px] items-center bg-white shadow-sm',
+                                ? `rounded-lg border-2 p-2 ${isVertical ? 'w-full' : 'min-w-[86px]'} items-center bg-white shadow-sm`
+                                : `rounded-lg border-2 p-3 ${isVertical ? 'w-full' : 'min-w-[100px]'} items-center bg-white shadow-sm`,
                             isMe ? "border-primary bg-primary/5" : "border-foreground/20"
                         )}
                     >

@@ -49,7 +49,7 @@ export default function JoinRoom() {
             name: localPlayerName,
             score: 0,
             isHost: false,
-            isReady: false,
+            isReady: true,
             usedBets: [],
             hasApiKey: !!apiKey,
             language,

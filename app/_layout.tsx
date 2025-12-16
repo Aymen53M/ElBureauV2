@@ -230,7 +230,7 @@ function ResumeBootstrap() {
                         name: playerName || 'Player',
                         score: 0,
                         isHost: false,
-                        isReady: false,
+                        isReady: true,
                         usedBets: [],
                         hasApiKey: !!apiKey,
                         language,
@@ -250,7 +250,7 @@ function ResumeBootstrap() {
                                 name: playerName || 'Player',
                                 score: 0,
                                 isHost: false,
-                                isReady: false,
+                                isReady: true,
                                 usedBets: [],
                                 hasApiKey: !!apiKey,
                                 language,
@@ -325,8 +325,8 @@ export default function RootLayout() {
                 <LanguageProvider>
                     <GameProvider>
                         <ResumeBootstrap />
-                        <View className="flex-1 md:bg-neutral-900 md:items-center md:justify-center">
-                            <View className="flex-1 w-full h-full md:max-w-[480px] md:h-[95vh] md:max-h-[850px] md:my-auto md:rounded-[32px] md:overflow-hidden md:shadow-2xl bg-background border-0 md:border-8 md:border-gray-800 relative">
+                        <View className="flex-1">
+                            <View className="flex-1 w-full h-full bg-background relative">
                                 <Outlet />
                                 <GlobalImmersiveToggle />
                             </View>

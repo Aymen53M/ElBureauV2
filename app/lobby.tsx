@@ -14,7 +14,7 @@ import PlayerAvatar from '@/components/PlayerAvatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
-import { fetchRoomState, subscribeToRoom, updatePlayerState, leaveRoom } from '@/services/roomService';
+import { fetchRoomState, subscribeToRoom, leaveRoom } from '@/services/roomService';
 import { resetGameplayForRoom } from '@/services/gameService';
 
 export default function Lobby() {
@@ -165,48 +165,11 @@ export default function Lobby() {
         router.replace('/');
     };
 
-    const toggleReady = async () => {
-        if (!currentPlayer?.id) return;
-
-        const nextReady = !gameState.players.find((p) => p.id === currentPlayer.id)?.isReady;
-
-        const nextPlayer: Player = {
-            ...(gameState.players.find((p) => p.id === currentPlayer.id) || currentPlayer),
-            isReady: !!nextReady,
-        };
-
-        setGameState(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                players: prev.players.map((p) =>
-                    p.id === currentPlayer.id ? { ...p, isReady: !!nextReady } : p
-                ),
-            };
-        });
-
-        setCurrentPlayer(nextPlayer);
-
-        try {
-            await updatePlayerState({
-                roomCode: gameState.roomCode,
-                playerId: currentPlayer.id,
-                patch: { is_ready: !!nextReady },
-            });
-        } catch (err) {
-            Alert.alert('Supabase', err instanceof Error ? err.message : 'Failed to update player');
-        }
-    };
-
     const startGame = async () => {
         const hostKey = (gameState.hostApiKey || apiKey || '').trim();
         if (!hostKey) {
             Alert.alert(t('apiKey'), t('missingApiKeyHost'));
             router.push('/settings');
-            return;
-        }
-        if (!allReady) {
-            Alert.alert(t('notReadyTitle'), t('notReadyDesc'));
             return;
         }
 
@@ -359,27 +322,11 @@ export default function Lobby() {
 
                     {/* Actions */}
                     <View className="space-y-3 pb-4">
-                        {!isHost && currentPlayer?.id && (
-                            <Button
-                                variant={gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'default' : 'outline'}
-                                size="lg"
-                                onPress={toggleReady}
-                                className={`w-full ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady
-                                    ? 'bg-success hover:bg-success/90 border-2 border-foreground shadow-none'
-                                    : 'bg-white border-2 border-foreground text-foreground'}`}
-                            >
-                                <Text className={`font-display font-bold text-lg ${gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? 'text-white' : 'text-foreground'
-                                    }`}>
-                                    {gameState.players.find((p) => p.id === currentPlayer.id)?.isReady ? t('ready') + '!' : t('notReady')}
-                                </Text>
-                            </Button>
-                        )}
-
                         {isHost && (
                             <Button
                                 variant="hero"
                                 onPress={startGame}
-                                disabled={!allReady || gameState.players.length < 1}
+                                disabled={gameState.players.length < 1}
                                 className="w-full shadow-none transform -rotate-1"
                             >
                                 <View className="flex-row items-center gap-2">
