@@ -565,6 +565,11 @@ export async function resetGameplayForRoom(args: {
     for (const q of deletionQueries) {
         const res: any = await q;
         if (res?.error) {
+            const msg = String(res.error.message || '').toLowerCase();
+            const missingTable = msg.includes('does not exist') || msg.includes('42p01');
+            if (missingTable) {
+                continue;
+            }
             throw new Error(res.error.message || 'Failed to reset gameplay');
         }
     }
@@ -579,10 +584,40 @@ export async function resetGameplayForRoom(args: {
         patch.questions = [];
     }
 
-    const { error: resetRoomError } = await client
+    const stripMissingColumns = (msg: string) => {
+        let changed = false;
+        if (msg.includes('phase_started_at') && 'phase_started_at' in patch) {
+            delete patch.phase_started_at;
+            changed = true;
+        }
+        if (msg.includes('final_mode') && 'final_mode' in patch) {
+            delete patch.final_mode;
+            changed = true;
+        }
+        if (msg.includes('current_question_index') && 'current_question_index' in patch) {
+            delete patch.current_question_index;
+            changed = true;
+        }
+        if (msg.includes('questions') && 'questions' in patch) {
+            delete patch.questions;
+            changed = true;
+        }
+        return changed;
+    };
+
+    let { error: resetRoomError } = await client
         .from('elbureau_rooms')
         .update(patch)
         .eq('room_code', roomCode);
+
+    for (let attempt = 0; resetRoomError && attempt < 4; attempt++) {
+        const msg = String(resetRoomError.message || '').toLowerCase();
+        if (!stripMissingColumns(msg)) break;
+        ({ error: resetRoomError } = await client
+            .from('elbureau_rooms')
+            .update(patch)
+            .eq('room_code', roomCode));
+    }
 
     if (resetRoomError) {
         throw new Error(resetRoomError.message);
