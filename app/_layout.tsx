@@ -26,9 +26,25 @@ function isMobileWeb() {
     }
 }
 
+function isIOSStandalone() {
+    if (Platform.OS !== 'web') return false;
+    // Check if running on iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    // Check if in standalone mode (Added to Home Screen)
+    const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    return isIOS && isStandalone;
+}
+
 function GlobalImmersiveToggle() {
     const insets = useSafeAreaInsets();
     const [isImmersive, setIsImmersive] = React.useState(false);
+    const [shouldHide, setShouldHide] = React.useState(false);
+
+    React.useEffect(() => {
+        if (isIOSStandalone()) {
+            setShouldHide(true);
+        }
+    }, []);
 
     React.useEffect(() => {
         if (Platform.OS !== 'web') return;
@@ -93,6 +109,8 @@ function GlobalImmersiveToggle() {
 
         setIsImmersive((prev) => !prev);
     };
+
+    if (shouldHide) return null;
 
     return (
         <>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Alert, Platform, KeyboardAvoidingView, useWindowDimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@/components/ui/Ionicons';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
@@ -1563,7 +1563,6 @@ export default function Game() {
     const isCorrectAnswer = !!answerBoard[activePlayer.id]?.isCorrect;
     const viewerHasAnswered = answerBoard[activePlayer.id]?.hasAnswered;
     const showLocalPreviewWhileQuestion = phase === 'question' && !!viewerHasAnswered;
-
     return (
         <SafeAreaView className="flex-1 bg-background relative">
             <ScreenBackground variant="game" />
@@ -1571,289 +1570,115 @@ export default function Game() {
                 className="flex-1"
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <View
-                    className={`${isDesktopWeb ? 'px-10 py-4' : (isCompact ? 'p-3' : 'p-7')} w-full flex-1 ${isTightLayout ? 'space-y-4' : 'space-y-10'}`}
+                <ScrollView
+                    className="flex-1"
+                    contentContainerStyle={{ flexGrow: 1 }}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
                 >
-                    {/* Header */}
-                    <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isTightLayout ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
-                        <Logo size="sm" animated={false} />
-                        {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
-                            <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
-                                <Text className="text-primary font-display font-bold text-lg">{activePlayer.score} pts</Text>
-                            </View>
-                        )}
-                    </View>
+                    <View
+                        className={`${isDesktopWeb ? 'px-10 py-4' : (isCompact ? 'p-3' : 'p-7')} w-full flex-1 ${isTightLayout ? 'space-y-4' : 'space-y-10'}`}
+                    >
+                        {/* Header */}
+                        <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isTightLayout ? 'mb-2 pt-2' : 'mb-9 pt-12'}`}>
+                            <Logo size="sm" animated={false} />
+                            {(phase === 'validation' || phase === 'scoring' || phase === 'final-scoring' || phase === 'final-validation' || phase === 'reveal') && (
+                                <View className="px-5 py-2.5 rounded-lg bg-white border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
+                                    <Text className="text-primary font-display font-bold text-lg">{activePlayer.score} pts</Text>
+                                </View>
+                            )}
+                        </View>
 
-                    <View className={isDesktopWeb ? 'max-w-7xl mx-auto w-full flex-1' : 'w-full flex-1'}>
-                        <View className={isDesktopWeb ? 'flex-row gap-8 flex-1' : 'flex-1'}>
-                            <View className={isDesktopWeb ? 'flex-1 min-w-0' : 'flex-1'}>
-                                {/* Opponent Status (Visible when not in lobby/results) */}
-                                {!isDesktopWeb && phase !== 'lobby' && phase !== 'results' && phase !== 'question' && (
-                                    <View className={isCompact ? 'mb-2' : 'mb-4'}>
-                                        <OpponentStatusList
-                                            players={gameState.players}
-                                            currentPlayerId={activePlayer.id}
-                                            showScores={true}
-                                            showBets={
-                                                phase === 'reveal' ||
-                                                phase === 'scoring' ||
-                                                phase === 'validation' ||
-                                                phase === 'final-scoring' ||
-                                                phase === 'final-validation'
-                                            }
-                                            compact={isCompact}
-                                        />
-                                    </View>
-                                )}
-
-                                <View className={`${isDesktopWeb ? 'w-full' : 'max-w-3xl mx-auto w-full'} ${isTightLayout ? 'space-y-4' : 'space-y-10'} flex-1`}>
-                                    {/* Unified Round Screen (Bet + Answer) */}
-                                    {!isFinalRound && phase === 'question' && activeQuestion && (
-                                        <View className={isTightLayout ? 'space-y-4' : 'space-y-8'}>
-                                            {/* Question + answers (always visible) */}
-                                            <QuestionCard
-                                                question={activeQuestion}
-                                                questionNumber={currentQuestionIndex + 1}
-                                                totalQuestions={totalQuestions}
-                                                selectedAnswer={selectedAnswer}
-                                                onSelectAnswer={handleAnswerSubmit}
-                                                isAnswerPhase={true}
-                                                density={isTightLayout ? 'compact' : 'default'}
-                                                disabled={!!viewerHasAnswered}
-                                                headerAccessory={
-                                                    <Timer
-                                                        key={timerKey}
-                                                        seconds={timePerQuestionSeconds}
-                                                        onComplete={handleRoundTimerComplete}
-                                                        endsAt={phaseEndsAtMs}
-                                                        size={isDesktopWeb ? 'xs' : 'xxs'}
-                                                    />
+                        <View className={isDesktopWeb ? 'max-w-7xl mx-auto w-full flex-1' : 'w-full flex-1'}>
+                            <View className={isDesktopWeb ? 'flex-row gap-8 flex-1' : 'flex-1'}>
+                                <View className={isDesktopWeb ? 'flex-1 min-w-0' : 'flex-1'}>
+                                    {/* Opponent Status (Visible when not in lobby/results) */}
+                                    {!isDesktopWeb && phase !== 'lobby' && phase !== 'results' && phase !== 'question' && (
+                                        <View className={isCompact ? 'mb-2' : 'mb-4'}>
+                                            <OpponentStatusList
+                                                players={gameState.players}
+                                                currentPlayerId={activePlayer.id}
+                                                showScores={true}
+                                                showBets={
+                                                    phase === 'reveal' ||
+                                                    phase === 'scoring' ||
+                                                    phase === 'validation' ||
+                                                    phase === 'final-scoring' ||
+                                                    phase === 'final-validation'
                                                 }
-                                                showCorrectAnswer={false}
-                                                hintsEnabled={gameState.settings.hintsEnabled}
+                                                compact={isCompact}
                                             />
-
-                                            {!showLocalPreviewWhileQuestion && (
-                                                <>
-                                                    {/* Bet selection (no confirm; submitting answer commits the bet) */}
-                                                    <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
-                                                        <CardContent className={`${isTightLayout ? 'p-4 space-y-3' : 'p-9 space-y-6'}`}>
-                                                            <View className="items-center">
-                                                                <View className="px-5 py-2.5 rounded-lg bg-accent/10 border-2 border-accent">
-                                                                    <Text className="text-accent font-display font-bold text-lg">
-                                                                        {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-
-                                                            <BetSelector
-                                                                totalQuestions={totalQuestions}
-                                                                usedBets={usedBetsForPlayer}
-                                                                selectedBet={selectedBet}
-                                                                onSelectBet={setSelectedBet}
-                                                                showHeader={false}
-                                                                density={isTightLayout ? 'compact' : 'default'}
-                                                                variant={totalQuestions > 12 ? 'stepper' : 'grid'}
-                                                            />
-
-                                                            <View className="items-center">
-                                                                <Text className="text-sm text-foreground/60 text-center font-bold font-sans">
-                                                                    {t('betDescription')}
-                                                                </Text>
-                                                            </View>
-                                                        </CardContent>
-                                                    </Card>
-                                                </>
-                                            )}
-
-                                            {showLocalPreviewWhileQuestion && (
-                                                <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
-                                                    <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                                        <CardContent className={isCompact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
-                                                            <Text className="text-lg font-display font-semibold text-foreground">
-                                                                {t('answerPreview')}
-                                                            </Text>
-                                                            {gameState.players.map((player) => {
-                                                                const entry = answerBoard[player.id];
-                                                                return (
-                                                                    <View key={player.id} className={`flex-row justify-between items-center ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
-                                                                        <Text className="font-semibold text-foreground">{player.name}</Text>
-                                                                        <Text className="text-sm text-muted-foreground bg-white/50 px-2 py-1 rounded-md overflow-hidden max-w-[50%]" numberOfLines={1}>
-                                                                            {entry?.hasAnswered ? entry.answer : t('waitingForAnswer')}
-                                                                        </Text>
-                                                                    </View>
-                                                                );
-                                                            })}
-                                                        </CardContent>
-                                                    </Card>
-                                                    <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
-                                                        <ActivityIndicator size="small" color="#4A3B32" />
-                                                        <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waiting')}</Text>
-                                                    </View>
-                                                </View>
-                                            )}
                                         </View>
                                     )}
 
-                                    {/* Final Wager Phase */}
-                                    {isFinalRound && phase === 'final-wager' && (
-                                        <View className={`${isCompact ? 'space-y-4' : 'space-y-6'}`}>
-                                            <Card className={`border-2 border-foreground bg-white rounded-lg ${isCompact ? 'p-4' : 'p-5'}`}>
-                                                <View className="mb-4">
-                                                    <Text className="text-xl font-display font-bold text-center mb-2">{t('finalMode')}</Text>
-                                                    <View className="flex-row gap-2 justify-center">
-                                                        <TouchableOpacity
-                                                            onPress={() => setFinalMode('personalized')}
-                                                            className={`px-4 py-2 rounded-full border-2 ${finalMode === 'personalized' ? 'bg-primary border-foreground' : 'bg-transparent border-transparent'}`}
-                                                        >
-                                                            <Text className={`font-bold ${finalMode === 'personalized' ? 'text-white' : 'text-foreground'}`}>{t('personalFinal')}</Text>
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity
-                                                            onPress={() => setFinalMode('shared')}
-                                                            className={`px-4 py-2 rounded-full border-2 ${finalMode === 'shared' ? 'bg-primary border-foreground' : 'bg-transparent border-transparent'}`}
-                                                        >
-                                                            <Text className={`font-bold ${finalMode === 'shared' ? 'text-white' : 'text-foreground'}`}>{t('sharedFinal')}</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-
-                                                {finalMode === 'shared' && (
-                                                    <View className="mb-4">
-                                                        <Text className="font-bold mb-2">{t('chooseDifficulty')}:</Text>
-                                                        <View className="flex-row justify-between gap-2">
-                                                            {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => {
-                                                                const voteCount = Object.values(finalChoices).filter(c => c.difficulty === d).length;
-                                                                const isSelected = (finalChoices[activePlayer.id]?.difficulty || 'medium') === d;
-                                                                return (
-                                                                    <TouchableOpacity
-                                                                        key={d}
-                                                                        onPress={() => updateFinalChoice({ difficulty: d })}
-                                                                        className={`flex-1 p-2 border-2 rounded-lg items-center ${isSelected ? 'bg-accent border-foreground' : 'bg-white border-foreground/20'}`}
-                                                                    >
-                                                                        <Text className="font-bold capitalize">{t(d)}</Text>
-                                                                        {voteCount > 0 && <Text className="text-xs">{voteCount} votes</Text>}
-                                                                    </TouchableOpacity>
-                                                                );
-                                                            })}
-                                                        </View>
-                                                    </View>
-                                                )}
-
-                                                <Text className="font-bold mb-2">{t('yourBet')} ({t('optional')}):</Text>
-                                                <View className="flex-row gap-2 justify-center mb-4">
-                                                    <TouchableOpacity onPress={() => updateFinalChoice({ wager: 0 })} className={`p-3 border-2 rounded ${finalChoices[activePlayer.id]?.wager === 0 ? 'bg-muted border-foreground' : 'border-dashed'}`}>
-                                                        <Text className="font-bold">No Bet</Text>
-                                                    </TouchableOpacity>
-                                                    {[10, 20].map((amt) => (
-                                                        <TouchableOpacity
-                                                            key={amt}
-                                                            onPress={() => updateFinalChoice({ wager: amt })}
-                                                            className={`p-3 border-2 rounded ${finalChoices[activePlayer.id]?.wager === amt ? 'bg-accent border-foreground' : 'border-foreground/20'}`}
-                                                        >
-                                                            <Text className="font-bold">{amt} pts</Text>
-                                                        </TouchableOpacity>
-                                                    ))}
-                                                </View>
-
-                                                {isHost && (
-                                                    <Button onPress={startFinalQuestion} variant="hero">
-                                                        <Text className="text-white font-bold">{t('startFinal')}</Text>
-                                                    </Button>
-                                                )}
-                                                {!isHost && (
-                                                    <Text className="text-center italic mt-4">{t('waitingForHost')}</Text>
-                                                )}
-                                            </Card>
-
-                                            {finalMode === 'personalized' && !((apiKey || '').trim()) && (
-                                                <View className="items-center space-y-2 bg-destructive/10 p-4 rounded-2xl border border-destructive/20 mt-2">
-                                                    <Ionicons name="warning" size={24} color="#B3261E" />
-                                                    <Text className="text-sm text-foreground/80 text-center font-medium">{t('missingApiKeyPersonal')}</Text>
-                                                    <Button variant="outline" size="sm" onPress={() => router.push('/settings')} className="border-destructive/30 text-destructive">
-                                                        <Text className="font-display font-bold text-destructive">{t('goToSettings')}</Text>
-                                                    </Button>
-                                                </View>
-                                            )}
-
-                                            <Button
-                                                variant="hero"
-                                                onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
-                                                disabled={finalMode === 'personalized' && !((apiKey || '').trim())}
-                                                className="w-full mt-2"
-                                            >
-                                                <Text className="font-display font-bold text-primary-foreground text-lg">
-                                                    {isGeneratingPersonalFinal ? t('loading') : t('submit')}
-                                                </Text>
-                                            </Button>
-                                        </View>
-                                    )}
-
-                                    {/* Question Phase */}
-                                    {
-                                        (phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
-                                            <View className={isCompact ? 'space-y-4' : 'space-y-8'}>
-                                                {/* Your Bet Display */}
-                                                <View className="items-center">
-                                                    <View className="px-5 py-2 rounded-lg bg-accent/10 border-2 border-accent transform -rotate-1">
-                                                        <Text className="text-accent font-display font-bold">
-                                                            {t('yourBet')}: {currentBetDisplay ?? 0} {t('points')}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-
-                                                {/* Question Card */}
+                                    <View className={`${isDesktopWeb ? 'w-full' : 'max-w-3xl mx-auto w-full'} ${isTightLayout ? 'space-y-4' : 'space-y-10'} flex-1`}>
+                                        {/* Unified Round Screen (Bet + Answer) */}
+                                        {!isFinalRound && phase === 'question' && activeQuestion && (
+                                            <View className={isTightLayout ? 'space-y-4' : 'space-y-8'}>
+                                                {/* Question + answers (always visible) */}
                                                 <QuestionCard
                                                     question={activeQuestion}
-                                                    questionNumber={isFinalRound ? 1 : currentQuestionIndex + 1}
+                                                    questionNumber={currentQuestionIndex + 1}
                                                     totalQuestions={totalQuestions}
                                                     selectedAnswer={selectedAnswer}
                                                     onSelectAnswer={handleAnswerSubmit}
-                                                    isAnswerPhase={phase === 'final-question'}
-                                                    density={isCompact ? 'compact' : 'default'}
+                                                    isAnswerPhase={true}
+                                                    density={isTightLayout ? 'compact' : 'default'}
+                                                    disabled={!!viewerHasAnswered}
                                                     headerAccessory={
-                                                        phase === 'final-question' ? (
-                                                            <Timer
-                                                                key={timerKey}
-                                                                seconds={timePerQuestionSeconds}
-                                                                onComplete={handleRoundTimerComplete}
-                                                                endsAt={phaseEndsAtMs}
-                                                                size="xxs"
-                                                            />
-                                                        ) : null
+                                                        <Timer
+                                                            key={timerKey}
+                                                            seconds={timePerQuestionSeconds}
+                                                            onComplete={handleRoundTimerComplete}
+                                                            endsAt={phaseEndsAtMs}
+                                                            size={isDesktopWeb ? 'xs' : 'xxs'}
+                                                        />
                                                     }
-                                                    showCorrectAnswer={showCorrectAnswer}
+                                                    showCorrectAnswer={false}
                                                     hintsEnabled={gameState.settings.hintsEnabled}
                                                 />
 
-                                                {phase === 'final-question' && (
-                                                    <Button
-                                                        variant="hero"
-                                                        onPress={handleSubmit}
-                                                        disabled={!selectedAnswer?.trim() || !!answerBoard[activePlayer.id]?.hasAnswered}
-                                                        className="w-full shadow-xl shadow-primary/25"
-                                                    >
-                                                        <Text className="text-lg font-display font-bold text-primary-foreground">
-                                                            {t('submit')}
-                                                        </Text>
-                                                    </Button>
+                                                {!showLocalPreviewWhileQuestion && (
+                                                    <>
+                                                        {/* Bet selection (no confirm; submitting answer commits the bet) */}
+                                                        <Card className="border-2 border-foreground bg-white rounded-lg overflow-hidden transform rotate-1">
+                                                            <CardContent className={`${isTightLayout ? 'p-4 space-y-3' : 'p-9 space-y-6'}`}>
+                                                                <View className="items-center">
+                                                                    <View className="px-5 py-2.5 rounded-lg bg-accent/10 border-2 border-accent">
+                                                                        <Text className="text-accent font-display font-bold text-lg">
+                                                                            {t('yourBet')}: {(betsByPlayerId[activePlayer.id] ?? selectedBet ?? 0)} {t('points')}
+                                                                        </Text>
+                                                                    </View>
+                                                                </View>
+
+                                                                <BetSelector
+                                                                    totalQuestions={totalQuestions}
+                                                                    usedBets={usedBetsForPlayer}
+                                                                    selectedBet={selectedBet}
+                                                                    onSelectBet={setSelectedBet}
+                                                                    showHeader={false}
+                                                                    density={isTightLayout ? 'compact' : 'default'}
+                                                                    variant={totalQuestions > 12 ? 'stepper' : 'grid'}
+                                                                />
+
+                                                                <View className="items-center">
+                                                                    <Text className="text-sm text-foreground/60 text-center font-bold font-sans">
+                                                                        {t('betDescription')}
+                                                                    </Text>
+                                                                </View>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </>
                                                 )}
 
-                                                {/* Answer Preview Phase */}
-                                                {phase === 'preview' && !showCorrectAnswer && (
+                                                {showLocalPreviewWhileQuestion && (
                                                     <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
                                                         <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
                                                             <CardContent className={isCompact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
                                                                 <Text className="text-lg font-display font-semibold text-foreground">
                                                                     {t('answerPreview')}
                                                                 </Text>
-                                                                {!viewerHasAnswered && (
-                                                                    <View className="p-4 rounded-lg bg-white border-2 border-dashed border-foreground/30">
-                                                                        <Text className="text-sm text-foreground/70 font-medium italic text-center">
-                                                                            {t('submitToSee')}
-                                                                        </Text>
-                                                                    </View>
-                                                                )}
-                                                                {viewerHasAnswered && gameState.players.map((player) => {
+                                                                {gameState.players.map((player) => {
                                                                     const entry = answerBoard[player.id];
                                                                     return (
                                                                         <View key={player.id} className={`flex-row justify-between items-center ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
@@ -1866,145 +1691,326 @@ export default function Game() {
                                                                 })}
                                                             </CardContent>
                                                         </Card>
-                                                        {isHost && (
-                                                            <Button
-                                                                variant="secondary"
-                                                                size="lg"
-                                                                onPress={handleRevealAnswer}
-                                                                className="w-full shadow-lg shadow-secondary/20"
-                                                            >
-                                                                <View className="flex-row items-center gap-2">
-                                                                    <Text className="font-display font-bold text-secondary-foreground text-lg">
-                                                                        {t('revealNow')}
-                                                                    </Text>
-                                                                    <Text>🎯</Text>
-                                                                </View>
-                                                            </Button>
-                                                        )}
-                                                    </View>
-                                                )}
-
-                                                {phase === 'preview' && !showCorrectAnswer && !isHost && viewerHasAnswered && (
-                                                    <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
-                                                        <ActivityIndicator size="small" color="#4A3B32" />
-                                                        <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waitingForHost')}</Text>
-                                                    </View>
-                                                )}
-
-                                                {/* Validation Phase */}
-                                                {(phase === 'validation' || phase === 'final-validation') && (
-                                                    <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                                        <CardContent className={isCompact ? 'p-3 space-y-3' : 'p-5 space-y-4'}>
-                                                            <Text className="text-lg font-display font-semibold text-foreground">
-                                                                {t('hostValidation')}
-                                                            </Text>
-                                                            {gameState.players.map((player) => {
-                                                                const entry = answerBoard[player.id];
-                                                                return (
-                                                                    <View key={player.id} className={`flex-row items-center justify-between ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
-                                                                        <View className="flex-1 mr-4">
-                                                                            <Text className="font-semibold text-foreground">{player.name}</Text>
-                                                                            <Text className="text-sm text-foreground/80 font-medium mt-0.5">
-                                                                                {entry?.answer || t('waitingForAnswer')}
-                                                                            </Text>
-                                                                        </View>
-                                                                        {isHost && entry?.hasAnswered && (
-                                                                            <View className="flex-row gap-2">
-                                                                                <TouchableOpacity
-                                                                                    onPress={() => toggleValidation(player.id, true)}
-                                                                                    className={`px-3 py-2 rounded-lg border-2 ${entry.isCorrect ? 'border-success bg-success/20' : 'border-transparent bg-muted/20'}`}
-                                                                                >
-                                                                                    <Ionicons name="checkmark" size={20} color={entry.isCorrect ? '#4A7A68' : '#A0A0A0'} />
-                                                                                </TouchableOpacity>
-                                                                                <TouchableOpacity
-                                                                                    onPress={() => toggleValidation(player.id, false)}
-                                                                                    className={`px-3 py-2 rounded-lg border-2 ${entry.isCorrect === false ? 'border-destructive bg-destructive/20' : 'border-transparent bg-muted/20'}`}
-                                                                                >
-                                                                                    <Ionicons name="close" size={20} color={entry.isCorrect === false ? '#B3261E' : '#A0A0A0'} />
-                                                                                </TouchableOpacity>
-                                                                            </View>
-                                                                        )}
-                                                                        {(!isHost) && (
-                                                                            <View className={`px-3 py-1.5 rounded-lg ${entry?.isCorrect === true ? 'bg-success/20' : (entry?.isCorrect === false ? 'bg-destructive/20' : 'bg-muted')}`}>
-                                                                                {entry?.isCorrect === true && <Ionicons name="checkmark-circle" size={20} color="#4A7A68" />}
-                                                                                {entry?.isCorrect === false && <Ionicons name="close-circle" size={20} color="#B3261E" />}
-                                                                                {entry?.isCorrect === undefined && <ActivityIndicator size="small" color="#999" />}
-                                                                            </View>
-                                                                        )}
-                                                                    </View>
-                                                                );
-                                                            })}
-
-                                                            {isHost && (
-                                                                <Button variant="hero" onPress={applyScores} className="w-full mt-2 shadow-xl shadow-primary/20">
-                                                                    <Text className="text-lg font-display font-bold text-primary-foreground">
-                                                                        {t('applyScores')}
-                                                                    </Text>
-                                                                </Button>
-                                                            )}
-                                                        </CardContent>
-                                                    </Card>
-                                                )}
-
-                                                {/* Scoring / progression */}
-                                                {(phase === 'scoring' || phase === 'final-scoring') && (
-                                                    <View className={isCompact ? 'items-center space-y-4' : 'items-center space-y-6'}>
-                                                        <View className={`${isCompact ? 'p-4' : 'p-6'} rounded-lg border-2 ${isCorrectAnswer ? 'bg-success/10 border-success' : 'bg-destructive/10 border-destructive'} items-center w-full transform -rotate-1`}>
-                                                            {isCorrectAnswer ? (
-                                                                <Ionicons name="trophy" size={isCompact ? 36 : 48} color="#4A7A68" />
-                                                            ) : (
-                                                                <Ionicons name="alert-circle" size={isCompact ? 36 : 48} color="#B3261E" />
-                                                            )}
-                                                            <Text className={`${isCompact ? 'text-2xl mt-2' : 'text-3xl mt-4'} font-display font-bold ${isCorrectAnswer ? 'text-success' : 'text-destructive'}`}>
-                                                                {isCorrectAnswer
-                                                                    ? `${t('correct')} ${isFinalRound ? '' : `+${currentBetDisplay ?? 0}`}`
-                                                                    : isFinalRound
-                                                                        ? `${t('incorrect')} -${currentFinalChoice.wager || 0}`
-                                                                        : t('incorrect')}
-                                                            </Text>
+                                                        <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
+                                                            <ActivityIndicator size="small" color="#4A3B32" />
+                                                            <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waiting')}</Text>
                                                         </View>
-
-                                                        {isHost ? (
-                                                            <Button variant="hero" onPress={handleNextQuestion} className="w-full shadow-xl shadow-primary/20">
-                                                                <Text className="text-lg font-display font-bold text-primary-foreground">
-                                                                    {isFinalRound ? `${t('seeResults')} 🏆` : `${t('next')} ${t('question')} ➡️`}
-                                                                </Text>
-                                                            </Button>
-                                                        ) : (
-                                                            <View className="items-center bg-white p-4 rounded-lg border-2 border-foreground">
-                                                                <ActivityIndicator size="small" color="#4A3B32" />
-                                                                <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waitingForHost')}</Text>
-                                                            </View>
-                                                        )}
                                                     </View>
                                                 )}
                                             </View>
-                                        )
-                                    }
-                                </View>
-                            </View>
+                                        )}
 
-                            {isDesktopWeb && phase !== 'lobby' && phase !== 'results' && (
-                                <View className="w-[320px] shrink-0">
-                                    <OpponentStatusList
-                                        players={gameState.players}
-                                        currentPlayerId={activePlayer.id}
-                                        showScores={true}
-                                        showBets={
-                                            phase === 'reveal' ||
-                                            phase === 'scoring' ||
-                                            phase === 'validation' ||
-                                            phase === 'final-scoring' ||
-                                            phase === 'final-validation'
+                                        {/* Final Wager Phase */}
+                                        {isFinalRound && phase === 'final-wager' && (
+                                            <View className={`${isCompact ? 'space-y-4' : 'space-y-6'}`}>
+                                                <Card className={`border-2 border-foreground bg-white rounded-lg ${isCompact ? 'p-4' : 'p-5'}`}>
+                                                    <View className="mb-4">
+                                                        <Text className="text-xl font-display font-bold text-center mb-2">{t('finalMode')}</Text>
+                                                        <View className="flex-row gap-2 justify-center">
+                                                            <TouchableOpacity
+                                                                onPress={() => setFinalMode('personalized')}
+                                                                className={`px-4 py-2 rounded-full border-2 ${finalMode === 'personalized' ? 'bg-primary border-foreground' : 'bg-transparent border-transparent'}`}
+                                                            >
+                                                                <Text className={`font-bold ${finalMode === 'personalized' ? 'text-white' : 'text-foreground'}`}>{t('personalFinal')}</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                onPress={() => setFinalMode('shared')}
+                                                                className={`px-4 py-2 rounded-full border-2 ${finalMode === 'shared' ? 'bg-primary border-foreground' : 'bg-transparent border-transparent'}`}
+                                                            >
+                                                                <Text className={`font-bold ${finalMode === 'shared' ? 'text-white' : 'text-foreground'}`}>{t('sharedFinal')}</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </View>
+
+                                                    {finalMode === 'shared' && (
+                                                        <View className="mb-4">
+                                                            <Text className="font-bold mb-2">{t('chooseDifficulty')}:</Text>
+                                                            <View className="flex-row justify-between gap-2">
+                                                                {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => {
+                                                                    const voteCount = Object.values(finalChoices).filter(c => c.difficulty === d).length;
+                                                                    const isSelected = (finalChoices[activePlayer.id]?.difficulty || 'medium') === d;
+                                                                    return (
+                                                                        <TouchableOpacity
+                                                                            key={d}
+                                                                            onPress={() => updateFinalChoice({ difficulty: d })}
+                                                                            className={`flex-1 p-2 border-2 rounded-lg items-center ${isSelected ? 'bg-accent border-foreground' : 'bg-white border-foreground/20'}`}
+                                                                        >
+                                                                            <Text className="font-bold capitalize">{t(d)}</Text>
+                                                                            {voteCount > 0 && <Text className="text-xs">{voteCount} votes</Text>}
+                                                                        </TouchableOpacity>
+                                                                    );
+                                                                })}
+                                                            </View>
+                                                        </View>
+                                                    )}
+
+                                                    <Text className="font-bold mb-2">{t('yourBet')} ({t('optional')}):</Text>
+                                                    <View className="flex-row gap-2 justify-center mb-4">
+                                                        <TouchableOpacity onPress={() => updateFinalChoice({ wager: 0 })} className={`p-3 border-2 rounded ${finalChoices[activePlayer.id]?.wager === 0 ? 'bg-muted border-foreground' : 'border-dashed'}`}>
+                                                            <Text className="font-bold">No Bet</Text>
+                                                        </TouchableOpacity>
+                                                        {[10, 20].map((amt) => (
+                                                            <TouchableOpacity
+                                                                key={amt}
+                                                                onPress={() => updateFinalChoice({ wager: amt })}
+                                                                className={`p-3 border-2 rounded ${finalChoices[activePlayer.id]?.wager === amt ? 'bg-accent border-foreground' : 'border-foreground/20'}`}
+                                                            >
+                                                                <Text className="font-bold">{amt} pts</Text>
+                                                            </TouchableOpacity>
+                                                        ))}
+                                                    </View>
+
+                                                    {isHost && (
+                                                        <Button onPress={startFinalQuestion} variant="hero">
+                                                            <Text className="text-white font-bold">{t('startFinal')}</Text>
+                                                        </Button>
+                                                    )}
+                                                    {!isHost && (
+                                                        <Text className="text-center italic mt-4">{t('waitingForHost')}</Text>
+                                                    )}
+                                                </Card>
+
+                                                {finalMode === 'personalized' && !((apiKey || '').trim()) && (
+                                                    <View className="items-center space-y-2 bg-destructive/10 p-4 rounded-2xl border border-destructive/20 mt-2">
+                                                        <Ionicons name="warning" size={24} color="#B3261E" />
+                                                        <Text className="text-sm text-foreground/80 text-center font-medium">{t('missingApiKeyPersonal')}</Text>
+                                                        <Button variant="outline" size="sm" onPress={() => router.push('/settings')} className="border-destructive/30 text-destructive">
+                                                            <Text className="font-display font-bold text-destructive">{t('goToSettings')}</Text>
+                                                        </Button>
+                                                    </View>
+                                                )}
+
+                                                <Button
+                                                    variant="hero"
+                                                    onPress={() => updateFinalChoice({ wager: finalWagerDraft })}
+                                                    disabled={finalMode === 'personalized' && !((apiKey || '').trim())}
+                                                    className="w-full mt-2"
+                                                >
+                                                    <Text className="font-display font-bold text-primary-foreground text-lg">
+                                                        {isGeneratingPersonalFinal ? t('loading') : t('submit')}
+                                                    </Text>
+                                                </Button>
+                                            </View>
+                                        )}
+
+                                        {/* Question Phase */}
+                                        {
+                                            (phase === 'preview' || phase === 'validation' || phase === 'scoring' || phase === 'final-question' || phase === 'final-validation' || phase === 'final-scoring') && activeQuestion && (
+                                                <View className={isCompact ? 'space-y-4' : 'space-y-8'}>
+                                                    {/* Your Bet Display */}
+                                                    <View className="items-center">
+                                                        <View className="px-5 py-2 rounded-lg bg-accent/10 border-2 border-accent transform -rotate-1">
+                                                            <Text className="text-accent font-display font-bold">
+                                                                {t('yourBet')}: {currentBetDisplay ?? 0} {t('points')}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Question Card */}
+                                                    <QuestionCard
+                                                        question={activeQuestion}
+                                                        questionNumber={isFinalRound ? 1 : currentQuestionIndex + 1}
+                                                        totalQuestions={totalQuestions}
+                                                        selectedAnswer={selectedAnswer}
+                                                        onSelectAnswer={handleAnswerSubmit}
+                                                        isAnswerPhase={phase === 'final-question'}
+                                                        density={isCompact ? 'compact' : 'default'}
+                                                        headerAccessory={
+                                                            phase === 'final-question' ? (
+                                                                <Timer
+                                                                    key={timerKey}
+                                                                    seconds={timePerQuestionSeconds}
+                                                                    onComplete={handleRoundTimerComplete}
+                                                                    endsAt={phaseEndsAtMs}
+                                                                    size="xxs"
+                                                                />
+                                                            ) : null
+                                                        }
+                                                        showCorrectAnswer={showCorrectAnswer}
+                                                        hintsEnabled={gameState.settings.hintsEnabled}
+                                                    />
+
+                                                    {phase === 'final-question' && (
+                                                        <Button
+                                                            variant="hero"
+                                                            onPress={handleSubmit}
+                                                            disabled={!selectedAnswer?.trim() || !!answerBoard[activePlayer.id]?.hasAnswered}
+                                                            className="w-full shadow-xl shadow-primary/25"
+                                                        >
+                                                            <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                                {t('submit')}
+                                                            </Text>
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Answer Preview Phase */}
+                                                    {phase === 'preview' && !showCorrectAnswer && (
+                                                        <View className={isCompact ? 'space-y-3' : 'space-y-5'}>
+                                                            <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
+                                                                <CardContent className={isCompact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
+                                                                    <Text className="text-lg font-display font-semibold text-foreground">
+                                                                        {t('answerPreview')}
+                                                                    </Text>
+                                                                    {!viewerHasAnswered && (
+                                                                        <View className="p-4 rounded-lg bg-white border-2 border-dashed border-foreground/30">
+                                                                            <Text className="text-sm text-foreground/70 font-medium italic text-center">
+                                                                                {t('submitToSee')}
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
+                                                                    {viewerHasAnswered && gameState.players.map((player) => {
+                                                                        const entry = answerBoard[player.id];
+                                                                        return (
+                                                                            <View key={player.id} className={`flex-row justify-between items-center ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
+                                                                                <Text className="font-semibold text-foreground">{player.name}</Text>
+                                                                                <Text className="text-sm text-muted-foreground bg-white/50 px-2 py-1 rounded-md overflow-hidden max-w-[50%]" numberOfLines={1}>
+                                                                                    {entry?.hasAnswered ? entry.answer : t('waitingForAnswer')}
+                                                                                </Text>
+                                                                            </View>
+                                                                        );
+                                                                    })}
+                                                                </CardContent>
+                                                            </Card>
+                                                            {isHost && (
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    size="lg"
+                                                                    onPress={handleRevealAnswer}
+                                                                    className="w-full shadow-lg shadow-secondary/20"
+                                                                >
+                                                                    <View className="flex-row items-center gap-2">
+                                                                        <Text className="font-display font-bold text-secondary-foreground text-lg">
+                                                                            {t('revealNow')}
+                                                                        </Text>
+                                                                        <Text>🎯</Text>
+                                                                    </View>
+                                                                </Button>
+                                                            )}
+                                                        </View>
+                                                    )}
+
+                                                    {phase === 'preview' && !showCorrectAnswer && !isHost && viewerHasAnswered && (
+                                                        <View className={`items-center bg-white ${isCompact ? 'p-3' : 'p-4'} rounded-lg border-2 border-foreground mx-auto transform -rotate-1`}>
+                                                            <ActivityIndicator size="small" color="#4A3B32" />
+                                                            <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waitingForHost')}</Text>
+                                                        </View>
+                                                    )}
+
+                                                    {/* Validation Phase */}
+                                                    {(phase === 'validation' || phase === 'final-validation') && (
+                                                        <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
+                                                            <CardContent className={isCompact ? 'p-3 space-y-3' : 'p-5 space-y-4'}>
+                                                                <Text className="text-lg font-display font-semibold text-foreground">
+                                                                    {t('hostValidation')}
+                                                                </Text>
+                                                                {gameState.players.map((player) => {
+                                                                    const entry = answerBoard[player.id];
+                                                                    return (
+                                                                        <View key={player.id} className={`flex-row items-center justify-between ${isCompact ? 'py-2' : 'py-3'} border-b border-black/5 last:border-0`}>
+                                                                            <View className="flex-1 mr-4">
+                                                                                <Text className="font-semibold text-foreground">{player.name}</Text>
+                                                                                <Text className="text-sm text-foreground/80 font-medium mt-0.5">
+                                                                                    {entry?.answer || t('waitingForAnswer')}
+                                                                                </Text>
+                                                                            </View>
+                                                                            {isHost && entry?.hasAnswered && (
+                                                                                <View className="flex-row gap-2">
+                                                                                    <TouchableOpacity
+                                                                                        onPress={() => toggleValidation(player.id, true)}
+                                                                                        className={`px-3 py-2 rounded-lg border-2 ${entry.isCorrect ? 'border-success bg-success/20' : 'border-transparent bg-muted/20'}`}
+                                                                                    >
+                                                                                        <Ionicons name="checkmark" size={20} color={entry.isCorrect ? '#4A7A68' : '#A0A0A0'} />
+                                                                                    </TouchableOpacity>
+                                                                                    <TouchableOpacity
+                                                                                        onPress={() => toggleValidation(player.id, false)}
+                                                                                        className={`px-3 py-2 rounded-lg border-2 ${entry.isCorrect === false ? 'border-destructive bg-destructive/20' : 'border-transparent bg-muted/20'}`}
+                                                                                    >
+                                                                                        <Ionicons name="close" size={20} color={entry.isCorrect === false ? '#B3261E' : '#A0A0A0'} />
+                                                                                    </TouchableOpacity>
+                                                                                </View>
+                                                                            )}
+                                                                            {(!isHost) && (
+                                                                                <View className={`px-3 py-1.5 rounded-lg ${entry?.isCorrect === true ? 'bg-success/20' : (entry?.isCorrect === false ? 'bg-destructive/20' : 'bg-muted')}`}>
+                                                                                    {entry?.isCorrect === true && <Ionicons name="checkmark-circle" size={20} color="#4A7A68" />}
+                                                                                    {entry?.isCorrect === false && <Ionicons name="close-circle" size={20} color="#B3261E" />}
+                                                                                    {entry?.isCorrect === undefined && <ActivityIndicator size="small" color="#999" />}
+                                                                                </View>
+                                                                            )}
+                                                                        </View>
+                                                                    );
+                                                                })}
+
+                                                                {isHost && (
+                                                                    <Button variant="hero" onPress={applyScores} className="w-full mt-2 shadow-xl shadow-primary/20">
+                                                                        <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                                            {t('applyScores')}
+                                                                        </Text>
+                                                                    </Button>
+                                                                )}
+                                                            </CardContent>
+                                                        </Card>
+                                                    )}
+
+                                                    {/* Scoring / progression */}
+                                                    {(phase === 'scoring' || phase === 'final-scoring') && (
+                                                        <View className={isCompact ? 'items-center space-y-4' : 'items-center space-y-6'}>
+                                                            <View className={`${isCompact ? 'p-4' : 'p-6'} rounded-lg border-2 ${isCorrectAnswer ? 'bg-success/10 border-success' : 'bg-destructive/10 border-destructive'} items-center w-full transform -rotate-1`}>
+                                                                {isCorrectAnswer ? (
+                                                                    <Ionicons name="trophy" size={isCompact ? 36 : 48} color="#4A7A68" />
+                                                                ) : (
+                                                                    <Ionicons name="alert-circle" size={isCompact ? 36 : 48} color="#B3261E" />
+                                                                )}
+                                                                <Text className={`${isCompact ? 'text-2xl mt-2' : 'text-3xl mt-4'} font-display font-bold ${isCorrectAnswer ? 'text-success' : 'text-destructive'}`}>
+                                                                    {isCorrectAnswer
+                                                                        ? `${t('correct')} ${isFinalRound ? '' : `+${currentBetDisplay ?? 0}`}`
+                                                                        : isFinalRound
+                                                                            ? `${t('incorrect')} -${currentFinalChoice.wager || 0}`
+                                                                            : t('incorrect')}
+                                                                </Text>
+                                                            </View>
+
+                                                            {isHost ? (
+                                                                <Button variant="hero" onPress={handleNextQuestion} className="w-full shadow-xl shadow-primary/20">
+                                                                    <Text className="text-lg font-display font-bold text-primary-foreground">
+                                                                        {isFinalRound ? `${t('seeResults')} 🏆` : `${t('next')} ${t('question')} ➡️`}
+                                                                    </Text>
+                                                                </Button>
+                                                            ) : (
+                                                                <View className="items-center bg-white p-4 rounded-lg border-2 border-foreground">
+                                                                    <ActivityIndicator size="small" color="#4A3B32" />
+                                                                    <Text className="text-muted-foreground font-bold font-sans mt-2">{t('waitingForHost')}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            )
                                         }
-                                        compact={isCompact}
-                                        orientation="vertical"
-                                    />
+                                    </View>
                                 </View>
-                            )}
+
+                                {isDesktopWeb && phase !== 'lobby' && phase !== 'results' && (
+                                    <View className="w-[320px] shrink-0">
+                                        <OpponentStatusList
+                                            players={gameState.players}
+                                            currentPlayerId={activePlayer.id}
+                                            showScores={true}
+                                            showBets={
+                                                phase === 'reveal' ||
+                                                phase === 'scoring' ||
+                                                phase === 'validation' ||
+                                                phase === 'final-scoring' ||
+                                                phase === 'final-validation'
+                                            }
+                                            compact={isCompact}
+                                            orientation="vertical"
+                                        />
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     </View>
-                </View>
+                </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
