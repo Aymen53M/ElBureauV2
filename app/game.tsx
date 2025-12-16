@@ -1573,14 +1573,6 @@ export default function Game() {
                                                 hintsEnabled={gameState.settings.hintsEnabled}
                                             />
 
-                                            {!showLocalPreviewWhileQuestion && !((betsByPlayerId[activePlayer.id] ?? selectedBet) || 0) && (
-                                                <View className="items-center bg-white p-2 rounded-lg border-2 border-foreground/20 mx-auto transform -rotate-1">
-                                                    <Text className="text-foreground/60 text-sm italic text-center font-bold font-sans">
-                                                        {t('placeBetFirst') || 'Choose your bet below to confirm your answer'}
-                                                    </Text>
-                                                </View>
-                                            )}
-
                                             {!showLocalPreviewWhileQuestion && (
                                                 <>
                                                     {/* Bet selection (no confirm; submitting answer commits the bet) */}

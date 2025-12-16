@@ -63,10 +63,10 @@ export default function Index() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="home" />
 
-            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-6 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} w-full z-10`}>
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-7 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} w-full z-10`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
-                    <TouchableOpacity className="p-2 w-12 h-12 rounded-lg bg-white items-center justify-center border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]">
+                    <TouchableOpacity className={`${isRTL ? 'ml-1' : 'mr-1'} p-2 w-12 h-12 rounded-lg bg-white items-center justify-center border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]`}>
                         <Ionicons name="settings-outline" size={24} color="#2B1F17" />
                     </TouchableOpacity>
                 </Link>

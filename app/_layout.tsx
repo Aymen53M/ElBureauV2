@@ -99,10 +99,16 @@ function GlobalImmersiveToggle() {
             <View
                 pointerEvents="box-none"
                 style={{
-                    position: Platform.OS === 'web' ? ('fixed' as any) : 'absolute',
-                    bottom: Platform.OS === 'web' ? ('calc(env(safe-area-inset-bottom) + 14px)' as any) : insets.bottom + 14,
-                    left: Platform.OS === 'web' ? ('calc(env(safe-area-inset-left) + 14px)' as any) : insets.left + 14,
-                    zIndex: 9999,
+                    position: 'absolute',
+                    bottom:
+                        Platform.OS === 'web'
+                            ? ('calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 14px)' as any)
+                            : insets.bottom + 14,
+                    left:
+                        Platform.OS === 'web'
+                            ? ('calc(var(--safe-area-left, env(safe-area-inset-left)) + 14px)' as any)
+                            : insets.left + 14,
+                    zIndex: 100000,
                 }}
             >
                 <TouchableOpacity
@@ -111,8 +117,8 @@ function GlobalImmersiveToggle() {
                     style={{
                         backgroundColor: 'rgba(255, 248, 239, 0.92)',
                         borderRadius: 999,
-                        width: 44,
-                        height: 44,
+                        width: 48,
+                        height: 48,
                         borderWidth: 1,
                         borderColor: 'rgba(43, 31, 23, 0.18)',
                         flexDirection: 'row',
