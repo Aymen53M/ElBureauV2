@@ -62,12 +62,8 @@ async function fetchGeminiJsonText(args: {
     temperature: number;
     maxOutputTokens?: number;
 }): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode; retryAfterMs?: number }> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-
-    const response = await retryFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
-        body: JSON.stringify({
+    const buildRequestBody = () =>
+        JSON.stringify({
             systemInstruction: { parts: [{ text: args.systemPrompt }] },
             contents: [{ role: 'user', parts: [{ text: args.userPrompt }] }],
             safetySettings: [
@@ -83,8 +79,25 @@ async function fetchGeminiJsonText(args: {
                     ? { maxOutputTokens: Math.round(args.maxOutputTokens) }
                     : {}),
             },
-        }),
-    });
+        });
+
+    const callModel = async (model: string) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const response = await retryFetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
+            body: buildRequestBody(),
+        });
+        return response;
+    };
+
+    // Strategy:
+    // 1) Try primary model.
+    // 2) If Gemini is overloaded/unavailable (503/5xx) after retries, fallback to gemini-2.0.
+    let response = await callModel(MODEL_PRIMARY);
+    if (!response.ok && (response.status === 503 || response.status >= 500)) {
+        response = await callModel(MODEL_FALLBACK);
+    }
 
     if (!response.ok) {
         const body = await response.text();
@@ -218,9 +231,10 @@ const languageNames: Record<string, string> = {
  * This keeps the "your key, your content" promise: host key for shared rounds,
  * player key for personal/final rounds.
  */
-// Google GenAI REST (v1beta) compatible model name.
-// The Go sample provided uses "gemini-2.5-flash"; we mirror that here.
-const MODEL = 'gemini-2.5-flash';
+// Google GenAI REST (v1beta) compatible model names.
+// Primary + fallback model used when Gemini is temporarily overloaded (503).
+const MODEL_PRIMARY = 'gemini-2.5-flash';
+const MODEL_FALLBACK = 'gemini-2.0-flash';
 
 type GeminiErrorCode =
     | 'MISSING_API_KEY'
@@ -681,7 +695,7 @@ Winner: ${data.winner.name} with ${data.winner.score} points!
 
 Write a fun, brief highlight commentary (2-3 sentences) celebrating the game. Make it feel exciting and party-like!`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_PRIMARY}:generateContent`;
 
     try {
         const response = await retryFetch(url, {
