@@ -11,6 +11,8 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import { getShadowStyle } from '@/lib/styles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { deleteRoomData } from '@/services/gameService';
 
 const demoPlayers: Player[] = [
     { id: '1', name: 'Alex', score: 45, isHost: true, isReady: true, usedBets: [], hasApiKey: true },
@@ -118,11 +120,14 @@ const ConfettiAnimation: React.FC<{ show: boolean }> = ({ show }) => {
 export default function Results() {
     const router = useRouter();
     const { t } = useLanguage();
-    const { gameState, setGameState } = useGame();
+    const { gameState, currentPlayer, clearRoomSession } = useGame();
     const { height: windowHeight } = useWindowDimensions();
     const compactHeight = Platform.OS === 'web' ? 900 : 760;
     const isCompact = windowHeight < compactHeight;
     const isTiny = windowHeight < 700;
+
+    const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
+    const cleanupScheduledRef = useRef(false);
 
     const [showConfetti, setShowConfetti] = useState(false);
     const [revealedRanks, setRevealedRanks] = useState<number[]>([]);
@@ -157,6 +162,23 @@ export default function Results() {
     }, [players.length]);
 
     useEffect(() => {
+        if (!isSupabaseConfigured) return;
+        if (!isHost) return;
+        const roomCode = gameState?.roomCode;
+        if (!roomCode) return;
+        if (cleanupScheduledRef.current) return;
+
+        cleanupScheduledRef.current = true;
+        const timer = setTimeout(() => {
+            deleteRoomData(roomCode).catch(() => undefined);
+        }, 30000);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [gameState?.roomCode, isHost]);
+
+    useEffect(() => {
         setRankPage(0);
     }, [view, players.length, isCompact]);
 
@@ -165,8 +187,21 @@ export default function Results() {
         if (!showConfetti || highlights || isLoadingHighlights) return;
     }, [showConfetti, highlights, isLoadingHighlights]);
 
-    const handlePlayAgain = () => {
-        setGameState(null);
+    const handlePlayAgain = async () => {
+        const roomCode = gameState?.roomCode;
+        if (isSupabaseConfigured && isHost && roomCode) {
+            await deleteRoomData(roomCode).catch(() => undefined);
+        }
+        await clearRoomSession().catch(() => undefined);
+        router.replace('/');
+    };
+
+    const handleGoHome = async () => {
+        const roomCode = gameState?.roomCode;
+        if (isSupabaseConfigured && isHost && roomCode) {
+            await deleteRoomData(roomCode).catch(() => undefined);
+        }
+        await clearRoomSession().catch(() => undefined);
         router.replace('/');
     };
 
@@ -394,7 +429,7 @@ export default function Results() {
 
                     <Button
                         variant="secondary"
-                        onPress={() => router.replace('/')}
+                        onPress={handleGoHome}
                         className="flex-1 shadow-none border-2 border-foreground"
                     >
                         <View className="flex-row items-center gap-2">

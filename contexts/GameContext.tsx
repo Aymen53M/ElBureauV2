@@ -77,6 +77,7 @@ interface GameContextType {
     setGameState: React.Dispatch<React.SetStateAction<GameState | null>>;
     currentPlayer: Player | null;
     setCurrentPlayer: React.Dispatch<React.SetStateAction<Player | null>>;
+    clearRoomSession: () => Promise<void>;
     apiKey: string;
     setApiKey: (key: string) => Promise<void>;
     playerName: string;
@@ -93,6 +94,9 @@ interface GameContextType {
 const API_KEY_STORAGE_KEY = 'elbureau-api-key';
 const PLAYER_NAME_STORAGE_KEY = 'elbureau-player-name';
 const DEVICE_ID_STORAGE_KEY = 'elbureau-device-id';
+const ROOM_CODE_STORAGE_KEY = 'elbureau-room-code';
+const PLAYER_ID_STORAGE_KEY = 'elbureau-player-id';
+const LAST_ROOM_CODE_STORAGE_KEY = 'elbureau-last-room-code';
 
 const defaultSettings: GameSettings = {
     theme: 'movies',
@@ -143,8 +147,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
 
                 // Attempt to restore session
-                const savedRoomCode = await AsyncStorage.getItem('elbureau-room-code');
-                const savedPlayerId = await AsyncStorage.getItem('elbureau-player-id');
+                const savedRoomCode = await AsyncStorage.getItem(ROOM_CODE_STORAGE_KEY);
+                const savedPlayerId = await AsyncStorage.getItem(PLAYER_ID_STORAGE_KEY);
 
                 if (savedRoomCode && savedPlayerId) {
                     console.log('Restoring session for room:', savedRoomCode);
@@ -191,12 +195,35 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Persist Room Code & Player ID
     useEffect(() => {
         if (gameState?.roomCode) {
-            AsyncStorage.setItem('elbureau-room-code', gameState.roomCode).catch(e => console.error(e));
+            AsyncStorage.setItem(ROOM_CODE_STORAGE_KEY, gameState.roomCode).catch(e => console.error(e));
+        } else {
+            AsyncStorage.removeItem(ROOM_CODE_STORAGE_KEY).catch(e => console.error(e));
         }
+
         if (currentPlayer?.id) {
-            AsyncStorage.setItem('elbureau-player-id', currentPlayer.id).catch(e => console.error(e));
+            AsyncStorage.setItem(PLAYER_ID_STORAGE_KEY, currentPlayer.id).catch(e => console.error(e));
+        } else {
+            AsyncStorage.removeItem(PLAYER_ID_STORAGE_KEY).catch(e => console.error(e));
         }
     }, [gameState?.roomCode, currentPlayer?.id]);
+
+    const clearRoomSession = async () => {
+        try {
+            if ((globalThis as any)?.localStorage?.removeItem) {
+                try {
+                    (globalThis as any).localStorage.removeItem(LAST_ROOM_CODE_STORAGE_KEY);
+                } catch {
+                    // noop
+                }
+            }
+            await AsyncStorage.multiRemove([ROOM_CODE_STORAGE_KEY, PLAYER_ID_STORAGE_KEY, LAST_ROOM_CODE_STORAGE_KEY]);
+        } catch (error) {
+            console.error('Failed to clear room session:', error);
+        } finally {
+            setCurrentPlayer(null);
+            setGameState(null);
+        }
+    };
 
     useEffect(() => {
         if (!apiKey || !currentPlayer?.id) return;
@@ -281,6 +308,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setGameState,
             currentPlayer,
             setCurrentPlayer,
+            clearRoomSession,
             apiKey,
             setApiKey,
             playerName,

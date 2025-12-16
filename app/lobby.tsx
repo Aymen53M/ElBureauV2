@@ -20,7 +20,7 @@ import { resetGameplayForRoom } from '@/services/gameService';
 export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { gameState, setGameState, currentPlayer, setCurrentPlayer, apiKey } = useGame();
+    const { gameState, setGameState, currentPlayer, apiKey, clearRoomSession } = useGame();
     const { height: windowHeight } = useWindowDimensions();
     const compactHeight = Platform.OS === 'web' ? 900 : 900;
     const isCompact = windowHeight < compactHeight;
@@ -161,8 +161,7 @@ export default function Lobby() {
                 // noop
             }
         }
-        setCurrentPlayer(null);
-        setGameState(null);
+        await clearRoomSession().catch(() => undefined);
         router.replace('/');
     };
 

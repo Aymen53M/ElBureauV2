@@ -624,6 +624,44 @@ export async function resetGameplayForRoom(args: {
     }
 }
 
+export async function deleteRoomData(roomCode: string): Promise<void> {
+    const client = requireSupabase();
+    const normalized = roomCode.toUpperCase();
+
+    let { error } = await client
+        .from('elbureau_rooms')
+        .delete()
+        .eq('room_code', normalized);
+
+    if (!error) return;
+
+    const msg = String(error.message || '').toLowerCase();
+    const missingTable = msg.includes('does not exist') || msg.includes('42p01');
+    if (missingTable) return;
+
+    const deletionQueries = [
+        client.from('elbureau_bets').delete().eq('room_code', normalized),
+        client.from('elbureau_answers').delete().eq('room_code', normalized),
+        client.from('elbureau_validations').delete().eq('room_code', normalized),
+        client.from('elbureau_final_choices').delete().eq('room_code', normalized),
+        client.from('elbureau_final_questions').delete().eq('room_code', normalized),
+        client.from('elbureau_final_answers').delete().eq('room_code', normalized),
+        client.from('elbureau_final_validations').delete().eq('room_code', normalized),
+        client.from('elbureau_room_players').delete().eq('room_code', normalized),
+        client.from('elbureau_rooms').delete().eq('room_code', normalized),
+    ];
+
+    for (const q of deletionQueries) {
+        const res: any = await q;
+        if (res?.error) {
+            const m = String(res.error.message || '').toLowerCase();
+            const isMissing = m.includes('does not exist') || m.includes('42p01');
+            if (isMissing) continue;
+            throw new Error(res.error.message || 'Failed to delete room data');
+        }
+    }
+}
+
 export function subscribeToGame(args: {
     roomCode: string;
     onChange: () => void;
