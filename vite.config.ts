@@ -12,6 +12,22 @@ export default defineConfig({
             },
         }),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return;
+                    if (id.includes('react-router-dom')) return 'router';
+                    if (id.includes('@tanstack/react-query')) return 'query';
+                    if (id.includes('@supabase/supabase-js')) return 'supabase';
+                    if (id.includes('react-native-web') || id.includes('/react-native/')) return 'rnweb';
+                    if (id.includes('react-dom')) return 'react-dom';
+                    if (id.includes('react/')) return 'react';
+                    return 'vendor';
+                },
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, '.'),
