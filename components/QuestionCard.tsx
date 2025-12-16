@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Question } from '@/contexts/GameContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -36,8 +36,16 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 }) => {
     const { t } = useLanguage();
     const [showHint, setShowHint] = React.useState(false);
+    const { width: windowWidth } = useWindowDimensions();
 
     const isCompact = density === 'compact';
+    const useOptionGrid =
+        isCompact &&
+        question.type === 'multiple-choice' &&
+        Array.isArray(question.options) &&
+        question.options.length > 0 &&
+        question.options.length <= 4 &&
+        windowWidth >= 360;
 
     React.useEffect(() => {
         setShowHint(false);
@@ -56,7 +64,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
     return (
         <Card className="rounded-lg border-2 border-foreground bg-white" style={styles.cardShadow}>
-            <CardContent className={`${isCompact ? 'p-4 space-y-4' : 'p-7 space-y-7'}`}>
+            <CardContent className={`${isCompact ? 'p-3 space-y-3' : 'p-7 space-y-7'}`}>
                 {/* Question header */}
                 <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center gap-2">
@@ -65,15 +73,18 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                         </Text>
                         {headerAccessory}
                     </View>
-                    <View className={`px-3 py-1 rounded-full border-2 border-foreground/10 ${getDifficultyColor()}`}>
-                        <Text className="text-xs font-semibold font-sans">
+                    <View className={`${isCompact ? 'px-2 py-0.5' : 'px-3 py-1'} rounded-full border-2 border-foreground/10 ${getDifficultyColor()}`}>
+                        <Text className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-semibold font-sans`}>
                             {t(question.difficulty)}
                         </Text>
                     </View>
                 </View>
 
                 {/* Question text */}
-                <Text className={`${isCompact ? 'text-lg' : 'text-2xl'} font-display font-medium text-center text-foreground leading-tight`}>
+                <Text
+                    className={`${isCompact ? 'text-base' : 'text-2xl'} font-display font-medium text-center text-foreground leading-tight`}
+                    numberOfLines={isCompact ? 4 : undefined}
+                >
                     {question.text}
                 </Text>
 
@@ -83,16 +94,18 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                         {!showHint ? (
                             <TouchableOpacity
                                 onPress={() => setShowHint(true)}
-                                className="px-4 py-2 rounded-lg bg-accent/10 border-2 border-accent/20"
+                                className={`${isCompact ? 'px-3 py-1.5' : 'px-4 py-2'} rounded-lg bg-accent/10 border-2 border-accent/20`}
                             >
-                                <Text className="text-accent font-semibold text-sm font-sans">
+                                <Text className={`text-accent font-semibold ${isCompact ? 'text-xs' : 'text-sm'} font-sans`}>
                                     💡 {t('showHint')}
                                 </Text>
                             </TouchableOpacity>
                         ) : (
-                            <View className="p-3 rounded-lg bg-accent/5 border-2 border-accent/20 w-full transform -rotate-1">
-                                <Text className="text-xs text-accent font-semibold mb-1 font-sans">{t('hint')}:</Text>
-                                <Text className="text-foreground text-center font-display">{question.hint}</Text>
+                            <View className={`${isCompact ? 'p-2' : 'p-3'} rounded-lg bg-accent/5 border-2 border-accent/20 w-full transform -rotate-1`}>
+                                <Text className={`${isCompact ? 'text-[10px]' : 'text-xs'} text-accent font-semibold mb-1 font-sans`}>{t('hint')}:</Text>
+                                <Text className={`text-foreground text-center font-display ${isCompact ? 'text-xs' : ''}`} numberOfLines={isCompact ? 3 : undefined}>
+                                    {question.hint}
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -109,7 +122,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                             </View>
                         )}
                         {question.type === 'multiple-choice' && question.options && (
-                            <View className={isCompact ? 'space-y-1.5' : 'space-y-3'}>
+                            <View className={useOptionGrid ? 'flex-row flex-wrap gap-2' : (isCompact ? 'space-y-1.5' : 'space-y-3')}>
                                 {question.options.map((option, index) => {
                                     const isSelected = selectedAnswer === option;
                                     const isCorrect = showCorrectAnswer && option === question.correctAnswer;
@@ -122,7 +135,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                             key={index}
                                             onPress={() => !isDisabled && onSelectAnswer(option)}
                                             disabled={isDisabled}
-                                            className={`flex-row items-center ${isCompact ? 'p-2.5 rounded-lg' : 'p-4 rounded-lg'} border-2 ${isCorrect
+                                            className={`${useOptionGrid ? 'w-[48%]' : 'w-full'} flex-row items-center ${isCompact ? 'p-2 rounded-lg' : 'p-4 rounded-lg'} border-2 ${isCorrect
                                                 ? 'border-success bg-success/20'
                                                 : isWrong
                                                     ? 'border-destructive bg-destructive/20'
@@ -131,13 +144,16 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                                                         : 'border-foreground/20 bg-transparent'
                                                 }`}
                                         >
-                                            <View className={`${isCompact ? 'w-7 h-7 rounded-full' : 'w-8 h-8 rounded-full'} bg-white items-center justify-center mr-3 border-2 border-foreground/20`}>
-                                                <Text className="font-bold text-foreground font-display">
+                                            <View className={`${isCompact ? 'w-6 h-6 rounded-full' : 'w-8 h-8 rounded-full'} bg-white items-center justify-center ${isCompact ? 'mr-2' : 'mr-3'} border-2 border-foreground/20`}>
+                                                <Text className={`font-bold text-foreground font-display ${isCompact ? 'text-xs' : ''}`}>
                                                     {String.fromCharCode(65 + index)}
                                                 </Text>
                                             </View>
-                                            <Text className={`flex-1 font-display ${isCompact ? 'text-sm' : 'text-base'} ${isCorrect ? 'text-success font-bold' : isWrong ? 'text-destructive font-bold' : 'text-foreground'
-                                                }`}>
+                                            <Text
+                                                className={`flex-1 font-display ${isCompact ? 'text-xs' : 'text-base'} ${isCorrect ? 'text-success font-bold' : isWrong ? 'text-destructive font-bold' : 'text-foreground'
+                                                }`}
+                                                numberOfLines={useOptionGrid ? 2 : undefined}
+                                            >
                                                 {option}
                                             </Text>
                                         </TouchableOpacity>
@@ -201,9 +217,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
                 {/* Correct answer reveal */}
                 {showCorrectAnswer && (
-                    <View className="p-4 rounded-lg bg-success/10 border-2 border-success/30 items-center transform rotate-1">
-                        <Text className="text-sm text-foreground/70 mb-1 font-sans">{t('correctAnswer')}</Text>
-                        <Text className="text-xl font-display font-bold text-success">
+                    <View className={`${isCompact ? 'p-3' : 'p-4'} rounded-lg bg-success/10 border-2 border-success/30 items-center transform rotate-1`}>
+                        <Text className={`${isCompact ? 'text-xs' : 'text-sm'} text-foreground/70 mb-1 font-sans`}>{t('correctAnswer')}</Text>
+                        <Text className={`${isCompact ? 'text-lg' : 'text-xl'} font-display font-bold text-success`}>
                             {question.correctAnswer}
                         </Text>
                     </View>

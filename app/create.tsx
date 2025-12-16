@@ -37,7 +37,7 @@ export default function CreateRoom() {
     const [questionType, setQuestionType] = useState<QuestionType>('multiple-choice');
 
     const [step, setStep] = useState(0);
-    const maxStep = 3;
+    const maxStep = 1;
 
     const canCreate = apiKey && playerName;
 
@@ -213,17 +213,46 @@ export default function CreateRoom() {
                     {/* Step content */}
                     <View className="flex-1 justify-center">
                         {step === 0 && (
-                            <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                <CardContent className={isCompact ? 'p-5 space-y-3' : 'p-7 space-y-4'}>
-                                    <ThemeSelector
-                                        selectedTheme={theme}
-                                        customTheme={customTheme}
-                                        onSelectTheme={setTheme}
-                                        onCustomThemeChange={setCustomTheme}
-                                        density={isCompact ? 'compact' : 'default'}
-                                    />
-                                </CardContent>
-                            </Card>
+                            <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
+                                <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
+                                    <CardContent className={isCompact ? 'p-5 space-y-3' : 'p-7 space-y-4'}>
+                                        <ThemeSelector
+                                            selectedTheme={theme}
+                                            customTheme={customTheme}
+                                            onSelectTheme={setTheme}
+                                            onCustomThemeChange={setCustomTheme}
+                                            density={isCompact ? 'compact' : 'default'}
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
+                                    <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
+                                        <View className="flex-row items-center gap-2">
+                                            <Ionicons name="help-circle" size={20} color="#6B3F23" />
+                                            <CardTitle className="text-lg">
+                                                {t('numberOfQuestions')}: <Text className="text-primary">{questionCount}</Text>
+                                            </CardTitle>
+                                        </View>
+                                    </CardHeader>
+                                    <CardContent className={isCompact ? 'space-y-2' : 'space-y-4'}>
+                                        <Slider
+                                            value={questionCount}
+                                            onValueChange={(val: number) => setQuestionCount(Math.round(val))}
+                                            minimumValue={5}
+                                            maximumValue={20}
+                                            step={1}
+                                            minimumTrackTintColor="#2B1F17"
+                                            maximumTrackTintColor="#E2CFBC"
+                                            thumbTintColor="#2B1F17"
+                                        />
+                                        <View className="flex-row justify-between mt-1">
+                                            <Text className="text-xs text-muted-foreground font-sans">5</Text>
+                                            <Text className="text-xs text-muted-foreground font-sans">20</Text>
+                                        </View>
+                                    </CardContent>
+                                </Card>
+                            </View>
                         )}
 
                         {step === 1 && (
@@ -278,73 +307,36 @@ export default function CreateRoom() {
                                         </View>
                                     </CardContent>
                                 </Card>
-                            </View>
-                        )}
 
-                        {step === 2 && (
-                            <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
-                                <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
-                                    <View className="flex-row items-center gap-2">
-                                        <Ionicons name="help-circle" size={20} color="#6B3F23" />
-                                        <CardTitle className="text-lg">
-                                            {t('numberOfQuestions')}: <Text className="text-primary">{questionCount}</Text>
-                                        </CardTitle>
-                                    </View>
-                                </CardHeader>
-                                <CardContent className={isCompact ? 'space-y-2' : 'space-y-4'}>
-                                    <Slider
-                                        value={questionCount}
-                                        onValueChange={(val: number) => setQuestionCount(Math.round(val))}
-                                        minimumValue={5}
-                                        maximumValue={20}
-                                        step={1}
-                                        minimumTrackTintColor="#2B1F17"
-                                        maximumTrackTintColor="#E2CFBC"
-                                        thumbTintColor="#2B1F17"
-                                    />
-                                    <View className="flex-row justify-between mt-1">
-                                        <Text className="text-xs text-muted-foreground font-sans">5</Text>
-                                        <Text className="text-xs text-muted-foreground font-sans">20</Text>
-                                    </View>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {step === 3 && (
-                            <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
-                                <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
-                                    <View className="flex-row items-center gap-2">
-                                        <Ionicons name="timer" size={20} color="#C97B4C" />
-                                        <CardTitle className="text-lg">
-                                            {t('timeLeft')}: <Text className="text-secondary-foreground">{timePerQuestion}s</Text>
-                                        </CardTitle>
-                                    </View>
-                                </CardHeader>
-                                <CardContent className={isCompact ? 'space-y-4' : 'space-y-6'}>
-                                    <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
-                                        <Slider
-                                            value={timePerQuestion}
-                                            onValueChange={(val: number) => setTimePerQuestion(Math.round(val))}
-                                            minimumValue={10}
-                                            maximumValue={60}
-                                            step={5}
-                                            minimumTrackTintColor="#2B1F17"
-                                            maximumTrackTintColor="#E2CFBC"
-                                            thumbTintColor="#2B1F17"
-                                        />
-                                        <View className="flex-row justify-between mt-1">
-                                            <Text className="text-xs text-muted-foreground font-sans">10s</Text>
-                                            <Text className="text-xs text-muted-foreground font-sans">60s</Text>
+                                <Card className="rounded-lg border-2 border-foreground bg-white transform -rotate-1">
+                                    <CardHeader className={isCompact ? 'pb-2' : 'pb-4'}>
+                                        <View className="flex-row items-center gap-2">
+                                            <Ionicons name="timer" size={20} color="#C97B4C" />
+                                            <CardTitle className="text-lg">
+                                                {t('timeLeft')}: <Text className="text-secondary-foreground">{timePerQuestion}s</Text>
+                                            </CardTitle>
                                         </View>
-                                    </View>
-
-                                    <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
-                                        <Text className="text-center text-muted-foreground font-display text-lg">
-                                            {t('readyToStart')}
-                                        </Text>
-                                    </View>
-                                </CardContent>
-                            </Card>
+                                    </CardHeader>
+                                    <CardContent className={isCompact ? 'space-y-4' : 'space-y-6'}>
+                                        <View className={isCompact ? 'space-y-2' : 'space-y-3'}>
+                                            <Slider
+                                                value={timePerQuestion}
+                                                onValueChange={(val: number) => setTimePerQuestion(Math.round(val))}
+                                                minimumValue={10}
+                                                maximumValue={60}
+                                                step={5}
+                                                minimumTrackTintColor="#2B1F17"
+                                                maximumTrackTintColor="#E2CFBC"
+                                                thumbTintColor="#2B1F17"
+                                            />
+                                            <View className="flex-row justify-between mt-1">
+                                                <Text className="text-xs text-muted-foreground font-sans">10s</Text>
+                                                <Text className="text-xs text-muted-foreground font-sans">60s</Text>
+                                            </View>
+                                        </View>
+                                    </CardContent>
+                                </Card>
+                            </View>
                         )}
                     </View>
 
