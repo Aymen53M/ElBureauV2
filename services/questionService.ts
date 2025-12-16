@@ -60,6 +60,7 @@ async function fetchGeminiJsonText(args: {
     systemPrompt: string;
     userPrompt: string;
     temperature: number;
+    maxOutputTokens?: number;
 }): Promise<{ ok: true; content: string } | { ok: false; error: string; code: GeminiErrorCode; retryAfterMs?: number }> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
@@ -78,12 +79,18 @@ async function fetchGeminiJsonText(args: {
                 temperature: args.temperature,
                 topP: 0.9,
                 responseMimeType: 'application/json',
+                ...(typeof args.maxOutputTokens === 'number' && args.maxOutputTokens > 0
+                    ? { maxOutputTokens: Math.round(args.maxOutputTokens) }
+                    : {}),
             },
         }),
     });
 
     if (!response.ok) {
         const body = await response.text();
+
+        const retryAfterHeader = response.headers.get('retry-after');
+        const retryAfterHeaderMs = retryAfterHeader && Number.isFinite(Number(retryAfterHeader)) ? Number(retryAfterHeader) * 1000 : 0;
 
         const bodyLower = body.toLowerCase();
         const parseRetryDelayMs = (raw: string) => {
@@ -113,7 +120,7 @@ async function fetchGeminiJsonText(args: {
             return 0;
         };
 
-        const retryAfterMs = parseRetryDelayMs(body);
+        const retryAfterMs = Math.max(parseRetryDelayMs(body), retryAfterHeaderMs);
 
         const looksLikeQuota =
             bodyLower.includes('quota') ||
@@ -157,6 +164,16 @@ async function fetchGeminiJsonText(args: {
                 ok: false,
                 code: 'INVALID_API_KEY',
                 error: 'Invalid Gemini API key or missing access. Please update your API key in Settings.',
+            };
+        }
+
+        if (response.status === 503 || response.status >= 500) {
+            const waitMs = retryAfterMs > 0 ? retryAfterMs : 5000;
+            return {
+                ok: false,
+                code: 'SERVICE_UNAVAILABLE',
+                retryAfterMs: waitMs,
+                error: `Gemini is temporarily unavailable. Please retry in ${Math.ceil(waitMs / 1000)}s.`,
             };
         }
 
@@ -210,6 +227,7 @@ type GeminiErrorCode =
     | 'INVALID_API_KEY'
     | 'QUOTA_EXCEEDED'
     | 'RATE_LIMITED'
+    | 'SERVICE_UNAVAILABLE'
     | 'HTTP_429'
     | 'HTTP_500'
     | 'HTTP_400'
@@ -219,7 +237,7 @@ type GeminiErrorCode =
     | 'INVALID_RESPONSE'
     | 'MODEL_UNAVAILABLE';
 
-const MAX_RETRIES = 1;
+const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 60000;
 
@@ -231,25 +249,9 @@ async function retryFetch(url: string, init: RequestInit, attempt = 1): Promise<
     try {
         const response = await fetch(url, init);
 
-        // Retry on 429 (rate limit) or 503 (overloaded) or 5xx server errors
-        if ((response.status === 429 || response.status === 503 || response.status >= 500) && attempt < MAX_RETRIES) {
-            if (response.status === 429) {
-                try {
-                    const body = await response.clone().text();
-                    const bodyLower = body.toLowerCase();
-                    const isQuota =
-                        bodyLower.includes('quota') ||
-                        bodyLower.includes('resource_exhausted') ||
-                        bodyLower.includes('exceeded');
-                    // If quota is exhausted, do not retry automatically (each retry consumes more quota).
-                    if (isQuota) {
-                        return response;
-                    }
-                } catch {
-                    // ignore
-                }
-            }
-
+        // Retry on 503 (overloaded) or 5xx server errors.
+        // Do NOT auto-retry 429 here; rate limiting is handled higher up with cooldown messaging.
+        if ((response.status === 503 || response.status >= 500) && attempt < MAX_RETRIES) {
             const retryAfter = response.headers.get('retry-after');
             const retryAfterMs = retryAfter && Number.isFinite(Number(retryAfter)) ? Number(retryAfter) * 1000 : 0;
             const delay = Math.max(calculateBackoffDelay(attempt), retryAfterMs);
@@ -336,6 +338,7 @@ Requirements:
 - ${questionTypeInstructions}
 - Language: ${languageLabel}
 - Do not mix question types. Every item must have "type": "${settings.questionType}".
+- Output MUST contain exactly ${settings.numberOfQuestions} items.
 - Do not include extra keys besides: text, type, options (only for multiple-choice), correctAnswer, hint (optional), difficulty.
 - The question text and hint MUST NOT reveal the correctAnswer. Do not include the answer, spelling, translation, or obvious synonyms in the question text or hint.
 - If you include a hint, it must be subtle and must NOT contain the answer or parts of it.
@@ -361,8 +364,16 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
         const desiredType = settings.questionType;
         const fallbackDifficulty: 'easy' | 'medium' | 'hard' = settings.difficulty === 'easy' || settings.difficulty === 'hard' ? settings.difficulty : 'medium';
 
+        const maxOutputTokens = Math.min(
+            8192,
+            Math.max(
+                2048,
+                Math.round(settings.numberOfQuestions * (desiredType === 'multiple-choice' ? 320 : 220))
+            )
+        );
+
         const prompt = buildUserPrompt(opts?.extraRules);
-        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.2 });
+        const fetched = await fetchGeminiJsonText({ apiKey, systemPrompt, userPrompt: prompt, temperature: 0.2, maxOutputTokens });
         if (!fetched.ok) {
             return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };
         }
@@ -518,11 +529,13 @@ ${JSON.stringify(source)}
 `;
 
     try {
+        const maxOutputTokens = Math.min(8192, Math.max(2048, Math.round(args.sourceQuestions.length * 320)));
         const fetched = await fetchGeminiJsonText({
             apiKey: args.apiKey,
             systemPrompt,
             userPrompt,
             temperature: 0.2,
+            maxOutputTokens,
         });
         if (!fetched.ok) {
             return { error: fetched.error, code: fetched.code, retryAfterMs: fetched.retryAfterMs };

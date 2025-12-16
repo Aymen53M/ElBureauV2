@@ -709,6 +709,13 @@ export default function Game() {
                             return;
                         }
 
+                        if (result.code === 'SERVICE_UNAVAILABLE' && (result as any).retryAfterMs) {
+                            const retryAfterMs = Number((result as any).retryAfterMs);
+                            questionsGenerationCooldownUntilRef.current = Date.now() + Math.max(1000, retryAfterMs);
+                            setLoadingMessage(result.error);
+                            return;
+                        }
+
                         questionsGenerationCooldownUntilRef.current = Date.now() + 60_000;
                         if (result.code === 'QUOTA_EXCEEDED') {
                             Alert.alert(t('aiQuotaExceededTitle'), t('aiQuotaExceededDesc'), [
