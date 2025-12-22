@@ -34,6 +34,8 @@ export const translations: Translations = {
     // Settings
     soundEffects: { en: 'Sound Effects', fr: 'Effets Sonores', ar: 'المؤثرات الصوتية' },
     animations: { en: 'Animations', fr: 'Animations', ar: 'الرسوم المتحركة' },
+    aiTemperature: { en: 'AI Temperature', fr: 'Température IA', ar: 'درجة حرارة الذكاء الاصطناعي' },
+    aiTemperatureDesc: { en: 'Lower = more predictable. Higher = more creative.', fr: 'Plus bas = plus prévisible. Plus haut = plus créatif.', ar: 'الأقل = أكثر ثباتًا. الأعلى = أكثر إبداعًا.' },
     apiKey: { en: 'Gemini API Key', fr: 'Clé API Gemini', ar: 'مفتاح API جيميني' },
     apiKeyPlaceholder: { en: 'Enter your Gemini API key...', fr: 'Entrez votre clé API Gemini...', ar: 'أدخل مفتاح API جيميني...' },
     apiKeyDesc: { en: 'Required to host games. Get your key from Google AI Studio.', fr: 'Requis pour héberger des jeux. Obtenez votre clé depuis Google AI Studio.', ar: 'مطلوب لاستضافة الألعاب. احصل على مفتاحك من Google AI Studio.' },

@@ -6,6 +6,7 @@ import { Ionicons } from '@/components/ui/Ionicons';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import Slider from '@/components/ui/Slider';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -17,13 +18,14 @@ import { updatePlayerState } from '@/services/roomService';
 export default function Settings() {
     const router = useRouter();
     const { t, isRTL, language } = useLanguage();
-    const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer, soundEnabled, setSoundEnabled, animationsEnabled, setAnimationsEnabled } = useGame();
+    const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer, soundEnabled, setSoundEnabled, animationsEnabled, setAnimationsEnabled, aiTemperature, setAiTemperature } = useGame();
 
     const { height: windowHeight } = useWindowDimensions();
     const compactHeight = Platform.OS === 'web' ? 900 : 760;
     const isCompact = windowHeight < compactHeight;
 
     const initialLanguageRef = React.useRef(language);
+    const initialAiTemperatureRef = React.useRef(aiTemperature);
 
     const [localApiKey, setLocalApiKey] = useState(apiKey);
     const [localPlayerName, setLocalPlayerName] = useState(playerName);
@@ -70,7 +72,11 @@ export default function Settings() {
         router.back();
     };
 
-    const hasChanges = localApiKey !== apiKey || localPlayerName !== playerName || language !== initialLanguageRef.current;
+    const hasChanges =
+        localApiKey !== apiKey ||
+        localPlayerName !== playerName ||
+        language !== initialLanguageRef.current ||
+        aiTemperature !== initialAiTemperatureRef.current;
 
     const openAIStudio = () => {
         Linking.openURL('https://aistudio.google.com/app/apikey');
@@ -205,6 +211,31 @@ export default function Settings() {
                                             >
                                                 <View className="w-4 h-4 rounded-full bg-white border border-foreground" />
                                             </TouchableOpacity>
+                                        </View>
+
+                                        <View className={isCompact ? 'space-y-1.5' : 'space-y-2'}>
+                                            <View className="flex-row items-center justify-between">
+                                                <View className="flex-row items-center gap-2">
+                                                    <Text className={isCompact ? 'text-lg' : 'text-xl'}>🤖</Text>
+                                                    <Text className="font-display font-semibold text-foreground">{t('aiTemperature')}</Text>
+                                                </View>
+                                                <Text className="font-display font-semibold text-foreground">{aiTemperature.toFixed(2)}</Text>
+                                            </View>
+                                            <Slider
+                                                value={aiTemperature}
+                                                onValueChange={(val: number) => setAiTemperature(Math.round(val * 20) / 20)}
+                                                minimumValue={0}
+                                                maximumValue={1}
+                                                step={0.05}
+                                                minimumTrackTintColor="#2B1F17"
+                                                maximumTrackTintColor="#E2CFBC"
+                                                thumbTintColor="#2B1F17"
+                                            />
+                                            <View className="flex-row justify-between mt-1">
+                                                <Text className="text-xs text-muted-foreground font-sans">0</Text>
+                                                <Text className="text-xs text-muted-foreground font-sans">1</Text>
+                                            </View>
+                                            <Text className="text-xs text-muted-foreground font-sans">{t('aiTemperatureDesc')}</Text>
                                         </View>
                                     </CardContent>
                                 </Card>

@@ -87,8 +87,10 @@ interface GameContextType {
     // Settings actions
     setSoundEnabled: (enabled: boolean) => Promise<void>;
     setAnimationsEnabled: (enabled: boolean) => Promise<void>;
+    setAiTemperature: (temperature: number) => Promise<void>;
     soundEnabled: boolean;
     animationsEnabled: boolean;
+    aiTemperature: number;
 }
 
 const API_KEY_STORAGE_KEY = 'elbureau-api-key';
@@ -97,6 +99,7 @@ const DEVICE_ID_STORAGE_KEY = 'elbureau-device-id';
 const ROOM_CODE_STORAGE_KEY = 'elbureau-room-code';
 const PLAYER_ID_STORAGE_KEY = 'elbureau-player-id';
 const LAST_ROOM_CODE_STORAGE_KEY = 'elbureau-last-room-code';
+const AI_TEMPERATURE_STORAGE_KEY = 'elbureau-ai-temperature';
 
 const defaultSettings: GameSettings = {
     theme: 'movies',
@@ -120,6 +123,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [deviceId, setDeviceId] = useState('');
     const [soundEnabled, setSoundEnabledState] = useState(defaultSettings.soundEnabled);
     const [animationsEnabled, setAnimationsEnabledState] = useState(defaultSettings.animationsEnabled);
+    const [aiTemperature, setAiTemperatureState] = useState(0.2);
 
     // Load saved data on mount
     useEffect(() => {
@@ -184,6 +188,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const savedAnimations = await AsyncStorage.getItem('elbureau-animations-enabled');
                 if (savedAnimations !== null) {
                     setAnimationsEnabledState(savedAnimations === 'true');
+                }
+
+                const savedTemperature = await AsyncStorage.getItem(AI_TEMPERATURE_STORAGE_KEY);
+                if (savedTemperature !== null) {
+                    const parsed = Number(savedTemperature);
+                    if (Number.isFinite(parsed)) {
+                        const clamped = Math.min(1, Math.max(0, parsed));
+                        setAiTemperatureState(clamped);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load saved data:', error);
@@ -302,6 +315,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const setAiTemperature = async (temperature: number) => {
+        try {
+            const parsed = Number(temperature);
+            const clamped = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 0.2;
+            await AsyncStorage.setItem(AI_TEMPERATURE_STORAGE_KEY, String(clamped));
+            setAiTemperatureState(clamped);
+        } catch (error) {
+            console.error('Failed to save AI temperature setting:', error);
+        }
+    };
+
     return (
         <GameContext.Provider value={{
             gameState,
@@ -317,8 +341,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             playerId,
             setSoundEnabled,
             setAnimationsEnabled,
+            setAiTemperature,
             soundEnabled,
             animationsEnabled,
+            aiTemperature,
         }}>
             {children}
         </GameContext.Provider>

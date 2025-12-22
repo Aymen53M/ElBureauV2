@@ -349,11 +349,18 @@ const QUESTIONS_SCHEMA = {
 export async function generateQuestions(
     settings: GameSettings,
     apiKey?: string,
-    opts?: { tone?: string; extraRules?: string }
+    opts?: { tone?: string; extraRules?: string; temperature?: number }
 ): Promise<GenerateQuestionsResponse> {
     if (!apiKey) {
         return { error: 'Missing Gemini API key', code: 'MISSING_API_KEY' };
     }
+
+    const temperature = (() => {
+        const raw = opts?.temperature;
+        const parsed = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(parsed)) return 0.2;
+        return Math.min(1, Math.max(0, parsed));
+    })();
 
     const languageLabel = languageNames[settings.language] || 'English';
 
@@ -443,7 +450,7 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
             apiKey,
             systemPrompt,
             userPrompt: prompt,
-            temperature: 0.2,
+            temperature,
             maxOutputTokens,
             responseSchema: QUESTIONS_SCHEMA
         });
@@ -547,6 +554,7 @@ export async function translateQuestions(args: {
     sourceLanguage: GameSettings['language'];
     targetLanguage: GameSettings['language'];
     apiKey?: string;
+    temperature?: number;
 }): Promise<GenerateQuestionsResponse> {
     if (!args.apiKey) {
         return { error: 'Missing Gemini API key', code: 'MISSING_API_KEY' };
@@ -601,13 +609,20 @@ Source questions JSON:
 ${JSON.stringify(source)}
 `;
 
+    const temperature = (() => {
+        const raw = args.temperature;
+        const parsed = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(parsed)) return 0.2;
+        return Math.min(1, Math.max(0, parsed));
+    })();
+
     try {
         const maxOutputTokens = Math.min(8192, Math.max(2048, Math.round(args.sourceQuestions.length * 320)));
         const fetched = await fetchGeminiJsonText({
             apiKey: args.apiKey,
             systemPrompt,
             userPrompt,
-            temperature: 0.2,
+            temperature,
             maxOutputTokens,
             responseSchema: QUESTIONS_SCHEMA
         });
@@ -727,11 +742,19 @@ interface HighlightsResponse {
 
 export async function generateGameHighlights(
     data: GameHighlightsData,
-    apiKey?: string
+    apiKey?: string,
+    temperature?: number
 ): Promise<HighlightsResponse> {
     if (!apiKey) {
         return { error: 'Missing API key' };
     }
+
+    const resolvedTemperature = (() => {
+        const raw = temperature;
+        const parsed = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(parsed)) return 0.9;
+        return Math.min(1, Math.max(0, parsed));
+    })();
 
     const languageLabel = languageNames[data.language] || 'English';
     const playerList = data.players
@@ -767,7 +790,7 @@ Write a fun, brief highlight commentary (2-3 sentences) celebrating the game. Ma
                     { role: 'user', parts: [{ text: userPrompt }] },
                 ],
                 generationConfig: {
-                    temperature: 0.9,
+                    temperature: resolvedTemperature,
                     topP: 0.95,
                     maxOutputTokens: 200,
                 },

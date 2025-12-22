@@ -101,7 +101,7 @@ function isAnswerCorrect(answer: string, question: Question): boolean {
 export default function Game() {
     const router = useRouter();
     const { t, isRTL, language } = useLanguage();
-    const { gameState, setGameState, currentPlayer, apiKey } = useGame();
+    const { gameState, setGameState, currentPlayer, apiKey, aiTemperature } = useGame();
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
     const compactHeight = Platform.OS === 'web' ? 900 : 760;
     const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 1024;
@@ -709,7 +709,7 @@ export default function Game() {
                     questionsGenerationInFlightRef.current = true;
                     setLoadingMessage(t('generatingQuestions'));
                     const baseLang = (roomState.room.settings.language as Language) || 'en';
-                    const result = await generateQuestions(roomState.room.settings, hostKey);
+                    const result = await generateQuestions(roomState.room.settings, hostKey, { temperature: aiTemperature });
                     questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
                     if (result.error) {
@@ -767,6 +767,7 @@ export default function Game() {
                                 sourceLanguage: baseLang,
                                 targetLanguage,
                                 apiKey: hostKey,
+                                temperature: aiTemperature,
                             });
                             if (!tr?.error && tr?.questions?.length) {
                                 byLanguage[targetLanguage] = tr.questions;
@@ -1340,7 +1341,7 @@ export default function Game() {
 
         let last: Question | null = null;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const result = await generateQuestions(args.finalSettings, args.apiKey, { extraRules });
+            const result = await generateQuestions(args.finalSettings, args.apiKey, { extraRules, temperature: aiTemperature });
             if (result.error || !result.questions?.length) {
                 throw new Error(result.error || t('generationFailed'));
             }
@@ -1534,6 +1535,7 @@ export default function Game() {
                     sourceLanguage: baseLang as Language,
                     targetLanguage: targetLang as Language,
                     apiKey: hostKey,
+                    temperature: aiTemperature,
                 });
                 if (tr?.questions && tr.questions.length > 0) {
                     questionsByLang[targetLang] = tr.questions[0];
