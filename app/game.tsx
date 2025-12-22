@@ -103,6 +103,17 @@ export default function Game() {
     const router = useRouter();
     const { t, isRTL, language } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey, aiTemperature } = useGame();
+
+    const aiTemperatureRef = React.useRef(aiTemperature);
+    useEffect(() => {
+        aiTemperatureRef.current = aiTemperature;
+    }, [aiTemperature]);
+
+    const apiKeyRef = React.useRef(apiKey);
+    useEffect(() => {
+        apiKeyRef.current = apiKey;
+    }, [apiKey]);
+
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
     const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 1024;
     const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight }) || isDesktopWeb;
@@ -700,7 +711,7 @@ export default function Game() {
                         setLoadingMessage(t('generatingQuestions'));
                         return;
                     }
-                    const hostKey = gameState.hostApiKey || apiKey;
+                    const hostKey = gameState.hostApiKey || apiKeyRef.current;
                     if (!hostKey) {
                         setLoadingMessage(t('missingApiKeyHost'));
                         return;
@@ -709,7 +720,7 @@ export default function Game() {
                     questionsGenerationInFlightRef.current = true;
                     setLoadingMessage(t('generatingQuestions'));
                     const baseLang = (roomState.room.settings.language as Language) || 'en';
-                    const result = await generateQuestions(roomState.room.settings, hostKey, { temperature: aiTemperature });
+                    const result = await generateQuestions(roomState.room.settings, hostKey, { temperature: aiTemperatureRef.current });
                     questionsGenerationInFlightRef.current = false;
                     if (cancelled) return;
                     if (result.error) {
@@ -767,7 +778,7 @@ export default function Game() {
                                 sourceLanguage: baseLang,
                                 targetLanguage,
                                 apiKey: hostKey,
-                                temperature: aiTemperature,
+                                temperature: aiTemperatureRef.current,
                             });
                             if (!tr?.error && tr?.questions?.length) {
                                 byLanguage[targetLanguage] = tr.questions;

@@ -88,6 +88,7 @@ async function fetchGeminiJsonText(args: {
             generationConfig: {
                 temperature: args.temperature,
                 topP: 0.9,
+                seed: Math.floor(Math.random() * 2147483647),
                 responseMimeType: 'application/json',
                 ...(args.responseSchema ? { responseSchema: args.responseSchema } : {}),
                 ...(typeof args.maxOutputTokens === 'number' && args.maxOutputTokens > 0
@@ -100,8 +101,14 @@ async function fetchGeminiJsonText(args: {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const response = await retryFetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': args.apiKey,
+                'Cache-Control': 'no-store, no-cache, max-age=0',
+                Pragma: 'no-cache',
+            },
             body: buildRequestBody(),
+            cache: 'no-store',
         }, 1, maxRetries);
         return response;
     };
@@ -445,7 +452,18 @@ Return ONLY a valid JSON array with this exact shape (no extra text):
             )
         );
 
-        const prompt = buildUserPrompt(opts?.extraRules);
+        const requestNonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const promptBase = buildUserPrompt(opts?.extraRules);
+        const prompt =
+            temperature > 0
+                ? `${promptBase}
+
+Uniqueness requirements:
+- Generate a fresh, varied set compared to typical trivia lists.
+- Avoid repeating the most common/obvious questions for this theme.
+- Internal request id (ignore): ${requestNonce}
+`
+                : promptBase;
         const fetched = await fetchGeminiJsonText({
             apiKey,
             systemPrompt,
