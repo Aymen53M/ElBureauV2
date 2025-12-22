@@ -13,6 +13,7 @@ import { OpponentStatusList } from '@/components/OpponentStatusList';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useGame, GamePhase, Question, Difficulty, Player, GameSettings } from '@/contexts/GameContext';
+import { isCompactLayout } from '@/lib/styles';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { generateQuestions, translateQuestions } from '@/services/questionService';
 import { fetchRoomState, updateRoomQuestions, updatePlayerState } from '@/services/roomService';
@@ -103,9 +104,8 @@ export default function Game() {
     const { t, isRTL, language } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey, aiTemperature } = useGame();
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
     const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 1024;
-    const isCompact = windowHeight < compactHeight || isDesktopWeb;
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight }) || isDesktopWeb;
     const isTightLayout = isCompact;
 
     const gameStateRef = React.useRef(gameState);

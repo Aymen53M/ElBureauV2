@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
 import { Ionicons } from '@/components/ui/Ionicons';
@@ -12,6 +12,7 @@ import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame } from '@/contexts/GameContext';
+import { isCompactLayout } from '@/lib/styles';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { updatePlayerState } from '@/services/roomService';
 
@@ -20,9 +21,8 @@ export default function Settings() {
     const { t, isRTL, language } = useLanguage();
     const { apiKey, setApiKey, playerName, setPlayerName, gameState, currentPlayer, setGameState, setCurrentPlayer, soundEnabled, setSoundEnabled, animationsEnabled, setAnimationsEnabled, aiTemperature, setAiTemperature } = useGame();
 
-    const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = windowHeight < compactHeight;
+    const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight });
 
     const initialLanguageRef = React.useRef(language);
     const initialAiTemperatureRef = React.useRef(aiTemperature);
@@ -86,6 +86,12 @@ export default function Settings() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="default" />
 
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
             <View className={`${isCompact ? 'p-4' : 'p-7'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-4' : 'space-y-6'}`}>
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'pt-2' : 'pt-8'}`}>
@@ -256,32 +262,33 @@ export default function Settings() {
                     </View>
                 </View>
 
-                <View className="flex-row gap-3">
-                    <Button
-                        variant="outline"
-                        onPress={() => {
-                            if (step > 0) setStep((s) => Math.max(0, s - 1));
-                            else router.back();
-                        }}
-                        className="flex-1 border-2 border-foreground bg-white"
-                    >
-                        <Text className="font-display font-bold text-foreground">{t('back')}</Text>
-                    </Button>
-                    <Button
-                        variant="hero"
-                        onPress={() => {
-                            if (step < maxStep) setStep((s) => Math.min(maxStep, s + 1));
-                            else handleSave();
-                        }}
-                        disabled={step >= maxStep ? (!hasChanges || isSaving) : false}
-                        className="flex-1"
-                    >
-                        <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
-                            {step < maxStep ? t('next') : (isSaving ? t('loading') : t('save'))}
-                        </Text>
-                    </Button>
+                    <View className="flex-row gap-3">
+                        <Button
+                            variant="outline"
+                            onPress={() => {
+                                if (step > 0) setStep((s) => Math.max(0, s - 1));
+                                else router.back();
+                            }}
+                            className="flex-1 border-2 border-foreground bg-white"
+                        >
+                            <Text className="font-display font-bold text-foreground">{t('back')}</Text>
+                        </Button>
+                        <Button
+                            variant="hero"
+                            onPress={() => {
+                                if (step < maxStep) setStep((s) => Math.min(maxStep, s + 1));
+                                else handleSave();
+                            }}
+                            disabled={step >= maxStep ? (!hasChanges || isSaving) : false}
+                            className="flex-1"
+                        >
+                            <Text className={`${isCompact ? 'text-base' : 'text-lg'} font-display font-bold text-primary-foreground`}>
+                                {step < maxStep ? t('next') : (isSaving ? t('loading') : t('save'))}
+                            </Text>
+                        </Button>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }

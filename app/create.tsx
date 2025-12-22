@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, useWindowDimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
 import { Ionicons } from '@/components/ui/Ionicons';
@@ -13,6 +13,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Difficulty, QuestionType } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { createRoom } from '@/services/roomService';
+import { isCompactLayout } from '@/lib/styles';
 
 const difficulties: Difficulty[] = ['easy', 'medium', 'hard', 'mixed'];
 const questionTypes: { type: QuestionType; icon: string }[] = [
@@ -25,9 +26,8 @@ export default function CreateRoom() {
     const router = useRouter();
     const { t, language, isRTL } = useLanguage();
     const { apiKey, playerName, playerId, setGameState, setCurrentPlayer } = useGame();
-    const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = windowHeight < compactHeight;
+    const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight });
 
     const [theme, setTheme] = useState('movies');
     const [customTheme, setCustomTheme] = useState('');
@@ -211,7 +211,12 @@ export default function CreateRoom() {
                     )}
 
                     {/* Step content */}
-                    <View className="flex-1 justify-center">
+                    <ScrollView
+                        className="flex-1"
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
                         {step === 0 && (
                             <View className={isCompact ? 'space-y-4' : 'space-y-6'}>
                                 <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
@@ -338,7 +343,7 @@ export default function CreateRoom() {
                                 </Card>
                             </View>
                         )}
-                    </View>
+                    </ScrollView>
 
                     {/* Bottom nav */}
                     <View className="flex-row gap-3">

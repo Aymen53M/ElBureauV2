@@ -21,3 +21,15 @@ export const getShadowStyle = (
         elevation: 4,
     };
 };
+
+export function isCompactLayout(args: { width: number; height: number }): boolean {
+    const width = Number(args?.width) || 0;
+    const height = Number(args?.height) || 0;
+    const minDim = Math.min(width, height);
+
+    if (Platform.OS === 'web') {
+        return width < 768 || height < 720;
+    }
+
+    return minDim <= 500;
+}

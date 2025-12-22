@@ -7,14 +7,14 @@ import Button from '@/components/ui/Button';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { isCompactLayout } from '@/lib/styles';
 
 import floatingLogo from '../assets/Flowting Logo.png';
 
 export default function Index() {
     const { t, isRTL } = useLanguage();
     const { width, height } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = height < compactHeight;
+    const isCompact = isCompactLayout({ width, height });
 
     const [logoError, setLogoError] = useState(false);
 
@@ -63,7 +63,7 @@ export default function Index() {
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="home" />
 
-            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between px-7 ${isCompact ? 'pt-6 pb-4' : 'pt-12 pb-8'} w-full z-10`}>
+            <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center justify-between ${isCompact ? 'px-4 pt-5 pb-3' : 'px-7 pt-12 pb-8'} w-full z-10`}>
                 <LanguageSelector compact />
                 <Link href="/settings" asChild>
                     <TouchableOpacity className={`${isRTL ? 'ml-1' : 'mr-1'} p-2 w-12 h-12 rounded-lg bg-white items-center justify-center border-2 border-foreground shadow-[2px_2px_0px_#2B1F17]`}>
@@ -72,7 +72,7 @@ export default function Index() {
                 </Link>
             </View>
 
-            <View className="flex-1 px-6 w-full">
+            <View className={`flex-1 ${isCompact ? 'px-4' : 'px-6'} w-full`}>
                 <View className={`items-center w-full ${isCompact ? 'space-y-8' : 'space-y-12'}`}>
                     <View className={isCompact ? 'mb-2' : 'mb-6'}>
                         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
@@ -90,7 +90,7 @@ export default function Index() {
                     </View>
 
                     {/* Glass Panel for Tagline */}
-                    <View className="px-6 py-3 rounded-lg bg-white border-2 border-foreground shadow-sm transform rotate-1">
+                    <View className={`${isCompact ? 'px-4 py-2' : 'px-6 py-3'} rounded-lg bg-white border-2 border-foreground shadow-sm transform rotate-1`}>
                         <Text className={`${isCompact ? 'text-base' : 'text-xl'} text-foreground font-display text-center font-medium`}>
                             {t('tagline')}
                         </Text>

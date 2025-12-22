@@ -1,7 +1,7 @@
 
 
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Platform, useWindowDimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -16,14 +16,14 @@ import { useGame, Player } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
 import { fetchRoomState, subscribeToRoom, leaveRoom } from '@/services/roomService';
 import { resetGameplayForRoom } from '@/services/gameService';
+import { isCompactLayout } from '@/lib/styles';
 
 export default function Lobby() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
     const { gameState, setGameState, currentPlayer, apiKey, clearRoomSession } = useGame();
-    const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 900;
-    const isCompact = windowHeight < compactHeight;
+    const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight });
 
     const subscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
     const hasNavigatedRef = React.useRef(false);
@@ -190,6 +190,11 @@ export default function Lobby() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <ScreenBackground variant="default" />
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
+            >
             <View className={`${isCompact ? 'p-3' : 'p-6'} max-w-4xl w-full self-center flex-1 ${isCompact ? 'space-y-4' : 'space-y-8'}`}>
                 {/* Header */}
                 <View className={`${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 ${isCompact ? 'mb-3 pt-1' : 'mb-6 pt-5'}`}>
@@ -340,6 +345,7 @@ export default function Lobby() {
                     </View>
                 </View>
             </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }

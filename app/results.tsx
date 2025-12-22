@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import ScreenBackground from '@/components/ui/ScreenBackground';
-import { getShadowStyle } from '@/lib/styles';
+import { getShadowStyle, isCompactLayout } from '@/lib/styles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGame, Player } from '@/contexts/GameContext';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
@@ -121,10 +121,9 @@ export default function Results() {
     const router = useRouter();
     const { t } = useLanguage();
     const { gameState, currentPlayer, clearRoomSession } = useGame();
-    const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = windowHeight < compactHeight;
-    const isTiny = windowHeight < 700;
+    const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight });
+    const isTiny = windowHeight < 700 || windowWidth < 360;
 
     const isHost = !!currentPlayer?.id && !!gameState?.hostId && currentPlayer.id === gameState.hostId;
     const cleanupScheduledRef = useRef(false);

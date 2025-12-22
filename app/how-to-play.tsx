@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, useWindowDimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from '@/components/ui/SafeArea';
 import { useRouter } from '@/lib/router';
 import { Ionicons } from '@/components/ui/Ionicons';
@@ -8,13 +8,13 @@ import Button from '@/components/ui/Button';
 import Logo from '@/components/Logo';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { isCompactLayout } from '@/lib/styles';
 
 export default function HowToPlay() {
     const router = useRouter();
     const { t, isRTL } = useLanguage();
-    const { height: windowHeight } = useWindowDimensions();
-    const compactHeight = Platform.OS === 'web' ? 900 : 760;
-    const isCompact = windowHeight < compactHeight;
+    const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+    const isCompact = isCompactLayout({ width: windowWidth, height: windowHeight });
 
     const [stepIndex, setStepIndex] = React.useState(0);
 
@@ -52,7 +52,11 @@ export default function HowToPlay() {
                     </View>
                 </View>
 
-                <View className="flex-1 justify-center">
+                <ScrollView
+                    className="flex-1"
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                    showsVerticalScrollIndicator={false}
+                >
                     {!isTips && active && (
                         <Card className="rounded-lg border-2 border-foreground bg-white transform rotate-1">
                             <CardContent className={isCompact ? 'p-4' : 'p-6'}>
@@ -87,7 +91,7 @@ export default function HowToPlay() {
                             </CardContent>
                         </Card>
                     )}
-                </View>
+                </ScrollView>
 
                 <View className="flex-row gap-3">
                     <Button
